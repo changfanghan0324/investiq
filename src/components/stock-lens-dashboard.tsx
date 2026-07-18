@@ -9,6 +9,7 @@ import {
 } from "react";
 import {
   Activity,
+  Apple,
   ArrowRight,
   BarChart3,
   Bot,
@@ -18,8 +19,9 @@ import {
   CircleHelp,
   Download,
   Info,
-  Layers3,
   LoaderCircle,
+  MoreVertical,
+  Pencil,
   Play,
   Plus,
   RefreshCw,
@@ -222,10 +224,6 @@ export function StockLensDashboard() {
         <aside className={styles.builder} aria-label="Backtest setup">
           <BuilderHeader holdings={input.positions.length} />
           <div className={styles.builderScroll}>
-            <SectionLabel icon={<Layers3 size={14} />} title="Holdings" meta={`${input.positions.length} active`} />
-            <p className={styles.integrityNote}>
-              Add as many US stocks or ETFs as needed. Live symbols load one by one to keep corporate-action checks reliable.
-            </p>
             <div className={styles.holdingStack}>
               <AnimatePresence initial={false}>
                 {input.positions.map((position, index) => (
@@ -254,6 +252,7 @@ export function StockLensDashboard() {
             >
               <Plus size={15} /> Add holding
             </motion.button>
+            <p className={styles.sequentialHint}>Unlimited holdings · live data loads sequentially</p>
 
             <div className={styles.builderDivider} />
             <SectionLabel icon={<CalendarDays size={14} />} title="Date window" />
@@ -567,10 +566,9 @@ function BuilderHeader({ holdings }: { holdings: number }) {
     <div className={styles.builderHeader}>
       <span>Backtest setup</span>
       <div>
-        <strong>Portfolio 01</strong>
-        <small>{holdings} holding{holdings === 1 ? "" : "s"}</small>
+        <strong>Portfolio 01 <Pencil size={13} aria-hidden="true" /></strong>
+        <button type="button" aria-label={`${holdings} holdings in portfolio`} title={`${holdings} holdings`}><MoreVertical size={16} /></button>
       </div>
-      <p>Exact-session recurring investment model</p>
     </div>
   );
 }
@@ -607,22 +605,25 @@ function HoldingEditor({
       transition={{ type: "spring", stiffness: 310, damping: 28, delay: Math.min(index * 0.035, 0.18) }}
     >
       <div className={styles.holdingTopline}>
-        <span className={styles.holdingIndex}>{String(index + 1).padStart(2, "0")}</span>
-        <label htmlFor={tickerInputId}>
-          <span>Ticker</span>
-          <input
-            id={tickerInputId}
-            aria-label={`Holding ${index + 1} ticker`}
-            aria-invalid={Boolean(errors[tickerKey])}
-            aria-describedby={errors[tickerKey] ? `${tickerKey}-error` : undefined}
-            value={position.ticker}
-            maxLength={12}
-            autoCapitalize="characters"
-            spellCheck={false}
-            placeholder="e.g. NVDA"
-            onChange={(event) => onChange({ ticker: event.target.value.toUpperCase().replace(/[^A-Z0-9.-]/g, "") })}
-          />
-        </label>
+        <span className={styles.holdingIndex}>{index + 1}</span>
+        <div className={styles.tickerIdentity}>
+          <TickerBadge ticker={position.ticker || "?"} />
+          <label htmlFor={tickerInputId}>
+            <input
+              id={tickerInputId}
+              aria-label={`Holding ${index + 1} ticker`}
+              aria-invalid={Boolean(errors[tickerKey])}
+              aria-describedby={errors[tickerKey] ? `${tickerKey}-error` : undefined}
+              value={position.ticker}
+              maxLength={12}
+              autoCapitalize="characters"
+              spellCheck={false}
+              placeholder="Ticker"
+              onChange={(event) => onChange({ ticker: event.target.value.toUpperCase().replace(/[^A-Z0-9.-]/g, "") })}
+            />
+            <small>{companyLabel(position.ticker)}</small>
+          </label>
+        </div>
         {removable ? (
           <button type="button" aria-label={`Remove holding ${index + 1}`} className={styles.iconButton} onClick={onRemove}>
             <Trash2 size={14} />
@@ -705,9 +706,8 @@ function ResultsWorkspace({
   onResultMode: (mode: ResultMode) => void;
   onToggleTransactions: () => void;
 }) {
-  const scenarioOptions: Array<{ value: ResultMode; label: string }> = [];
-  if (report.historical) scenarioOptions.push({ value: "historical", label: "Historical" });
-  report.projection?.scenarios.forEach((scenario) => scenarioOptions.push({ value: scenario.id, label: scenario.label }));
+  const projectionOptions = report.projection?.scenarios ?? [];
+  const baselineProjection = projectionOptions.find((scenario) => scenario.id === "baseline") ?? projectionOptions[0];
   const positive = result.totalProfit >= 0;
   const transactions = showAllTransactions ? [...result.transactions].reverse() : result.transactions.slice(-7).reverse();
 
@@ -715,26 +715,35 @@ function ResultsWorkspace({
     <motion.div key={`${report.source}-${resultMode}-${result.endDate}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ staggerChildren: 0.06 }}>
       <div className={styles.resultHeader}>
         <div>
-          <span className={styles.eyebrow}>Portfolio performance</span>
           <div className={styles.resultTitleRow}>
-            <h1>{portfolioTitle(holdingResults.map((item) => item.ticker))}</h1>
+            <h1>Portfolio performance</h1>
             <span className={report.source === "demo" ? styles.demoPill : styles.livePill}>
               <i /> {report.source === "demo" ? "SYNTHETIC PREVIEW" : "VERIFIED LIVE DATA"}
             </span>
           </div>
-          <p>{result.startDate} — {result.endDate} · {result.holdingsCount} holdings · {formatDuration(result.durationDays)}</p>
-        </div>
-        <div className={styles.scenarioTabs} aria-label="Report scenario">
-          {scenarioOptions.map((option) => (
+          <div className={styles.scenarioTabs} aria-label="Report scenario">
             <button
               type="button"
-              key={option.value}
-              className={resultMode === option.value ? styles.scenarioActive : undefined}
-              onClick={() => onResultMode(option.value)}
+              className={resultMode === "historical" ? styles.scenarioActive : undefined}
+              disabled={!report.historical}
+              onClick={() => onResultMode("historical")}
             >
-              {option.label}
+              Historical
             </button>
-          ))}
+            <button
+              type="button"
+              className={resultMode !== "historical" ? styles.scenarioActive : undefined}
+              disabled={!baselineProjection}
+              title={baselineProjection ? "Open simulated estimate" : "Choose a future end date to create a simulated estimate"}
+              onClick={() => baselineProjection && onResultMode(baselineProjection.id)}
+            >
+              Projected
+            </button>
+          </div>
+        </div>
+        <div className={styles.resultContext}>
+          <button type="button" aria-label="Portfolio result details" title={`${portfolioTitle(holdingResults.map((item) => item.ticker))} · ${result.startDate} to ${result.endDate}`}><Info size={16} /></button>
+          <p>{result.startDate} — {result.endDate} · {result.holdingsCount} holdings · {formatDuration(result.durationDays)}</p>
         </div>
       </div>
 
@@ -742,11 +751,11 @@ function ResultsWorkspace({
         <div className={styles.simulationBanner}>
           <Zap size={15} />
           <span><strong>Simulated estimate — not a forecast.</strong> This scenario is separated from historical performance and is not a prediction or guaranteed return.</span>
-        </div>
-      ) : report.source === "demo" ? (
-        <div className={styles.previewBanner}>
-          <Info size={15} />
-          <span>This animated preview uses synthetic data. Select your portfolio and run a live backtest for actual market history.</span>
+          <div className={styles.projectionScenarioTabs} aria-label="Projection assumption">
+            {projectionOptions.map((scenario) => (
+              <button type="button" key={scenario.id} className={resultMode === scenario.id ? styles.projectionScenarioActive : undefined} onClick={() => onResultMode(scenario.id)}>{scenario.label}</button>
+            ))}
+          </div>
         </div>
       ) : null}
 
@@ -815,6 +824,7 @@ function InsightsRail({
   onAssistant: () => void;
 }) {
   const topHolding = [...holdingResults].sort((a, b) => b.result.totalProfit - a.result.totalProfit)[0];
+  const contributionBase = Math.max(result.totalContributions, 0.000001);
   return (
     <div className={styles.insightScroll}>
       <RailSection title="Execution summary">
@@ -826,11 +836,11 @@ function InsightsRail({
       </RailSection>
 
       <RailSection title="Return breakdown">
-        <AuditRow label="Stock return" value={formatCurrency(result.priceReturn)} tone={result.priceReturn >= 0 ? "positive" : "negative"} />
-        <AuditRow label="Gross dividends" value={formatCurrency(result.grossDividends)} tone="positive" />
-        <AuditRow label="Fees" value={`−${formatCurrency(result.totalFees)}`} tone="negative" />
-        <AuditRow label="Taxes" value={`−${formatCurrency(result.dividendTax + result.capitalGainsTax)}`} tone="negative" />
-        <AuditRow label="Total profit" value={formatCurrency(result.totalProfit)} tone={result.totalProfit >= 0 ? "positive" : "negative"} strong />
+        <AuditRow label="Stock return" value={formatPercent(result.priceReturn / contributionBase * 100)} tone={result.priceReturn >= 0 ? "positive" : "negative"} />
+        <AuditRow label="Dividend return" value={formatPercent(result.grossDividends / contributionBase * 100)} tone="positive" />
+        <AuditRow label="Fees" value={formatPercent(-result.totalFees / contributionBase * 100)} tone="negative" />
+        <AuditRow label="Taxes" value={formatPercent(-(result.dividendTax + result.capitalGainsTax) / contributionBase * 100)} tone="negative" />
+        <AuditRow label="Total return" value={formatPercent(result.totalReturnPercent)} tone={result.totalProfit >= 0 ? "positive" : "negative"} strong />
       </RailSection>
 
       <RailSection title="Risk">
@@ -1160,9 +1170,19 @@ function AuditRow({
 }
 
 function TickerBadge({ ticker }: { ticker: string }) {
+  const normalized = ticker.trim().toUpperCase();
+  if (normalized === "AAPL") {
+    return <span className={`${styles.tickerBadge} ${styles.appleBadge}`} aria-hidden="true"><Apple size={17} fill="currentColor" /></span>;
+  }
+  if (normalized === "GOOG" || normalized === "GOOGL") {
+    return <span className={`${styles.tickerBadge} ${styles.googleBadge}`} aria-hidden="true">G</span>;
+  }
+  if (normalized === "MSFT") {
+    return <span className={`${styles.tickerBadge} ${styles.microsoftBadge}`} aria-hidden="true"><i /><i /><i /><i /></span>;
+  }
   const palette = ["#5b8cff", "#19b89e", "#9b8cff", "#d99a47", "#f05d69"];
-  const color = palette[ticker.split("").reduce((sum, char) => sum + char.charCodeAt(0), 0) % palette.length];
-  return <span className={styles.tickerBadge} style={{ color, borderColor: `${color}55`, background: `${color}12` }}>{ticker.slice(0, 1)}</span>;
+  const color = palette[normalized.split("").reduce((sum, char) => sum + char.charCodeAt(0), 0) % palette.length];
+  return <span className={styles.tickerBadge} style={{ color, borderColor: `${color}55`, background: `${color}12` }}>{normalized.slice(0, 1) || "?"}</span>;
 }
 
 function WorkspaceLoading({ loading }: { loading: boolean }) {
@@ -1283,6 +1303,20 @@ function isValidDateString(value: string) {
 function portfolioTitle(tickers: string[]): string {
   if (tickers.length <= 4) return tickers.join(" · ");
   return `${tickers.slice(0, 4).join(" · ")} +${tickers.length - 4}`;
+}
+
+function companyLabel(ticker: string): string {
+  const names: Record<string, string> = {
+    AAPL: "Apple Inc.",
+    GOOG: "Alphabet Inc., Class C",
+    GOOGL: "Alphabet Inc., Class A",
+    MSFT: "Microsoft Corporation",
+    NVDA: "NVIDIA Corporation",
+    SPY: "SPDR S&P 500 ETF Trust",
+    SOXL: "Direxion Semiconductor Bull 3X",
+    RYCEY: "Rolls-Royce Holdings ADR",
+  };
+  return names[ticker.trim().toUpperCase()] ?? "US stock or ETF";
 }
 
 function selectResult(report: PortfolioReport | undefined, mode: ResultMode): PortfolioAggregateResult | undefined {

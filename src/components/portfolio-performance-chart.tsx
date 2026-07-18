@@ -17,7 +17,7 @@ import type { PortfolioAggregateResult } from "@/types/backtest";
 import styles from "./stock-lens-dashboard.module.css";
 
 type ChartMode = "value" | "return" | "drawdown";
-type ChartRange = "1y" | "3y" | "all";
+type ChartRange = "ytd" | "1y" | "3y" | "all";
 
 interface ChartDatum {
   date: string;
@@ -51,7 +51,7 @@ export function PortfolioPerformanceChart({ result }: { result: PortfolioAggrega
           ))}
         </div>
         <div className={styles.rangeTabs} aria-label="Chart range">
-          {(["1y", "3y", "all"] as const).map((item) => (
+          {(["ytd", "1y", "3y", "all"] as const).map((item) => (
             <button
               type="button"
               key={item}
@@ -70,12 +70,18 @@ export function PortfolioPerformanceChart({ result }: { result: PortfolioAggrega
       </div>
 
       <div className={styles.chartCanvas} aria-label={`Portfolio ${mode} chart`}>
-        <ResponsiveContainer width="100%" height="100%">
+        {range === "all" ? (
+          <div className={styles.chartEventBands} aria-hidden="true">
+            <span>COVID-19</span>
+            <span>Inflation surge</span>
+          </div>
+        ) : null}
+        <ResponsiveContainer className={styles.chartResponsive} width="100%" height="100%">
           <AreaChart data={data} margin={{ top: 12, right: 8, left: 0, bottom: 0 }}>
             <defs>
               <linearGradient id="stockLensValue" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#2962ff" stopOpacity={0.3} />
-                <stop offset="88%" stopColor="#2962ff" stopOpacity={0.01} />
+                <stop offset="0%" stopColor="#24aef2" stopOpacity={0.24} />
+                <stop offset="88%" stopColor="#24aef2" stopOpacity={0.01} />
               </linearGradient>
               <linearGradient id="stockLensNegative" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stopColor="#f23645" stopOpacity={0.05} />
@@ -104,12 +110,12 @@ export function PortfolioPerformanceChart({ result }: { result: PortfolioAggrega
                 <Area
                   type="monotone"
                   dataKey="value"
-                  stroke="#4f7cff"
+                  stroke="#24aef2"
                   strokeWidth={2.25}
                   fill="url(#stockLensValue)"
                   animationDuration={900}
                   animationEasing="ease-out"
-                  activeDot={{ r: 4, fill: "#ffffff", stroke: "#2962ff", strokeWidth: 2 }}
+                  activeDot={{ r: 4, fill: "#ffffff", stroke: "#24aef2", strokeWidth: 2 }}
                 />
                 <Line
                   type="monotone"
@@ -162,9 +168,13 @@ function buildChartData(result: PortfolioAggregateResult, range: ChartRange): Ch
 
   const lastDate = Date.parse(`${complete.at(-1)?.date ?? result.endDate}T00:00:00Z`);
   const years = range === "1y" ? 1 : range === "3y" ? 3 : undefined;
-  const visible = years
-    ? complete.filter((item) => Date.parse(`${item.date}T00:00:00Z`) >= lastDate - years * 365.25 * 86_400_000)
-    : complete;
+  const lastYear = new Date(lastDate).getUTCFullYear();
+  const ytdStart = Date.parse(`${lastYear}-01-01T00:00:00Z`);
+  const visible = range === "ytd"
+    ? complete.filter((item) => Date.parse(`${item.date}T00:00:00Z`) >= ytdStart)
+    : years
+      ? complete.filter((item) => Date.parse(`${item.date}T00:00:00Z`) >= lastDate - years * 365.25 * 86_400_000)
+      : complete;
   const step = Math.max(1, Math.ceil(visible.length / 520));
   return visible.filter((_, index) => index % step === 0 || index === visible.length - 1);
 }
