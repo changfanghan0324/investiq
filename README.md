@@ -170,6 +170,7 @@ Vendor credentials stay in server-only environment variables. The browser receiv
 | `tsconfig.json` | Strict TypeScript settings and the `@/*` → `src/*` import alias. |
 | `vitest.config.ts` | Vitest runtime and matching source alias. |
 | `eslint.config.mjs` | Next.js Core Web Vitals and TypeScript lint configuration. |
+| `vercel.json` | Pins the Vercel framework preset to Next.js so server routes and build output are deployed correctly. |
 | `next-env.d.ts` | Next.js-generated type declarations; do not edit manually. |
 | `design/stock-lens-web-concept.png` | Approved full-screen visual direction used to guide the dashboard implementation. |
 | `public/` | Reserved for future static web assets; the app currently uses the branded icon under `src/app/`. |
