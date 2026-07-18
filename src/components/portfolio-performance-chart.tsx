@@ -74,47 +74,47 @@ export function PortfolioPerformanceChart({ result }: { result: PortfolioAggrega
           <AreaChart data={data} margin={{ top: 12, right: 8, left: 0, bottom: 0 }}>
             <defs>
               <linearGradient id="stockLensValue" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#25c8f7" stopOpacity={0.32} />
-                <stop offset="88%" stopColor="#25c8f7" stopOpacity={0.01} />
+                <stop offset="0%" stopColor="#2962ff" stopOpacity={0.3} />
+                <stop offset="88%" stopColor="#2962ff" stopOpacity={0.01} />
               </linearGradient>
               <linearGradient id="stockLensNegative" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#ff625f" stopOpacity={0.06} />
-                <stop offset="100%" stopColor="#ff625f" stopOpacity={0.34} />
+                <stop offset="0%" stopColor="#f23645" stopOpacity={0.05} />
+                <stop offset="100%" stopColor="#f23645" stopOpacity={0.32} />
               </linearGradient>
             </defs>
-            <CartesianGrid stroke="rgba(132, 174, 196, 0.12)" vertical={false} />
+            <CartesianGrid stroke="rgba(120, 123, 134, 0.15)" vertical={false} />
             <XAxis
               dataKey="date"
               minTickGap={52}
               tickLine={false}
-              axisLine={{ stroke: "rgba(132, 174, 196, 0.2)" }}
-              tick={{ fill: "#78909f", fontSize: 10 }}
+              axisLine={{ stroke: "rgba(120, 123, 134, 0.28)" }}
+              tick={{ fill: "#787b86", fontSize: 10 }}
               tickFormatter={(value: string) => formatAxisDate(value, rangeDays)}
             />
             <YAxis
               width={58}
               tickLine={false}
               axisLine={false}
-              tick={{ fill: "#78909f", fontSize: 10 }}
+              tick={{ fill: "#787b86", fontSize: 10 }}
               tickFormatter={(value: number) => mode === "value" ? compactCurrency(value) : `${value.toFixed(0)}%`}
             />
-            <Tooltip content={<ChartTooltip mode={mode} />} cursor={{ stroke: "rgba(110, 231, 255, 0.42)", strokeDasharray: "3 4" }} />
+            <Tooltip content={<ChartTooltip mode={mode} />} cursor={{ stroke: "rgba(91, 140, 255, 0.52)", strokeDasharray: "3 4" }} />
             {mode === "value" ? (
               <>
                 <Area
                   type="monotone"
                   dataKey="value"
-                  stroke="#29cdf8"
+                  stroke="#4f7cff"
                   strokeWidth={2.25}
                   fill="url(#stockLensValue)"
                   animationDuration={900}
                   animationEasing="ease-out"
-                  activeDot={{ r: 4, fill: "#dff9ff", stroke: "#18bde9", strokeWidth: 2 }}
+                  activeDot={{ r: 4, fill: "#ffffff", stroke: "#2962ff", strokeWidth: 2 }}
                 />
                 <Line
                   type="monotone"
                   dataKey="contributed"
-                  stroke="#8ca4b7"
+                  stroke="#8a8e99"
                   strokeWidth={1.6}
                   dot={false}
                   animationDuration={700}
@@ -124,7 +124,7 @@ export function PortfolioPerformanceChart({ result }: { result: PortfolioAggrega
               <Area
                 type="monotone"
                 dataKey={mode === "return" ? "returnPercent" : "drawdown"}
-                stroke={mode === "return" ? "#52dc8a" : "#ff625f"}
+                stroke={mode === "return" ? "#089981" : "#f23645"}
                 strokeWidth={2.1}
                 fill={mode === "return" ? "url(#stockLensValue)" : "url(#stockLensNegative)"}
                 animationDuration={850}

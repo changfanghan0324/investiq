@@ -60,8 +60,6 @@ type ResultMode = ProjectionScenarioId | "historical";
 type HealthState = "checking" | "ready" | "degraded";
 type FieldErrors = Record<string, string>;
 
-const MAX_HOLDINGS = 2;
-
 const intervalOptions: Array<{ label: string; value: IntervalUnit }> = [
   { label: "Day", value: "trading-days" },
   { label: "Week", value: "weeks" },
@@ -134,10 +132,6 @@ export function StockLensDashboard() {
 
   function addHolding() {
     setError("");
-    if (input.positions.length >= MAX_HOLDINGS) {
-      setError("This launch supports up to 2 holdings per run so corporate-action checks remain reliable.");
-      return;
-    }
     const template = input.positions.at(-1)?.investment ?? {
       mode: "amount" as const,
       value: 100,
@@ -228,9 +222,9 @@ export function StockLensDashboard() {
         <aside className={styles.builder} aria-label="Backtest setup">
           <BuilderHeader holdings={input.positions.length} />
           <div className={styles.builderScroll}>
-            <SectionLabel icon={<Layers3 size={14} />} title="Holdings" meta={`${input.positions.length}/${MAX_HOLDINGS}`} />
+            <SectionLabel icon={<Layers3 size={14} />} title="Holdings" meta={`${input.positions.length} active`} />
             <p className={styles.integrityNote}>
-              Launch limit: 2 holdings per run so every symbol can complete verified corporate-action checks reliably.
+              Add as many US stocks or ETFs as needed. Live symbols load one by one to keep corporate-action checks reliable.
             </p>
             <div className={styles.holdingStack}>
               <AnimatePresence initial={false}>
@@ -250,14 +244,16 @@ export function StockLensDashboard() {
                 ))}
               </AnimatePresence>
             </div>
-            <button
+            <motion.button
               type="button"
               className={styles.addHolding}
               onClick={addHolding}
-              disabled={input.positions.length >= MAX_HOLDINGS}
+              whileTap={{ scale: 0.975 }}
+              whileHover={{ scale: 1.006 }}
+              transition={{ type: "spring", stiffness: 450, damping: 28 }}
             >
-              <Plus size={15} /> {input.positions.length >= MAX_HOLDINGS ? "2-holding launch limit reached" : "Add another holding"}
-            </button>
+              <Plus size={15} /> Add holding
+            </motion.button>
 
             <div className={styles.builderDivider} />
             <SectionLabel icon={<CalendarDays size={14} />} title="Date window" />
@@ -422,25 +418,29 @@ export function StockLensDashboard() {
               </motion.div>
             ) : null}
 
-            <button
+            <motion.button
               type="button"
               className={styles.runButton}
               disabled={Boolean(loadingMode)}
               onClick={() => void run(false)}
+              whileTap={loadingMode ? undefined : { scale: 0.975 }}
+              transition={{ type: "spring", stiffness: 460, damping: 28 }}
             >
               {loadingMode === "live" ? <LoaderCircle size={17} className={styles.spin} /> : <Play size={16} fill="currentColor" />}
               {loadingMode === "live" ? "Calculating exact sessions…" : "Run live backtest"}
               {!loadingMode ? <ArrowRight size={15} /> : null}
-            </button>
-            <button
+            </motion.button>
+            <motion.button
               type="button"
               className={styles.demoButton}
               disabled={Boolean(loadingMode)}
               onClick={() => void run(true)}
+              whileTap={loadingMode ? undefined : { scale: 0.98 }}
+              transition={{ type: "spring", stiffness: 440, damping: 28 }}
             >
               <RefreshCw size={13} className={loadingMode === "demo" ? styles.spin : undefined} />
               Load synthetic demo
-            </button>
+            </motion.button>
             <div className={styles.readyState}>
               <span className={health === "ready" ? styles.statusReady : styles.statusMuted} />
               {health === "checking" ? "Checking services" : health === "ready" ? "Market-data service ready" : "Service status unavailable"}
@@ -528,25 +528,44 @@ function Header({
         <a href="#data-integrity">Data Integrity</a>
       </nav>
       <div className={styles.headerActions}>
+        <HeaderMarketPulse />
         <div className={styles.marketStatus} title="Stock Lens service status">
           <span className={health === "ready" ? styles.statusReady : health === "checking" ? styles.statusChecking : styles.statusMuted} />
-          <div><strong>{health === "ready" ? "DATA READY" : health === "checking" ? "CHECKING DATA" : "DATA DEGRADED"}</strong><small>Server verified</small></div>
+          <div><strong>{health === "ready" ? "Data ready" : health === "checking" ? "Checking data" : "Data degraded"}</strong><small>Server verified</small></div>
         </div>
-        <button type="button" className={styles.secondaryAction} disabled={!reportReady} onClick={onAssistant}>
+        <motion.button type="button" className={styles.secondaryAction} disabled={!reportReady} onClick={onAssistant} whileTap={reportReady ? { scale: 0.96 } : undefined}>
           <Sparkles size={15} /> <span>AI Analyst</span>
-        </button>
-        <button type="button" className={styles.primaryAction} disabled={!reportReady} onClick={onExport}>
+        </motion.button>
+        <motion.button type="button" className={styles.primaryAction} disabled={!reportReady} onClick={onExport} whileTap={reportReady ? { scale: 0.96 } : undefined}>
           <Download size={15} /> <span>Export PDF</span>
-        </button>
+        </motion.button>
       </div>
     </header>
+  );
+}
+
+function HeaderMarketPulse() {
+  const reduceMotion = useReducedMotion();
+  return (
+    <div className={styles.headerPulse} aria-hidden="true">
+      <svg viewBox="0 0 108 30" role="presentation">
+        <path className={styles.pulseBaseline} d="M2 23 L106 23" />
+        <motion.path
+          className={styles.pulseLine}
+          d="M2 24 L10 20 L18 22 L27 14 L36 17 L44 10 L52 13 L61 9 L70 12 L79 5 L87 8 L97 3 L106 6"
+          initial={reduceMotion ? false : { pathLength: 0, opacity: 0.35 }}
+          animate={{ pathLength: 1, opacity: 1 }}
+          transition={reduceMotion ? { duration: 0 } : { duration: 1.35, ease: "easeOut", repeat: Infinity, repeatDelay: 2.4 }}
+        />
+      </svg>
+    </div>
   );
 }
 
 function BuilderHeader({ holdings }: { holdings: number }) {
   return (
     <div className={styles.builderHeader}>
-      <span>BACKTEST SETUP</span>
+      <span>Backtest setup</span>
       <div>
         <strong>Portfolio 01</strong>
         <small>{holdings} holding{holdings === 1 ? "" : "s"}</small>
@@ -581,10 +600,11 @@ function HoldingEditor({
     <motion.div
       layout
       className={styles.holdingCard}
-      initial={{ opacity: 0, y: -8 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, height: 0, scale: 0.97 }}
-      transition={{ duration: 0.24 }}
+      initial={{ opacity: 0, x: -12, scale: 0.985 }}
+      animate={{ opacity: 1, x: 0, scale: 1 }}
+      exit={{ opacity: 0, height: 0, x: -10, scale: 0.97 }}
+      whileHover={{ y: -1, borderColor: "rgba(91, 140, 255, 0.48)" }}
+      transition={{ type: "spring", stiffness: 310, damping: 28, delay: Math.min(index * 0.035, 0.18) }}
     >
       <div className={styles.holdingTopline}>
         <span className={styles.holdingIndex}>{String(index + 1).padStart(2, "0")}</span>
@@ -640,7 +660,7 @@ function HoldingEditor({
             {position.investment.mode === "shares" ? <span>sh</span> : null}
           </div>
         </Field>
-        <Field label="Interval" htmlFor={intervalInputId} error={errors[intervalKey]} errorId={`${intervalKey}-error`}>
+        <Field label="Repeat schedule" htmlFor={intervalInputId} error={errors[intervalKey]} errorId={`${intervalKey}-error`}>
           <div className={styles.intervalControl}>
             <span>Every</span>
             <input
@@ -695,9 +715,9 @@ function ResultsWorkspace({
     <motion.div key={`${report.source}-${resultMode}-${result.endDate}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ staggerChildren: 0.06 }}>
       <div className={styles.resultHeader}>
         <div>
-          <span className={styles.eyebrow}>PORTFOLIO PERFORMANCE</span>
+          <span className={styles.eyebrow}>Portfolio performance</span>
           <div className={styles.resultTitleRow}>
-            <h1>{holdingResults.map((item) => item.ticker).join(" · ")}</h1>
+            <h1>{portfolioTitle(holdingResults.map((item) => item.ticker))}</h1>
             <span className={report.source === "demo" ? styles.demoPill : styles.livePill}>
               <i /> {report.source === "demo" ? "SYNTHETIC PREVIEW" : "VERIFIED LIVE DATA"}
             </span>
@@ -740,7 +760,7 @@ function ResultsWorkspace({
       <PortfolioPerformanceChart result={result} />
 
       <div className={styles.lowerGrid}>
-        <section className={styles.panel}>
+        <motion.section className={styles.panel} initial={{ opacity: 0, y: 14 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, amount: 0.18 }} transition={{ duration: 0.42 }}>
           <PanelHeader title="Holding attribution" meta="Contribution-weighted" />
           <div className={styles.attributionHeader}>
             <span>Ticker</span><span>Final value</span><span>Return</span><span>Portfolio</span>
@@ -756,9 +776,9 @@ function ResultsWorkspace({
               </div>
             );
           })}
-        </section>
+        </motion.section>
 
-        <section className={styles.panel}>
+        <motion.section className={styles.panel} initial={{ opacity: 0, y: 14 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, amount: 0.18 }} transition={{ duration: 0.42, delay: 0.06 }}>
           <PanelHeader title="Recent transactions" meta={`${result.transactions.length} total`} />
           <div className={styles.transactionScroller}>
             <div className={styles.transactionHeader}>
@@ -777,7 +797,7 @@ function ResultsWorkspace({
           <button type="button" className={styles.tableAction} onClick={onToggleTransactions}>
             {showAllTransactions ? "Show recent only" : "View all transactions"} <ArrowRight size={14} />
           </button>
-        </section>
+        </motion.section>
       </div>
     </motion.div>
   );
@@ -823,7 +843,7 @@ function InsightsRail({
       </RailSection>
 
       <button type="button" className={styles.aiCard} onClick={onAssistant}>
-        <div><Sparkles size={18} /><strong>AI ANALYST</strong><ArrowRight size={16} /></div>
+        <div><Sparkles size={18} /><strong>AI analysis</strong><ArrowRight size={16} /></div>
         <p>
           {topHolding
             ? `${topHolding.ticker} is the strongest profit contributor in this run. Ask for a plain-language explanation grounded only in this report.`
@@ -1140,7 +1160,7 @@ function AuditRow({
 }
 
 function TickerBadge({ ticker }: { ticker: string }) {
-  const palette = ["#31c9f5", "#5ddc8a", "#9a83ff", "#ffad5b", "#ff6e74"];
+  const palette = ["#5b8cff", "#19b89e", "#9b8cff", "#d99a47", "#f05d69"];
   const color = palette[ticker.split("").reduce((sum, char) => sum + char.charCodeAt(0), 0) % palette.length];
   return <span className={styles.tickerBadge} style={{ color, borderColor: `${color}55`, background: `${color}12` }}>{ticker.slice(0, 1)}</span>;
 }
@@ -1150,7 +1170,7 @@ function WorkspaceLoading({ loading }: { loading: boolean }) {
     <div className={styles.emptyWorkspace}>
       <span><Activity size={26} /></span>
       <h1>{loading ? "Building your portfolio timeline" : "Ready for an exact-session backtest"}</h1>
-      <p>{loading ? "Aligning trading dates, adjusted prices, dividends, taxes, and fees." : "Configure up to 2 US stocks or ETFs, then run the model."}</p>
+      <p>{loading ? "Aligning trading dates, adjusted prices, dividends, taxes, and fees." : "Configure any number of US stocks or ETFs, then run the model."}</p>
       {loading ? <div className={styles.loadingTrack}><i /></div> : null}
     </div>
   );
@@ -1170,6 +1190,7 @@ function createDefaultInput(): PortfolioInput {
     positions: [
       { id: "holding-aapl", ticker: "AAPL", investment: { mode: "amount", value: 500, intervalValue: 1, intervalUnit: "months" } },
       { id: "holding-goog", ticker: "GOOG", investment: { mode: "amount", value: 500, intervalValue: 1, intervalUnit: "months" } },
+      { id: "holding-msft", ticker: "MSFT", investment: { mode: "amount", value: 500, intervalValue: 1, intervalUnit: "months" } },
     ],
     startDate: addYearsClamped(today, -8),
     endDate: today,
@@ -1186,7 +1207,6 @@ function validatePortfolio(input: PortfolioInput): { summary?: string; fields: F
   let formError: string | undefined;
 
   if (input.positions.length === 0) formError = "Add at least one holding.";
-  if (input.positions.length > MAX_HOLDINGS) formError = "This launch supports no more than 2 holdings per run.";
 
   const tickers = input.positions.map((position) => position.ticker.trim().toUpperCase());
   input.positions.forEach((position, index) => {
@@ -1258,6 +1278,11 @@ function isValidDateString(value: string) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
   const parsed = new Date(`${value}T00:00:00Z`);
   return Number.isFinite(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
+}
+
+function portfolioTitle(tickers: string[]): string {
+  if (tickers.length <= 4) return tickers.join(" · ");
+  return `${tickers.slice(0, 4).join(" · ")} +${tickers.length - 4}`;
 }
 
 function selectResult(report: PortfolioReport | undefined, mode: ResultMode): PortfolioAggregateResult | undefined {
