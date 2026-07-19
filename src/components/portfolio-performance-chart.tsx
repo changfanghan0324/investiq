@@ -17,7 +17,7 @@ import type { PortfolioAggregateResult } from "@/types/backtest";
 import styles from "./stock-lens-dashboard.module.css";
 
 type ChartMode = "value" | "return" | "drawdown";
-type ChartRange = "1y" | "3y" | "all";
+type ChartRange = "ytd" | "1y" | "3y" | "all";
 
 interface ChartDatum {
   date: string;
@@ -51,7 +51,7 @@ export function PortfolioPerformanceChart({ result }: { result: PortfolioAggrega
           ))}
         </div>
         <div className={styles.rangeTabs} aria-label="Chart range">
-          {(["1y", "3y", "all"] as const).map((item) => (
+          {(["ytd", "1y", "3y", "all"] as const).map((item) => (
             <button
               type="button"
               key={item}
@@ -70,51 +70,57 @@ export function PortfolioPerformanceChart({ result }: { result: PortfolioAggrega
       </div>
 
       <div className={styles.chartCanvas} aria-label={`Portfolio ${mode} chart`}>
-        <ResponsiveContainer width="100%" height="100%">
+        {range === "all" ? (
+          <div className={styles.chartEventBands} aria-hidden="true">
+            <span>COVID-19</span>
+            <span>Inflation surge</span>
+          </div>
+        ) : null}
+        <ResponsiveContainer className={styles.chartResponsive} width="100%" height="100%">
           <AreaChart data={data} margin={{ top: 12, right: 8, left: 0, bottom: 0 }}>
             <defs>
               <linearGradient id="stockLensValue" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#25c8f7" stopOpacity={0.32} />
-                <stop offset="88%" stopColor="#25c8f7" stopOpacity={0.01} />
+                <stop offset="0%" stopColor="#24aef2" stopOpacity={0.24} />
+                <stop offset="88%" stopColor="#24aef2" stopOpacity={0.01} />
               </linearGradient>
               <linearGradient id="stockLensNegative" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#ff625f" stopOpacity={0.06} />
-                <stop offset="100%" stopColor="#ff625f" stopOpacity={0.34} />
+                <stop offset="0%" stopColor="#f23645" stopOpacity={0.05} />
+                <stop offset="100%" stopColor="#f23645" stopOpacity={0.32} />
               </linearGradient>
             </defs>
-            <CartesianGrid stroke="rgba(132, 174, 196, 0.12)" vertical={false} />
+            <CartesianGrid stroke="rgba(120, 123, 134, 0.15)" vertical={false} />
             <XAxis
               dataKey="date"
               minTickGap={52}
               tickLine={false}
-              axisLine={{ stroke: "rgba(132, 174, 196, 0.2)" }}
-              tick={{ fill: "#78909f", fontSize: 10 }}
+              axisLine={{ stroke: "rgba(120, 123, 134, 0.28)" }}
+              tick={{ fill: "#787b86", fontSize: 10 }}
               tickFormatter={(value: string) => formatAxisDate(value, rangeDays)}
             />
             <YAxis
               width={58}
               tickLine={false}
               axisLine={false}
-              tick={{ fill: "#78909f", fontSize: 10 }}
+              tick={{ fill: "#787b86", fontSize: 10 }}
               tickFormatter={(value: number) => mode === "value" ? compactCurrency(value) : `${value.toFixed(0)}%`}
             />
-            <Tooltip content={<ChartTooltip mode={mode} />} cursor={{ stroke: "rgba(110, 231, 255, 0.42)", strokeDasharray: "3 4" }} />
+            <Tooltip content={<ChartTooltip mode={mode} />} cursor={{ stroke: "rgba(91, 140, 255, 0.52)", strokeDasharray: "3 4" }} />
             {mode === "value" ? (
               <>
                 <Area
                   type="monotone"
                   dataKey="value"
-                  stroke="#29cdf8"
+                  stroke="#24aef2"
                   strokeWidth={2.25}
                   fill="url(#stockLensValue)"
                   animationDuration={900}
                   animationEasing="ease-out"
-                  activeDot={{ r: 4, fill: "#dff9ff", stroke: "#18bde9", strokeWidth: 2 }}
+                  activeDot={{ r: 4, fill: "#ffffff", stroke: "#24aef2", strokeWidth: 2 }}
                 />
                 <Line
                   type="monotone"
                   dataKey="contributed"
-                  stroke="#8ca4b7"
+                  stroke="#8a8e99"
                   strokeWidth={1.6}
                   dot={false}
                   animationDuration={700}
@@ -124,7 +130,7 @@ export function PortfolioPerformanceChart({ result }: { result: PortfolioAggrega
               <Area
                 type="monotone"
                 dataKey={mode === "return" ? "returnPercent" : "drawdown"}
-                stroke={mode === "return" ? "#52dc8a" : "#ff625f"}
+                stroke={mode === "return" ? "#089981" : "#f23645"}
                 strokeWidth={2.1}
                 fill={mode === "return" ? "url(#stockLensValue)" : "url(#stockLensNegative)"}
                 animationDuration={850}
@@ -162,9 +168,13 @@ function buildChartData(result: PortfolioAggregateResult, range: ChartRange): Ch
 
   const lastDate = Date.parse(`${complete.at(-1)?.date ?? result.endDate}T00:00:00Z`);
   const years = range === "1y" ? 1 : range === "3y" ? 3 : undefined;
-  const visible = years
-    ? complete.filter((item) => Date.parse(`${item.date}T00:00:00Z`) >= lastDate - years * 365.25 * 86_400_000)
-    : complete;
+  const lastYear = new Date(lastDate).getUTCFullYear();
+  const ytdStart = Date.parse(`${lastYear}-01-01T00:00:00Z`);
+  const visible = range === "ytd"
+    ? complete.filter((item) => Date.parse(`${item.date}T00:00:00Z`) >= ytdStart)
+    : years
+      ? complete.filter((item) => Date.parse(`${item.date}T00:00:00Z`) >= lastDate - years * 365.25 * 86_400_000)
+      : complete;
   const step = Math.max(1, Math.ceil(visible.length / 520));
   return visible.filter((_, index) => index % step === 0 || index === visible.length - 1);
 }

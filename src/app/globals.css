@@ -1,15 +1,15 @@
 :root {
-  --background: #05111b;
-  --foreground: #eef7fb;
-  --panel: #081a27;
-  --panel-2: #0b2232;
-  --line: rgba(151, 190, 210, 0.16);
-  --line-strong: rgba(151, 190, 210, 0.28);
-  --muted: #8299a8;
-  --cyan: #21c4f6;
-  --cyan-2: #6ee7ff;
-  --green: #54d787;
-  --red: #ff625f;
+  --background: #0b0e14;
+  --foreground: #d1d4dc;
+  --panel: #131722;
+  --panel-2: #1e222d;
+  --line: #2a2e39;
+  --line-strong: #363a45;
+  --muted: #787b86;
+  --cyan: #2962ff;
+  --cyan-2: #5b8cff;
+  --green: #089981;
+  --red: #f23645;
 }
 
 html {
@@ -33,7 +33,7 @@ body {
   flex-direction: column;
   color: var(--foreground);
   background: var(--background);
-  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -74,7 +74,7 @@ a:focus-visible {
 }
 
 ::selection {
-  color: #001019;
+  color: #ffffff;
   background: var(--cyan-2);
 }
 

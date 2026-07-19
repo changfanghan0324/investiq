@@ -4,6 +4,7 @@ import { aggregateBacktestResults } from '@/domain/portfolio-aggregate';
 import { createReport } from '@/services/create-report';
 import type {
   BacktestInput,
+  PortfolioHoldingReport,
   PortfolioInput,
   PortfolioProjectionScenario,
   PortfolioReport,
@@ -16,25 +17,27 @@ export async function createPortfolioReport(options: {
   input: PortfolioInput;
   demo: boolean;
 }): Promise<PortfolioReport> {
-  const holdings = await Promise.all(
-    options.input.positions.map(async (position, index) => {
-      const input: BacktestInput = {
-        ticker: position.ticker,
-        investment: position.investment,
-        startDate: options.input.startDate,
-        endDate: options.input.endDate,
-        taxMode: options.input.taxMode,
-        dividendTaxRate: options.input.dividendTaxRate,
-        liquidateAtEnd: options.input.liquidateAtEnd,
-        capitalGainsTaxRate: options.input.capitalGainsTaxRate,
-        fees: options.input.fees,
-      };
-      return {
-        position,
-        report: await createReport({ input, demo: options.demo, demoSeed: index + 1 }),
-      };
-    }),
-  );
+  const holdings: PortfolioHoldingReport[] = [];
+
+  // Live market-data plans are quota constrained. Loading sequentially lets a
+  // portfolio contain any number of holdings without creating a request burst.
+  for (const [index, position] of options.input.positions.entries()) {
+    const input: BacktestInput = {
+      ticker: position.ticker,
+      investment: position.investment,
+      startDate: options.input.startDate,
+      endDate: options.input.endDate,
+      taxMode: options.input.taxMode,
+      dividendTaxRate: options.input.dividendTaxRate,
+      liquidateAtEnd: options.input.liquidateAtEnd,
+      capitalGainsTaxRate: options.input.capitalGainsTaxRate,
+      fees: options.input.fees,
+    };
+    holdings.push({
+      position,
+      report: await createReport({ input, demo: options.demo, demoSeed: index + 1 }),
+    });
+  }
 
   const historical = aggregateBacktestResults(
     holdings.flatMap((holding) => (holding.report.historical ? [holding.report.historical] : [])),

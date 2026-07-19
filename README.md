@@ -6,7 +6,7 @@ The application is research software. It does not place trades, provide investme
 
 ## Product capabilities
 
-- Model a portfolio of one or two unique US stock or ETF tickers per verified run. The launch cap keeps provider-backed corporate-action checks within reliable request limits while still supporting multi-asset portfolios.
+- Model any number of unique US stock or ETF tickers per verified run. Live holdings load sequentially so larger portfolios remain within provider-backed corporate-action request limits.
 - Invest either a fixed USD amount or a fixed number of shares per order.
 - Run orders every Day, Week, Month, or Year with a configurable interval.
 - Use fractional shares, always rounded down to 0.001 share.
@@ -172,7 +172,7 @@ Vendor credentials stay in server-only environment variables. The browser receiv
 | `eslint.config.mjs` | Next.js Core Web Vitals and TypeScript lint configuration. |
 | `vercel.json` | Pins the Vercel framework preset to Next.js so server routes and build output are deployed correctly. |
 | `next-env.d.ts` | Next.js-generated type declarations; do not edit manually. |
-| `design/stock-lens-web-concept.png` | Approved full-screen visual direction used to guide the dashboard implementation. |
+| `design/stock-lens-web-concept-v2.png` | Current full-screen visual direction for the unlimited-holdings TradingView-inspired workspace. |
 | `public/` | Reserved for future static web assets; the app currently uses the branded icon under `src/app/`. |
 | `output/` | Local browser/PDF verification artifacts; not required at runtime. |
 | `tmp/` | Temporary PDF-render inspection files; not required at runtime. |

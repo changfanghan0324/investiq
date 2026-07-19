@@ -3,6 +3,7 @@ import { publicError } from '@/server/errors';
 const MASSIVE_API_BASE = 'https://api.massive.com';
 const MASSIVE_CACHE_TTL_MS = 6 * 60 * 60 * 1_000;
 const MAX_MASSIVE_CACHE_ENTRIES = 500;
+const MASSIVE_RETRY_DELAYS_MS = [13_000, 26_000, 39_000] as const;
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const TICKER_PATTERN = /^[A-Z0-9.-]{1,12}$/;
 const UNSUPPORTED_CORPORATE_ACTION_MESSAGE =
@@ -156,6 +157,12 @@ export function validateMarketDataOptions(value: unknown): MarketDataOptions {
   if (!TICKER_PATTERN.test(ticker) || !from || !to || !requiredStart) {
     throw publicError(400, 'Please review the ticker and selected dates.');
   }
+  if (ticker === 'SPX') {
+    throw publicError(
+      422,
+      'SPX is an index, not a purchasable US stock or ETF. Use an investable S&P 500 ETF such as SPY, VOO, or IVV.',
+    );
+  }
   if (from > to) {
     throw publicError(400, 'The start date cannot be later than the end date.');
   }
@@ -174,17 +181,22 @@ export async function loadMarketData(options: MarketDataOptions): Promise<Market
 
   const ticker = options.ticker.toUpperCase();
   const encodedTicker = encodeURIComponent(ticker);
-  const [chart, dividendResponse, splitResponse] = await Promise.all([
-    requestYahooChart(ticker, options.from, options.to),
-    requestMassive<MassiveListResponse<MassiveDividend>>(
-      `/stocks/v1/dividends?ticker=${encodedTicker}&limit=5000&sort=ex_dividend_date.asc`,
-      apiKey,
-    ),
-    requestMassive<MassiveListResponse<MassiveSplit>>(
-      `/stocks/v1/splits?ticker=${encodedTicker}&execution_date.gte=${options.from}&execution_date.lte=${options.to}&limit=1000&sort=execution_date.asc`,
-      apiKey,
-    ),
-  ]);
+  // Keep vendor calls sequential. Free market-data plans have tight per-minute
+  // limits, and a burst of dividend + split requests made valid portfolios look
+  // like a server outage. A split lookup is only necessary when Yahoo reports a
+  // split event that must be independently verified.
+  const chart = await requestYahooChart(ticker, options.from, options.to);
+  const dividendResponse = await requestMassive<MassiveListResponse<MassiveDividend>>(
+    `/stocks/v1/dividends?ticker=${encodedTicker}&limit=5000&sort=ex_dividend_date.asc`,
+    apiKey,
+  );
+  const hasYahooSplits = Object.keys(chart.events?.splits ?? {}).length > 0;
+  const splitResponse = hasYahooSplits
+    ? await requestMassive<MassiveListResponse<MassiveSplit>>(
+        `/stocks/v1/splits?ticker=${encodedTicker}&execution_date.gte=${options.from}&execution_date.lte=${options.to}&limit=1000&sort=execution_date.asc`,
+        apiKey,
+      )
+    : ({ status: 'OK', results: [] } satisfies MassiveListResponse<MassiveSplit>);
 
   const meta = chart.meta ?? {};
   if (meta.currency !== 'USD' || meta.exchangeTimezoneName !== 'America/New_York') {
@@ -248,31 +260,48 @@ async function requestMassive<T>(path: string, apiKey: string): Promise<T> {
   if (cached && cached.expiresAt > Date.now()) return cached.payload as T;
 
   const separator = path.includes('?') ? '&' : '?';
-  const response = await fetch(
-    `${MASSIVE_API_BASE}${path}${separator}apiKey=${encodeURIComponent(apiKey)}`,
-    {
-      cache: 'no-store',
-      headers: { Accept: 'application/json' },
-      signal: AbortSignal.timeout(30_000),
-    },
-  );
-  const payload = (await response.json().catch(() => ({}))) as T & { status?: string };
+  for (let attempt = 0; attempt <= MASSIVE_RETRY_DELAYS_MS.length; attempt += 1) {
+    const response = await fetch(
+      `${MASSIVE_API_BASE}${path}${separator}apiKey=${encodeURIComponent(apiKey)}`,
+      {
+        cache: 'no-store',
+        headers: { Accept: 'application/json' },
+        signal: AbortSignal.timeout(30_000),
+      },
+    );
+    const payload = (await response.json().catch(() => ({}))) as T & { status?: string };
 
-  if (response.ok && payload.status !== 'ERROR') {
-    if (massiveCache.size >= MAX_MASSIVE_CACHE_ENTRIES) {
-      const oldestKey = massiveCache.keys().next().value as string | undefined;
-      if (oldestKey) massiveCache.delete(oldestKey);
+    if (response.ok && payload.status !== 'ERROR') {
+      if (massiveCache.size >= MAX_MASSIVE_CACHE_ENTRIES) {
+        const oldestKey = massiveCache.keys().next().value as string | undefined;
+        if (oldestKey) massiveCache.delete(oldestKey);
+      }
+      massiveCache.set(path, {
+        expiresAt: Date.now() + MASSIVE_CACHE_TTL_MS,
+        payload,
+      });
+      return payload;
     }
-    massiveCache.set(path, {
-      expiresAt: Date.now() + MASSIVE_CACHE_TTL_MS,
-      payload,
-    });
-    return payload;
+
+    if (response.status === 429 && attempt < MASSIVE_RETRY_DELAYS_MS.length) {
+      const retryAfterSeconds = Number(response.headers.get('retry-after'));
+      const retryDelay = Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0
+        ? Math.min(retryAfterSeconds * 1_000, 60_000)
+        : MASSIVE_RETRY_DELAYS_MS[attempt];
+      await delay(retryDelay);
+      continue;
+    }
+    if (response.status === 429) {
+      throw publicError(429, 'The market-data provider is rate-limited. Please wait one minute and run the backtest again.');
+    }
+    throw publicError(502, `Upstream market-data request failed (${response.status}).`);
   }
-  if (response.status === 429) {
-    throw publicError(429, 'The market-data service is busy. Please try again shortly.');
-  }
-  throw publicError(502, `Upstream market-data request failed (${response.status}).`);
+
+  throw publicError(502, 'Upstream market-data request failed.');
+}
+
+function delay(milliseconds: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }
 
 async function requestYahooChart(ticker: string, from: string, to: string): Promise<YahooChartResult> {

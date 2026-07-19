@@ -16,7 +16,9 @@ export async function loadMarketData(options: {
   requiredStart: DateString;
 }): Promise<MarketData> {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 45_000);
+  // The server may deliberately back off when a free provider rate limit is
+  // reached. Keep the browser request alive long enough for that safe retry.
+  const timeout = setTimeout(() => controller.abort(), 150_000);
 
   try {
     const response = await fetch('/api/market-data', {
