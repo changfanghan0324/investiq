@@ -1056,9 +1056,19 @@
 .insights { border-color: #203943; }
 .builderHeader { min-height: 75px; padding: 13px 18px 12px; border-color: #203943; background: #0a1c25; gap: 9px; }
 .builderHeader > div { align-items: center; }
-.builderHeader strong { display: flex; align-items: center; color: #f0f6f8; font-size: 16px; gap: 9px; }
-.builderHeader strong svg { color: #8fa2ad; }
+.builderHeader strong { color: #f0f6f8; font-size: 16px; font-weight: 500; }
 .builderHeader button { display: grid; width: 26px; height: 26px; border: 0; color: #90a3ae; background: transparent; place-items: center; }
+.portfolioNameDisplay { display: flex; align-items: center; min-width: 0; gap: 5px; }
+.portfolioNameDisplay strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.builderHeader .editPortfolioName { width: 25px; height: 25px; border-radius: 3px; transition: color 160ms ease, background 160ms ease; }
+.builderHeader .editPortfolioName:hover { color: #31b6f5; background: rgba(36, 174, 242, 0.1); }
+.builderHeader .editPortfolioName:focus-visible,
+.portfolioNameEditor button:focus-visible,
+.portfolioNameEditor input:focus-visible { outline: 2px solid #24aef2; outline-offset: 2px; }
+.portfolioNameEditor { display: grid; grid-template-columns: minmax(0, 1fr) 26px 26px; align-items: center; min-width: 0; gap: 3px; }
+.portfolioNameEditor input { width: 100%; min-width: 0; height: 28px; padding: 0 7px; border: 1px solid #31505c; border-radius: 3px; outline: 0; color: #f0f6f8; background: #07151d; font-family: inherit; font-size: 13px; }
+.portfolioNameEditor button { border-radius: 3px; }
+.portfolioNameEditor button:hover { color: #31b6f5; background: rgba(36, 174, 242, 0.1); }
 .builderScroll,
 .insightScroll { height: calc(100% - 75px); }
 .builderScroll { padding: 12px 12px 24px; }

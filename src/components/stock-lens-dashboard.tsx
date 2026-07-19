@@ -72,6 +72,7 @@ const intervalOptions: Array<{ label: string; value: IntervalUnit }> = [
 
 export function StockLensDashboard() {
   const [input, setInput] = useState<PortfolioInput>(createDefaultInput);
+  const [portfolioName, setPortfolioName] = useState("Portfolio 01");
   const [report, setReport] = useState<PortfolioReport>();
   const [resultMode, setResultMode] = useState<ResultMode>("historical");
   const [loadingMode, setLoadingMode] = useState<LoadingMode | undefined>("demo");
@@ -84,6 +85,14 @@ export function StockLensDashboard() {
   const [setupCollapsed, setSetupCollapsed] = useState(false);
   const workspaceRef = useRef<HTMLElement>(null);
   const inputRevisionRef = useRef(0);
+
+  useEffect(() => {
+    const restoreName = window.setTimeout(() => {
+      const savedName = window.localStorage.getItem("stock-lens-portfolio-name")?.trim();
+      if (savedName) setPortfolioName(savedName);
+    });
+    return () => window.clearTimeout(restoreName);
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -132,6 +141,12 @@ export function StockLensDashboard() {
       ...current,
       positions: current.positions.map((position) => position.id === id ? { ...position, ...patch } : position),
     }));
+  }
+
+  function renamePortfolio(name: string) {
+    const nextName = name.trim() || "Portfolio 01";
+    setPortfolioName(nextName);
+    window.localStorage.setItem("stock-lens-portfolio-name", nextName);
   }
 
   function addHolding() {
@@ -226,7 +241,9 @@ export function StockLensDashboard() {
         <aside className={`${styles.builder} ${setupCollapsed ? styles.builderCollapsed : ""}`} aria-label="Backtest setup">
           <BuilderHeader
             holdings={input.positions.length}
+            name={portfolioName}
             collapsed={setupCollapsed}
+            onRename={renamePortfolio}
             onToggle={() => setSetupCollapsed((value) => !value)}
           />
           <div className={styles.builderScroll} id="backtest-setup-controls">
@@ -576,13 +593,38 @@ function HeaderMarketPulse() {
 
 function BuilderHeader({
   holdings,
+  name,
   collapsed,
+  onRename,
   onToggle,
 }: {
   holdings: number;
+  name: string;
   collapsed: boolean;
+  onRename: (name: string) => void;
   onToggle: () => void;
 }) {
+  const [editing, setEditing] = useState(false);
+  const [draftName, setDraftName] = useState(name);
+  const nameInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!editing) return;
+    nameInputRef.current?.focus();
+    nameInputRef.current?.select();
+  }, [editing]);
+
+  function saveName(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    onRename(draftName);
+    setEditing(false);
+  }
+
+  function cancelEdit() {
+    setDraftName(name);
+    setEditing(false);
+  }
+
   return (
     <div className={styles.builderHeader}>
       <button
@@ -597,7 +639,42 @@ function BuilderHeader({
         <span>Backtest setup</span>
       </button>
       <div className={styles.portfolioHeading}>
-        <strong>Portfolio 01 <Pencil size={13} aria-hidden="true" /></strong>
+        {editing ? (
+          <form className={styles.portfolioNameEditor} onSubmit={saveName}>
+            <input
+              ref={nameInputRef}
+              value={draftName}
+              maxLength={40}
+              aria-label="Portfolio name"
+              onChange={(event) => setDraftName(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Escape") cancelEdit();
+              }}
+            />
+            <button type="submit" aria-label="Save portfolio name" title="Save name">
+              <Check size={14} />
+            </button>
+            <button type="button" aria-label="Cancel portfolio name edit" title="Cancel" onClick={cancelEdit}>
+              <X size={14} />
+            </button>
+          </form>
+        ) : (
+          <div className={styles.portfolioNameDisplay}>
+            <strong>{name}</strong>
+            <button
+              type="button"
+              className={styles.editPortfolioName}
+              aria-label={`Rename ${name}`}
+              title="Rename portfolio"
+              onClick={() => {
+                setDraftName(name);
+                setEditing(true);
+              }}
+            >
+              <Pencil size={13} />
+            </button>
+          </div>
+        )}
         <button type="button" aria-label={`${holdings} holdings in portfolio`} title={`${holdings} holdings`}><MoreVertical size={16} /></button>
       </div>
     </div>
