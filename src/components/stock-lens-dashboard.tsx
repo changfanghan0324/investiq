@@ -21,6 +21,8 @@ import {
   Info,
   LoaderCircle,
   MoreVertical,
+  PanelLeftClose,
+  PanelLeftOpen,
   Pencil,
   Play,
   Plus,
@@ -28,7 +30,6 @@ import {
   ShieldCheck,
   Sparkles,
   Trash2,
-  TrendingDown,
   X,
   Zap,
 } from "lucide-react";
@@ -80,6 +81,7 @@ export function StockLensDashboard() {
   const [health, setHealth] = useState<HealthState>("checking");
   const [assistantOpen, setAssistantOpen] = useState(false);
   const [showAllTransactions, setShowAllTransactions] = useState(false);
+  const [setupCollapsed, setSetupCollapsed] = useState(false);
   const workspaceRef = useRef<HTMLElement>(null);
   const inputRevisionRef = useRef(0);
 
@@ -220,10 +222,14 @@ export function StockLensDashboard() {
         onExport={exportPdf}
       />
 
-      <div className={styles.dashboardGrid}>
-        <aside className={styles.builder} aria-label="Backtest setup">
-          <BuilderHeader holdings={input.positions.length} />
-          <div className={styles.builderScroll}>
+      <div className={`${styles.dashboardGrid} ${setupCollapsed ? styles.setupCollapsed : ""}`}>
+        <aside className={`${styles.builder} ${setupCollapsed ? styles.builderCollapsed : ""}`} aria-label="Backtest setup">
+          <BuilderHeader
+            holdings={input.positions.length}
+            collapsed={setupCollapsed}
+            onToggle={() => setSetupCollapsed((value) => !value)}
+          />
+          <div className={styles.builderScroll} id="backtest-setup-controls">
             <div className={styles.holdingStack}>
               <AnimatePresence initial={false}>
                 {input.positions.map((position, index) => (
@@ -461,8 +467,6 @@ export function StockLensDashboard() {
           ) : (
             <WorkspaceLoading loading={Boolean(loadingMode)} />
           )}
-
-          <MethodologySection />
         </section>
 
         <aside className={styles.insights} aria-label="Portfolio audit summary">
@@ -523,8 +527,7 @@ function Header({
       </a>
       <nav className={styles.navLinks} aria-label="Primary navigation">
         <a className={styles.navActive} href="#portfolio-lab">Portfolio Lab</a>
-        <a href="#methodology">Methodology</a>
-        <a href="#data-integrity">Data Integrity</a>
+        <a href="/methodology">How it works</a>
       </nav>
       <div className={styles.headerActions}>
         <HeaderMarketPulse />
@@ -561,11 +564,29 @@ function HeaderMarketPulse() {
   );
 }
 
-function BuilderHeader({ holdings }: { holdings: number }) {
+function BuilderHeader({
+  holdings,
+  collapsed,
+  onToggle,
+}: {
+  holdings: number;
+  collapsed: boolean;
+  onToggle: () => void;
+}) {
   return (
     <div className={styles.builderHeader}>
-      <span>Backtest setup</span>
-      <div>
+      <button
+        type="button"
+        className={styles.builderToggle}
+        aria-expanded={!collapsed}
+        aria-controls="backtest-setup-controls"
+        aria-label={collapsed ? "Expand backtest setup" : "Collapse backtest setup"}
+        onClick={onToggle}
+      >
+        {collapsed ? <PanelLeftOpen size={17} /> : <PanelLeftClose size={17} />}
+        <span>Backtest setup</span>
+      </button>
+      <div className={styles.portfolioHeading}>
         <strong>Portfolio 01 <Pencil size={13} aria-hidden="true" /></strong>
         <button type="button" aria-label={`${holdings} holdings in portfolio`} title={`${holdings} holdings`}><MoreVertical size={16} /></button>
       </div>
@@ -959,38 +980,6 @@ function AssistantDrawer({
         </form>
       </motion.aside>
     </motion.div>
-  );
-}
-
-function MethodologySection() {
-  const items = [
-    { icon: <CalendarDays size={19} />, number: "01", title: "Exact execution calendar", text: "A scheduled order on a weekend or market holiday rolls to the next available trading session. The conservative fill uses that session's split-adjusted daily high." },
-    { icon: <Activity size={19} />, number: "02", title: "Dividends without double counting", text: "Eligibility is captured on the ex-date. Ordinary cash dividends are taxed according to the selected basis, then reinvested on the payment date at that day's adjusted high." },
-    { icon: <ShieldCheck size={19} />, number: "03", title: "Corporate-action safety stop", text: "Splits and reverse splits are supported through adjusted OHLC. If a merger, spin-off, exchange, special dividend, right, warrant, or unverifiable event is detected, Stock Lens stops instead of guessing." },
-    { icon: <TrendingDown size={19} />, number: "04", title: "Honest future simulations", text: "Future scenarios use available history beginning no earlier than 1990 and no earlier than actual listing data. Every future figure is a simulated estimate, kept separate from history and never presented as a forecast." },
-  ];
-  return (
-    <section className={styles.methodology} id="methodology">
-      <div className={styles.methodHeader}>
-        <span>HOW THE MODEL WORKS</span>
-        <h2>Auditable assumptions, not a black box.</h2>
-        <p>Every result is built from explicit timing, price, tax, fee, and safety rules. These rules are also embedded in the exported PDF.</p>
-      </div>
-      <div className={styles.methodGrid}>
-        {items.map((item) => (
-          <article key={item.number} id={item.number === "03" ? "data-integrity" : undefined}>
-            <div><span>{item.icon}</span><b>{item.number}</b></div>
-            <h3>{item.title}</h3>
-            <p>{item.text}</p>
-          </article>
-        ))}
-      </div>
-      <footer className={styles.footer}>
-        <span><span className={styles.brandMarkSmall}><i /><b /></span> STOCK LENS</span>
-        <p>Research software, not investment or tax advice. Market data may be delayed or revised.</p>
-        <a href="#portfolio-lab">Back to lab ↑</a>
-      </footer>
-    </section>
   );
 }
 

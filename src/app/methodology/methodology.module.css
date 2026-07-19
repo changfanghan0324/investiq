@@ -1,0 +1,70 @@
+.page {
+  min-height: 100vh;
+  color: #dce7ec;
+  background:
+    radial-gradient(circle at 78% 6%, rgba(36, 174, 242, 0.08), transparent 28%),
+    #06151d;
+}
+
+.topbar {
+  position: sticky;
+  z-index: 10;
+  top: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 60px;
+  padding: 0 22px;
+  border-bottom: 1px solid #203943;
+  background: rgba(6, 21, 29, 0.95);
+  backdrop-filter: blur(18px);
+}
+
+.brand,
+.backLink { display: flex; align-items: center; }
+.brand { color: #f2f7f9; gap: 10px; }
+.brand strong { font-size: 17px; font-weight: 600; letter-spacing: 0.055em; }
+.brandMark { position: relative; width: 31px; height: 31px; border: 1.5px solid #24aef2; border-radius: 50%; }
+.brandMark i,
+.brandMark b { position: absolute; display: block; height: 1.5px; content: ""; background: #24aef2; transform-origin: left center; }
+.brandMark i { top: 17px; left: 5px; width: 13px; transform: rotate(-18deg); }
+.brandMark b { top: 13px; left: 16px; width: 18px; transform: rotate(12deg); }
+.backLink { min-height: 36px; padding: 0 13px; border: 1px solid #31505c; border-radius: 4px; color: #c5d2d8; background: #0b202a; font-size: 11px; gap: 7px; }
+.backLink:hover { color: #ffffff; border-color: #24aef2; }
+
+.content { width: min(980px, calc(100% - 40px)); margin: 0 auto; padding: 76px 0 90px; }
+.intro { max-width: 720px; }
+.intro h1 { color: #f1f6f8; font-size: clamp(30px, 5vw, 54px); font-weight: 500; letter-spacing: -0.045em; line-height: 1.05; }
+.intro p { max-width: 660px; margin-top: 20px; color: #91a3ad; font-size: 14px; line-height: 1.7; }
+
+.ruleList { margin-top: 58px; border-top: 1px solid #28434d; }
+.rule {
+  display: grid;
+  grid-template-columns: 42px 44px minmax(0, 1fr);
+  padding: 27px 4px;
+  border-bottom: 1px solid #28434d;
+  gap: 20px;
+}
+.ruleNumber { padding-top: 5px; color: #58727e; font-family: var(--font-geist-mono); font-size: 10px; }
+.ruleIcon { display: grid; width: 38px; height: 38px; border: 1px solid rgba(36, 174, 242, 0.3); border-radius: 4px; color: #31b6f5; background: rgba(36, 174, 242, 0.08); place-items: center; }
+.rule h2 { color: #edf4f7; font-size: 17px; font-weight: 500; }
+.rule p { max-width: 710px; margin-top: 8px; color: #9aabb4; font-size: 12px; line-height: 1.7; }
+.rule code { display: inline-block; margin-top: 12px; padding: 6px 8px; border-left: 2px solid #24aef2; color: #b8c8cf; background: rgba(13, 35, 45, 0.72); font-family: var(--font-geist-mono); font-size: 10px; }
+
+.simulation { display: flex; align-items: flex-start; justify-content: space-between; margin-top: 48px; padding: 24px; border: 1px solid rgba(224, 170, 73, 0.28); border-radius: 4px; background: rgba(123, 80, 19, 0.1); gap: 36px; }
+.simulation h2 { color: #f0e0bd; font-size: 17px; font-weight: 500; }
+.simulation p { max-width: 620px; margin-top: 8px; color: #b7a98d; font-size: 11px; line-height: 1.65; }
+.simulation strong { flex: none; color: #e4bd73; font-family: var(--font-geist-mono); font-size: 9px; font-weight: 500; }
+
+@media (max-width: 700px) {
+  .topbar { padding: 0 12px; }
+  .brand strong { font-size: 13px; }
+  .brandMark { width: 27px; height: 27px; }
+  .backLink { padding: 0 10px; }
+  .content { width: min(100% - 28px, 980px); padding-top: 46px; }
+  .intro h1 { font-size: 34px; }
+  .rule { grid-template-columns: 32px minmax(0, 1fr); gap: 14px; }
+  .ruleIcon { grid-column: 1; grid-row: 2; }
+  .rule > div:last-child { grid-column: 2; grid-row: 1 / span 2; }
+  .simulation { flex-direction: column; gap: 16px; }
+}
