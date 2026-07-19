@@ -701,8 +701,11 @@
 }
 
 .runButton {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) 22px;
+  align-items: center;
   min-height: 44px;
-  margin-top: 14px;
+  margin-top: 0;
   border: 1px solid #3f70ff;
   color: #ffffff;
   background: #2962ff;
@@ -710,7 +713,10 @@
   font-size: 10px;
 }
 
-.runButton svg:last-child { margin-left: auto; margin-right: 4px; }
+.runIcon,
+.runTrailing { display: grid; width: 22px; height: 22px; place-items: center; }
+.runLabel { overflow: hidden; text-align: center; text-overflow: ellipsis; white-space: nowrap; }
+.runTrailing { justify-self: end; }
 .runButton:hover:not(:disabled) { background: #1e53e5; transform: translateY(-2px); box-shadow: 0 16px 40px rgba(41, 98, 255, 0.3); }
 .runButton:disabled,
 .demoButton:disabled { cursor: wait; opacity: 0.65; }
@@ -735,6 +741,18 @@
   font-size: 8px;
   gap: 6px;
 }
+
+.builderActionBar {
+  position: relative;
+  z-index: 4;
+  flex: none;
+  padding: 10px 12px 11px;
+  border-top: 1px solid #203943;
+  background: linear-gradient(180deg, rgba(8, 25, 34, 0.96), #081922 24%);
+  box-shadow: 0 -14px 28px rgba(3, 12, 17, 0.24);
+}
+.builderActionBar .demoButton { margin-top: 6px; }
+.builderActionBar .readyState { margin: 7px 0 0; }
 
 .spin { animation: spin 0.9s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
@@ -1033,6 +1051,7 @@
 
 .builder,
 .insights { background: rgba(8, 25, 34, 0.97); }
+.builder { display: flex; flex-direction: column; }
 .builder { border-color: #203943; }
 .insights { border-color: #203943; }
 .builderHeader { min-height: 75px; padding: 13px 18px 12px; border-color: #203943; background: #0a1c25; gap: 9px; }
@@ -1043,6 +1062,7 @@
 .builderScroll,
 .insightScroll { height: calc(100% - 75px); }
 .builderScroll { padding: 12px 12px 24px; }
+.builderScroll { flex: 1; height: auto; min-height: 0; }
 .holdingStack { gap: 8px; }
 .holdingCard { padding: 10px 12px; border-color: #203943; border-radius: 4px; background: #0b202a; box-shadow: 0 8px 22px rgba(0, 0, 0, 0.16); }
 .holdingTopline { grid-template-columns: 26px minmax(0, 1fr) 26px; margin-bottom: 8px; gap: 10px; }
@@ -1192,7 +1212,8 @@
 .builderCollapsed .builderToggle { justify-content: center; width: 36px; height: 36px; }
 .builderCollapsed .builderToggle span,
 .builderCollapsed .portfolioHeading,
-.builderCollapsed .builderScroll { display: none; }
+.builderCollapsed .builderScroll,
+.builderCollapsed .builderActionBar { display: none; }
 
 @media (min-width: 1421px) {
   .dashboardGrid.setupCollapsed { grid-template-columns: 54px minmax(610px, 1fr) 354px; }
@@ -1261,6 +1282,7 @@
   .builderCollapsed .builderHeader { min-height: 54px; }
   .builderScroll,
   .insightScroll { height: auto; overflow: visible; }
+  .builderActionBar { display: none; }
   .workspace { padding: 20px 12px 0; }
   .methodology { margin-right: -12px; margin-left: -12px; padding-right: 12px; padding-left: 12px; }
   .chartCanvas { height: 290px; }

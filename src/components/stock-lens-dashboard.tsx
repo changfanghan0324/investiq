@@ -423,6 +423,8 @@ export function StockLensDashboard() {
               </motion.div>
             ) : null}
 
+          </div>
+          <div className={styles.builderActionBar}>
             <motion.button
               type="button"
               className={styles.runButton}
@@ -431,9 +433,11 @@ export function StockLensDashboard() {
               whileTap={loadingMode ? undefined : { scale: 0.975 }}
               transition={{ type: "spring", stiffness: 460, damping: 28 }}
             >
-              {loadingMode === "live" ? <LoaderCircle size={17} className={styles.spin} /> : <Play size={16} fill="currentColor" />}
-              {loadingMode === "live" ? "Calculating exact sessions…" : "Run live backtest"}
-              {!loadingMode ? <ArrowRight size={15} /> : null}
+              <span className={styles.runIcon}>
+                {loadingMode === "live" ? <LoaderCircle size={17} className={styles.spin} /> : <Play size={15} fill="currentColor" />}
+              </span>
+              <span className={styles.runLabel}>{loadingMode === "live" ? "Calculating exact sessions…" : "Run live backtest"}</span>
+              <span className={styles.runTrailing}>{loadingMode ? null : <ArrowRight size={15} />}</span>
             </motion.button>
             <motion.button
               type="button"
@@ -448,7 +452,13 @@ export function StockLensDashboard() {
             </motion.button>
             <div className={styles.readyState}>
               <span className={health === "ready" ? styles.statusReady : styles.statusMuted} />
-              {health === "checking" ? "Checking services" : health === "ready" ? "Market-data service ready" : "Service status unavailable"}
+              {loadingMode === "live"
+                ? "Aligning exact trading sessions"
+                : health === "checking"
+                  ? "Checking services"
+                  : health === "ready"
+                    ? "Market-data service ready"
+                    : "Service status unavailable"}
             </div>
           </div>
         </aside>
