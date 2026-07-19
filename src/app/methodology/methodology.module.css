@@ -22,6 +22,7 @@
 
 .brand,
 .backLink { display: flex; align-items: center; }
+.topbarActions { display: flex; align-items: center; gap: 8px; }
 .brand { color: #f2f7f9; gap: 10px; }
 .brand strong { font-size: 17px; font-weight: 600; letter-spacing: 0.055em; }
 .brandMark { position: relative; width: 31px; height: 31px; border: 1.5px solid #24aef2; border-radius: 50%; }
@@ -31,6 +32,16 @@
 .brandMark b { top: 13px; left: 16px; width: 18px; transform: rotate(12deg); }
 .backLink { min-height: 36px; padding: 0 13px; border: 1px solid #31505c; border-radius: 4px; color: #c5d2d8; background: #0b202a; font-size: 11px; gap: 7px; }
 .backLink:hover { color: #ffffff; border-color: #24aef2; }
+
+.visuallyHidden { position: absolute; width: 1px; height: 1px; overflow: hidden; margin: -1px; padding: 0; border: 0; clip: rect(0 0 0 0); white-space: nowrap; }
+.languageControl { position: relative; display: inline-flex; align-items: center; justify-content: center; min-width: 70px; height: 36px; border: 1px solid #31505c; border-radius: 4px; color: #c5d2d8; background: #0b202a; cursor: pointer; gap: 6px; }
+.languageControl:hover,
+.languageControl:focus-within { border-color: #24aef2; }
+.languageControl select { position: absolute; z-index: 1; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+.languageControl > svg { color: #78909b; pointer-events: none; }
+.languageCurrent { display: inline-flex; align-items: center; pointer-events: none; gap: 5px; }
+.languageCurrent > span { font-size: 16px; line-height: 1; }
+.languageCurrent b { color: #c7d4da; font-family: var(--font-geist-mono); font-size: 9px; font-weight: 500; }
 
 .content { width: min(980px, calc(100% - 40px)); margin: 0 auto; padding: 76px 0 90px; }
 .intro { max-width: 720px; }
@@ -61,6 +72,8 @@
   .brand strong { font-size: 13px; }
   .brandMark { width: 27px; height: 27px; }
   .backLink { padding: 0 10px; }
+  .backLink { font-size: 0; gap: 0; }
+  .backLink svg { width: 16px; }
   .content { width: min(100% - 28px, 980px); padding-top: 46px; }
   .intro h1 { font-size: 34px; }
   .rule { grid-template-columns: 32px minmax(0, 1fr); gap: 14px; }

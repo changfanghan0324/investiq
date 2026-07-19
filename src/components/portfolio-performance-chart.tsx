@@ -13,6 +13,7 @@ import {
 } from "recharts";
 
 import type { PortfolioAggregateResult } from "@/types/backtest";
+import { type Translate, useLanguage } from "@/i18n/language";
 
 import styles from "./stock-lens-dashboard.module.css";
 
@@ -28,6 +29,7 @@ interface ChartDatum {
 }
 
 export function PortfolioPerformanceChart({ result }: { result: PortfolioAggregateResult }) {
+  const { locale, t } = useLanguage();
   const [mode, setMode] = useState<ChartMode>("value");
   const [range, setRange] = useState<ChartRange>("all");
   const data = useMemo(() => buildChartData(result, range), [result, range]);
@@ -38,7 +40,7 @@ export function PortfolioPerformanceChart({ result }: { result: PortfolioAggrega
   return (
     <div className={styles.chartShell}>
       <div className={styles.chartToolbar}>
-        <div className={styles.chartTabs} aria-label="Chart metric">
+        <div className={styles.chartTabs} aria-label={t("chart.metric")}>
           {(["value", "return", "drawdown"] as const).map((item) => (
             <button
               type="button"
@@ -46,11 +48,11 @@ export function PortfolioPerformanceChart({ result }: { result: PortfolioAggrega
               className={mode === item ? styles.chartTabActive : styles.chartTab}
               onClick={() => setMode(item)}
             >
-              {item[0].toUpperCase() + item.slice(1)}
+              {t(item === "value" ? "chart.value" : item === "return" ? "chart.return" : "chart.drawdown")}
             </button>
           ))}
         </div>
-        <div className={styles.rangeTabs} aria-label="Chart range">
+        <div className={styles.rangeTabs} aria-label={t("chart.range")}>
           {(["ytd", "1y", "3y", "all"] as const).map((item) => (
             <button
               type="button"
@@ -65,15 +67,15 @@ export function PortfolioPerformanceChart({ result }: { result: PortfolioAggrega
       </div>
 
       <div className={styles.chartLegend}>
-        <span><i className={styles.legendCyan} />{legendForMode(mode)}</span>
-        {mode === "value" ? <span><i className={styles.legendSlate} />Contributed capital</span> : null}
+        <span><i className={styles.legendCyan} />{legendForMode(mode, t)}</span>
+        {mode === "value" ? <span><i className={styles.legendSlate} />{t("chart.contributedCapital")}</span> : null}
       </div>
 
-      <div className={styles.chartCanvas} aria-label={`Portfolio ${mode} chart`}>
+      <div className={styles.chartCanvas} aria-label={t("chart.aria", { mode: t(mode === "value" ? "chart.value" : mode === "return" ? "chart.return" : "chart.drawdown") })}>
         {range === "all" ? (
           <div className={styles.chartEventBands} aria-hidden="true">
-            <span>COVID-19</span>
-            <span>Inflation surge</span>
+            <span>{t("chart.covid")}</span>
+            <span>{t("chart.inflation")}</span>
           </div>
         ) : null}
         <ResponsiveContainer className={styles.chartResponsive} width="100%" height="100%">
@@ -95,7 +97,7 @@ export function PortfolioPerformanceChart({ result }: { result: PortfolioAggrega
               tickLine={false}
               axisLine={{ stroke: "rgba(120, 123, 134, 0.28)" }}
               tick={{ fill: "#787b86", fontSize: 10 }}
-              tickFormatter={(value: string) => formatAxisDate(value, rangeDays)}
+              tickFormatter={(value: string) => formatAxisDate(value, rangeDays, locale)}
             />
             <YAxis
               width={58}
@@ -180,6 +182,7 @@ function buildChartData(result: PortfolioAggregateResult, range: ChartRange): Ch
 }
 
 function ChartTooltip({ active, payload, mode }: { active?: boolean; payload?: Array<{ payload: ChartDatum }>; mode: ChartMode }) {
+  const { t } = useLanguage();
   const point = payload?.[0]?.payload;
   if (!active || !point) return null;
   return (
@@ -187,11 +190,11 @@ function ChartTooltip({ active, payload, mode }: { active?: boolean; payload?: A
       <strong>{point.date}</strong>
       {mode === "value" ? (
         <>
-          <span><i className={styles.legendCyan} />Portfolio {usd(point.value)}</span>
-          <span><i className={styles.legendSlate} />Contributed {usd(point.contributed)}</span>
+          <span><i className={styles.legendCyan} />{t("chart.portfolio")} {usd(point.value)}</span>
+          <span><i className={styles.legendSlate} />{t("chart.contributed")} {usd(point.contributed)}</span>
         </>
       ) : (
-        <span>{mode === "return" ? "Cash-flow-neutral return" : "Drawdown"} {mode === "return" ? point.returnPercent.toFixed(2) : point.drawdown.toFixed(2)}%</span>
+        <span>{mode === "return" ? t("chart.cashFlowReturn") : t("chart.drawdown")} {mode === "return" ? point.returnPercent.toFixed(2) : point.drawdown.toFixed(2)}%</span>
       )}
     </div>
   );
@@ -207,16 +210,16 @@ function usd(value: number) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(value);
 }
 
-function legendForMode(mode: ChartMode) {
-  if (mode === "return") return "Cash-flow-neutral return";
-  if (mode === "drawdown") return "Peak-to-trough drawdown";
-  return "Portfolio value";
+function legendForMode(mode: ChartMode, t: Translate) {
+  if (mode === "return") return t("chart.cashFlowReturn");
+  if (mode === "drawdown") return t("chart.peakDrawdown");
+  return t("chart.portfolioValue");
 }
 
-function formatAxisDate(value: string, rangeDays: number) {
+function formatAxisDate(value: string, rangeDays: number, locale: string) {
   if (rangeDays <= 730) {
     const date = new Date(`${value}T00:00:00Z`);
-    const month = date.toLocaleDateString("en-US", { month: "short", timeZone: "UTC" });
+    const month = date.toLocaleDateString(locale, { month: "short", timeZone: "UTC" });
     return rangeDays <= 370 ? `${month} ${date.getUTCDate()}` : `${month} '${value.slice(2, 4)}`;
   }
   return value.slice(0, 4);
