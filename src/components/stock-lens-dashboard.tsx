@@ -37,6 +37,7 @@ import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 
 import { brokerPresets, getBrokerPreset } from "@/constants/broker-presets";
 import { PortfolioPerformanceChart } from "@/components/portfolio-performance-chart";
+import { languageOptions, type Translate, type TranslationKey, useLanguage } from "@/i18n/language";
 import { createPortfolioReport } from "@/services/create-portfolio-report";
 import {
   askPortfolioAssistant,
@@ -53,7 +54,7 @@ import type {
   PortfolioReport,
   ProjectionScenarioId,
 } from "@/types/backtest";
-import { addYearsClamped, formatDuration, todayDateString } from "@/utils/date";
+import { addYearsClamped, todayDateString } from "@/utils/date";
 import { formatCurrency, formatPercent } from "@/utils/format";
 
 import styles from "./stock-lens-dashboard.module.css";
@@ -63,14 +64,15 @@ type ResultMode = ProjectionScenarioId | "historical";
 type HealthState = "checking" | "ready" | "degraded";
 type FieldErrors = Record<string, string>;
 
-const intervalOptions: Array<{ label: string; value: IntervalUnit }> = [
-  { label: "Day", value: "trading-days" },
-  { label: "Week", value: "weeks" },
-  { label: "Month", value: "months" },
-  { label: "Year", value: "years" },
+const intervalOptions: Array<{ labelKey: TranslationKey; value: IntervalUnit }> = [
+  { labelKey: "holding.day", value: "trading-days" },
+  { labelKey: "holding.week", value: "weeks" },
+  { labelKey: "holding.month", value: "months" },
+  { labelKey: "holding.year", value: "years" },
 ];
 
 export function StockLensDashboard() {
+  const { t } = useLanguage();
   const [input, setInput] = useState<PortfolioInput>(createDefaultInput);
   const [portfolioName, setPortfolioName] = useState("Portfolio 01");
   const [report, setReport] = useState<PortfolioReport>();
@@ -168,7 +170,7 @@ export function StockLensDashboard() {
 
   async function run(demo = false) {
     setError("");
-    const validation = validatePortfolio(input);
+    const validation = validatePortfolio(input, t);
     setFieldErrors(validation.fields);
     if (validation.summary) {
       setError(validation.summary);
@@ -198,7 +200,7 @@ export function StockLensDashboard() {
         demo,
       });
       if (inputRevisionRef.current !== revisionAtStart) {
-        setError("Inputs changed while the calculation was running. Run again to create a report for the current setup.");
+        setError(t("error.inputsChanged"));
         return;
       }
       setReport(next);
@@ -210,7 +212,7 @@ export function StockLensDashboard() {
       window.setTimeout(() => workspaceRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 80);
     } catch (caught) {
       if (inputRevisionRef.current === revisionAtStart) {
-        setError(caught instanceof Error ? caught.message : "The backtest could not be completed. Please try again.");
+        setError(caught instanceof Error ? caught.message : t("error.backtest"));
       }
     } finally {
       setLoadingMode(undefined);
@@ -223,7 +225,7 @@ export function StockLensDashboard() {
       report,
       result: selected,
       holdings: holdingResults,
-      scenarioLabel: resultMode === "historical" ? undefined : labelScenario(resultMode),
+      scenarioLabel: resultMode === "historical" ? undefined : labelScenario(resultMode, t),
     });
   }
 
@@ -238,7 +240,7 @@ export function StockLensDashboard() {
       />
 
       <div className={`${styles.dashboardGrid} ${setupCollapsed ? styles.setupCollapsed : ""}`}>
-        <aside className={`${styles.builder} ${setupCollapsed ? styles.builderCollapsed : ""}`} aria-label="Backtest setup">
+        <aside className={`${styles.builder} ${setupCollapsed ? styles.builderCollapsed : ""}`} aria-label={t("builder.setup")}>
           <BuilderHeader
             holdings={input.positions.length}
             name={portfolioName}
@@ -273,14 +275,14 @@ export function StockLensDashboard() {
               whileHover={{ scale: 1.006 }}
               transition={{ type: "spring", stiffness: 450, damping: 28 }}
             >
-              <Plus size={15} /> Add holding
+              <Plus size={15} /> {t("holding.add")}
             </motion.button>
-            <p className={styles.sequentialHint}>Unlimited holdings · live data loads sequentially</p>
+            <p className={styles.sequentialHint}>{t("holding.unlimited")}</p>
 
             <div className={styles.builderDivider} />
-            <SectionLabel icon={<CalendarDays size={14} />} title="Date window" />
+            <SectionLabel icon={<CalendarDays size={14} />} title={t("date.window")} />
             <div className={styles.dateRow}>
-              <Field label="Start date" htmlFor="start-date" error={fieldErrors.startDate}>
+              <Field label={t("date.start")} htmlFor="start-date" error={fieldErrors.startDate}>
                 <input
                   id="start-date"
                   className={styles.input}
@@ -292,8 +294,8 @@ export function StockLensDashboard() {
                   onChange={(event) => updateInput((current) => ({ ...current, startDate: event.target.value }))}
                 />
               </Field>
-              <span className={styles.dateConnector}>to</span>
-              <Field label="End date" htmlFor="end-date" error={fieldErrors.endDate}>
+              <span className={styles.dateConnector}>{t("date.to")}</span>
+              <Field label={t("date.end")} htmlFor="end-date" error={fieldErrors.endDate}>
                 <input
                   id="end-date"
                   className={styles.input}
@@ -306,17 +308,17 @@ export function StockLensDashboard() {
                 />
               </Field>
             </div>
-            <p className={styles.helperText}>Non-trading dates roll forward to the next market session.</p>
+            <p className={styles.helperText}>{t("date.nonTrading")}</p>
 
             <div className={styles.builderDivider} />
-            <SectionLabel icon={<ShieldCheck size={14} />} title="Taxes & reporting" />
-            <Field label="Reporting basis">
+            <SectionLabel icon={<ShieldCheck size={14} />} title={t("tax.section")} />
+            <Field label={t("tax.basis")}>
               <SegmentedControl
-                ariaLabel="Reporting basis"
+                ariaLabel={t("tax.basis")}
                 value={input.taxMode}
                 options={[
-                  { label: "Pretax", value: "pre-tax" },
-                  { label: "Aftertax", value: "after-tax" },
+                  { label: t("tax.pretax"), value: "pre-tax" },
+                  { label: t("tax.aftertax"), value: "after-tax" },
                 ]}
                 onChange={(taxMode) => updateInput((current) => ({ ...current, taxMode: taxMode as PortfolioInput["taxMode"] }))}
               />
@@ -330,7 +332,7 @@ export function StockLensDashboard() {
                   exit={{ opacity: 0, height: 0 }}
                 >
                   <div className={styles.compactFieldRow}>
-                    <label htmlFor="withholding-rate">Dividend withholding</label>
+                    <label htmlFor="withholding-rate">{t("tax.dividendWithholding")}</label>
                     <div className={styles.suffixInput}>
                       <input
                         id="withholding-rate"
@@ -352,8 +354,8 @@ export function StockLensDashboard() {
             </AnimatePresence>
             <label className={styles.toggleRow}>
               <span>
-                <strong>Liquidate at end</strong>
-                <small>Otherwise value at final adjusted close</small>
+                <strong>{t("tax.liquidate")}</strong>
+                <small>{t("tax.finalClose")}</small>
               </span>
               <input
                 type="checkbox"
@@ -365,7 +367,7 @@ export function StockLensDashboard() {
             {input.liquidateAtEnd ? (
               <div className={styles.compactFieldGroup}>
                 <div className={styles.compactFieldRow}>
-                  <label htmlFor="capital-gains-rate">Capital gains tax</label>
+                  <label htmlFor="capital-gains-rate">{t("tax.capitalGains")}</label>
                   <div className={styles.suffixInput}>
                     <input
                       id="capital-gains-rate"
@@ -386,8 +388,8 @@ export function StockLensDashboard() {
             ) : null}
 
             <div className={styles.builderDivider} />
-            <SectionLabel icon={<BarChart3 size={14} />} title="Broker & pricing" />
-            <Field label="Broker / pricing plan" htmlFor="broker-plan">
+            <SectionLabel icon={<BarChart3 size={14} />} title={t("broker.section")} />
+            <Field label={t("broker.plan")} htmlFor="broker-plan">
               <div className={styles.selectWrap}>
                 <select
                   id="broker-plan"
@@ -403,18 +405,18 @@ export function StockLensDashboard() {
               </div>
             </Field>
             {input.fees.brokerId === "custom" ? (
-              <Field label="Plan name" htmlFor="broker-plan-name">
+              <Field label={t("broker.planName")} htmlFor="broker-plan-name">
                 <input
                   id="broker-plan-name"
                   className={styles.input}
                   value={input.fees.brokerName}
                   onChange={(event) => updateInput((current) => ({ ...current, fees: { ...current.fees, brokerName: event.target.value } }))}
-                  placeholder="Your broker"
+                  placeholder={t("broker.placeholder")}
                 />
               </Field>
             ) : null}
             <button type="button" className={styles.feeDisclosure} onClick={() => setAdvancedFees((value) => !value)}>
-              <span><Info size={13} /> {advancedFees ? "Hide" : "Review or edit"} exact fee rules</span>
+              <span><Info size={13} /> {advancedFees ? t("broker.hideFees") : t("broker.reviewFees")}</span>
               <ChevronDown size={14} className={advancedFees ? styles.chevronOpen : undefined} />
             </button>
             <AnimatePresence initial={false}>
@@ -425,13 +427,13 @@ export function StockLensDashboard() {
                   animate={{ opacity: 1, height: "auto" }}
                   exit={{ opacity: 0, height: 0 }}
                 >
-                  <FeeEditor title="Buy order" ruleKey="buy" value={input.fees.buy} errors={fieldErrors} onChange={(buy) => updateInput((current) => ({ ...current, fees: { ...current.fees, buy } }))} />
-                  <FeeEditor title="Sell order" ruleKey="sell" value={input.fees.sell} errors={fieldErrors} onChange={(sell) => updateInput((current) => ({ ...current, fees: { ...current.fees, sell } }))} />
-                  <FeeEditor title="Dividend reinvestment" ruleKey="dividendReinvestment" value={input.fees.dividendReinvestment} errors={fieldErrors} onChange={(dividendReinvestment) => updateInput((current) => ({ ...current, fees: { ...current.fees, dividendReinvestment } }))} />
+                  <FeeEditor title={t("broker.buyOrder")} ruleKey="buy" value={input.fees.buy} errors={fieldErrors} onChange={(buy) => updateInput((current) => ({ ...current, fees: { ...current.fees, buy } }))} />
+                  <FeeEditor title={t("broker.sellOrder")} ruleKey="sell" value={input.fees.sell} errors={fieldErrors} onChange={(sell) => updateInput((current) => ({ ...current, fees: { ...current.fees, sell } }))} />
+                  <FeeEditor title={t("broker.dividendReinvestment")} ruleKey="dividendReinvestment" value={input.fees.dividendReinvestment} errors={fieldErrors} onChange={(dividendReinvestment) => updateInput((current) => ({ ...current, fees: { ...current.fees, dividendReinvestment } }))} />
                 </motion.div>
               ) : null}
             </AnimatePresence>
-            <p className={styles.brokerNote}>{input.fees.notes} Checked {input.fees.effectiveDate}.</p>
+            <p className={styles.brokerNote}>{localizedBrokerNote(input.fees.brokerId, input.fees.notes, t)} {t("broker.checked", { date: input.fees.effectiveDate })}</p>
 
             {error ? (
               <motion.div className={styles.errorBanner} initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} role="alert">
@@ -453,7 +455,7 @@ export function StockLensDashboard() {
               <span className={styles.runIcon}>
                 {loadingMode === "live" ? <LoaderCircle size={17} className={styles.spin} /> : <Play size={15} fill="currentColor" />}
               </span>
-              <span className={styles.runLabel}>{loadingMode === "live" ? "Calculating exact sessions…" : "Run live backtest"}</span>
+              <span className={styles.runLabel}>{loadingMode === "live" ? t("run.calculatingExact") : t("run.liveBacktest")}</span>
               <span className={styles.runTrailing}>{loadingMode ? null : <ArrowRight size={15} />}</span>
             </motion.button>
             <motion.button
@@ -465,17 +467,17 @@ export function StockLensDashboard() {
               transition={{ type: "spring", stiffness: 440, damping: 28 }}
             >
               <RefreshCw size={13} className={loadingMode === "demo" ? styles.spin : undefined} />
-              Load synthetic demo
+              {t("run.loadDemo")}
             </motion.button>
             <div className={styles.readyState}>
               <span className={health === "ready" ? styles.statusReady : styles.statusMuted} />
               {loadingMode === "live"
-                ? "Aligning exact trading sessions"
+                ? t("run.aligning")
                 : health === "checking"
-                  ? "Checking services"
+                  ? t("run.checking")
                   : health === "ready"
-                    ? "Market-data service ready"
-                    : "Service status unavailable"}
+                    ? t("run.ready")
+                    : t("run.unavailable")}
             </div>
           </div>
         </aside>
@@ -496,7 +498,7 @@ export function StockLensDashboard() {
           )}
         </section>
 
-        <aside className={styles.insights} aria-label="Portfolio audit summary">
+        <aside className={styles.insights} aria-label={t("audit.summaryAria")}>
           {selected && report ? (
             <InsightsRail
               result={selected}
@@ -512,12 +514,12 @@ export function StockLensDashboard() {
 
       <div className={styles.mobileRunBar}>
         <div>
-          <strong>{input.positions.length} holding{input.positions.length === 1 ? "" : "s"}</strong>
+          <strong>{t(input.positions.length === 1 ? "run.holding" : "run.holdings", { count: input.positions.length })}</strong>
           <span>{input.startDate.slice(0, 4)}–{input.endDate.slice(0, 4)}</span>
         </div>
         <button type="button" disabled={Boolean(loadingMode)} onClick={() => void run(false)}>
           {loadingMode === "live" ? <LoaderCircle size={15} className={styles.spin} /> : <Play size={14} fill="currentColor" />}
-          {loadingMode === "live" ? "Calculating…" : "Run live"}
+          {loadingMode === "live" ? t("run.calculating") : t("run.live")}
         </button>
       </div>
 
@@ -545,28 +547,44 @@ function Header({
   onAssistant: () => void;
   onExport: () => void;
 }) {
+  const { language, setLanguage, t } = useLanguage();
+  const activeLanguage = languageOptions.find((option) => option.code === language) ?? languageOptions[0];
   return (
     <header className={styles.topbar}>
       <a className={styles.brand} href="#portfolio-lab" aria-label="Stock Lens portfolio lab">
         <span className={styles.brandMark}><i /><b /></span>
         <strong>STOCK LENS</strong>
-        <em>US EQUITIES</em>
+        <em>{t("brand.market")}</em>
       </a>
-      <nav className={styles.navLinks} aria-label="Primary navigation">
-        <a className={styles.navActive} href="#portfolio-lab">Portfolio Lab</a>
-        <a href="/methodology">How it works</a>
+      <nav className={styles.navLinks} aria-label={t("nav.primary")}>
+        <a className={styles.navActive} href="#portfolio-lab">{t("nav.portfolio")}</a>
+        <a href="/methodology">{t("nav.methodology")}</a>
       </nav>
       <div className={styles.headerActions}>
         <HeaderMarketPulse />
-        <div className={styles.marketStatus} title="Stock Lens service status">
+        <div className={styles.marketStatus} title={t("header.serviceStatus")}>
           <span className={health === "ready" ? styles.statusReady : health === "checking" ? styles.statusChecking : styles.statusMuted} />
-          <div><strong>{health === "ready" ? "Data ready" : health === "checking" ? "Checking data" : "Data degraded"}</strong><small>Server verified</small></div>
+          <div><strong>{health === "ready" ? t("header.dataReady") : health === "checking" ? t("header.checkingData") : t("header.dataDegraded")}</strong><small>{t("header.serverVerified")}</small></div>
         </div>
+        <label className={styles.languageControl} title={t("language.label")}>
+          <span className={styles.visuallyHidden}>{t("language.label")}</span>
+          <span className={styles.languageCurrent} aria-hidden="true"><span>{activeLanguage.flag}</span><b>{activeLanguage.shortLabel}</b></span>
+          <select
+            value={language}
+            aria-label={t("language.label")}
+            onChange={(event) => setLanguage(event.target.value as typeof language)}
+          >
+            {languageOptions.map((option) => (
+              <option key={option.code} value={option.code}>{option.flag} {option.label}</option>
+            ))}
+          </select>
+          <ChevronDown size={13} aria-hidden="true" />
+        </label>
         <motion.button type="button" className={styles.secondaryAction} disabled={!reportReady} onClick={onAssistant} whileTap={reportReady ? { scale: 0.96 } : undefined}>
-          <Sparkles size={15} /> <span>AI Analyst</span>
+          <Sparkles size={15} /> <span>{t("header.aiAnalyst")}</span>
         </motion.button>
         <motion.button type="button" className={styles.primaryAction} disabled={!reportReady} onClick={onExport} whileTap={reportReady ? { scale: 0.96 } : undefined}>
-          <Download size={15} /> <span>Export PDF</span>
+          <Download size={15} /> <span>{t("header.exportPdf")}</span>
         </motion.button>
       </div>
     </header>
@@ -604,6 +622,7 @@ function BuilderHeader({
   onRename: (name: string) => void;
   onToggle: () => void;
 }) {
+  const { t } = useLanguage();
   const [editing, setEditing] = useState(false);
   const [draftName, setDraftName] = useState(name);
   const nameInputRef = useRef<HTMLInputElement>(null);
@@ -632,11 +651,11 @@ function BuilderHeader({
         className={styles.builderToggle}
         aria-expanded={!collapsed}
         aria-controls="backtest-setup-controls"
-        aria-label={collapsed ? "Expand backtest setup" : "Collapse backtest setup"}
+        aria-label={collapsed ? t("builder.expand") : t("builder.collapse")}
         onClick={onToggle}
       >
         {collapsed ? <PanelLeftOpen size={17} /> : <PanelLeftClose size={17} />}
-        <span>Backtest setup</span>
+        <span>{t("builder.setup")}</span>
       </button>
       <div className={styles.portfolioHeading}>
         {editing ? (
@@ -645,16 +664,16 @@ function BuilderHeader({
               ref={nameInputRef}
               value={draftName}
               maxLength={40}
-              aria-label="Portfolio name"
+              aria-label={t("builder.portfolioName")}
               onChange={(event) => setDraftName(event.target.value)}
               onKeyDown={(event) => {
                 if (event.key === "Escape") cancelEdit();
               }}
             />
-            <button type="submit" aria-label="Save portfolio name" title="Save name">
+            <button type="submit" aria-label={t("builder.saveName")} title={t("builder.saveName")}>
               <Check size={14} />
             </button>
-            <button type="button" aria-label="Cancel portfolio name edit" title="Cancel" onClick={cancelEdit}>
+            <button type="button" aria-label={t("builder.cancelName")} title={t("builder.cancelName")} onClick={cancelEdit}>
               <X size={14} />
             </button>
           </form>
@@ -664,8 +683,8 @@ function BuilderHeader({
             <button
               type="button"
               className={styles.editPortfolioName}
-              aria-label={`Rename ${name}`}
-              title="Rename portfolio"
+              aria-label={t("builder.rename", { name })}
+              title={t("builder.renameTitle")}
               onClick={() => {
                 setDraftName(name);
                 setEditing(true);
@@ -675,7 +694,7 @@ function BuilderHeader({
             </button>
           </div>
         )}
-        <button type="button" aria-label={`${holdings} holdings in portfolio`} title={`${holdings} holdings`}><MoreVertical size={16} /></button>
+        <button type="button" aria-label={t("builder.holdingsAria", { count: holdings })} title={t("builder.holdingsTitle", { count: holdings })}><MoreVertical size={16} /></button>
       </div>
     </div>
   );
@@ -696,6 +715,7 @@ function HoldingEditor({
   onChange: (patch: Partial<PortfolioPositionInput>) => void;
   onRemove: () => void;
 }) {
+  const { t } = useLanguage();
   const tickerKey = `ticker-${position.id}`;
   const orderKey = `order-${position.id}`;
   const intervalKey = `interval-${position.id}`;
@@ -719,37 +739,37 @@ function HoldingEditor({
           <label htmlFor={tickerInputId}>
             <input
               id={tickerInputId}
-              aria-label={`Holding ${index + 1} ticker`}
+              aria-label={t("holding.tickerAria", { count: index + 1 })}
               aria-invalid={Boolean(errors[tickerKey])}
               aria-describedby={errors[tickerKey] ? `${tickerKey}-error` : undefined}
               value={position.ticker}
               maxLength={12}
               autoCapitalize="characters"
               spellCheck={false}
-              placeholder="Ticker"
+              placeholder={t("holding.tickerPlaceholder")}
               onChange={(event) => onChange({ ticker: event.target.value.toUpperCase().replace(/[^A-Z0-9.-]/g, "") })}
             />
-            <small>{companyLabel(position.ticker)}</small>
+            <small>{companyLabel(position.ticker, t)}</small>
           </label>
         </div>
         {removable ? (
-          <button type="button" aria-label={`Remove holding ${index + 1}`} className={styles.iconButton} onClick={onRemove}>
+          <button type="button" aria-label={t("holding.remove", { count: index + 1 })} className={styles.iconButton} onClick={onRemove}>
             <Trash2 size={14} />
           </button>
         ) : <span className={styles.iconSpacer} />}
       </div>
       {errors[tickerKey] ? <small className={styles.fieldError} id={`${tickerKey}-error`}>{errors[tickerKey]}</small> : null}
-      <Field label="Order type">
+      <Field label={t("holding.orderType")}>
         <SegmentedControl
-          ariaLabel={`Holding ${index + 1} order type`}
+          ariaLabel={`${t("holding.orderType")} ${index + 1}`}
           value={position.investment.mode}
-          options={[{ label: "Cash", value: "amount" }, { label: "Shares", value: "shares" }]}
+          options={[{ label: t("holding.cash"), value: "amount" }, { label: t("holding.shares"), value: "shares" }]}
           onChange={(mode) => onChange({ investment: { ...position.investment, mode: mode as "amount" | "shares" } })}
         />
       </Field>
       <div className={styles.orderRow}>
         <Field
-          label={position.investment.mode === "amount" ? "USD per order" : "Shares per order"}
+          label={position.investment.mode === "amount" ? t("holding.usdPerOrder") : t("holding.sharesPerOrder")}
           htmlFor={orderInputId}
           error={errors[orderKey]}
           errorId={`${orderKey}-error`}
@@ -769,12 +789,12 @@ function HoldingEditor({
             {position.investment.mode === "shares" ? <span>sh</span> : null}
           </div>
         </Field>
-        <Field label="Repeat schedule" htmlFor={intervalInputId} error={errors[intervalKey]} errorId={`${intervalKey}-error`}>
+        <Field label={t("holding.repeat")} htmlFor={intervalInputId} error={errors[intervalKey]} errorId={`${intervalKey}-error`}>
           <div className={styles.intervalControl}>
-            <span>Every</span>
+            <span>{t("holding.every")}</span>
             <input
               id={intervalInputId}
-              aria-label={`Holding ${index + 1} interval count`}
+              aria-label={t("holding.intervalCount", { count: index + 1 })}
               aria-invalid={Boolean(errors[intervalKey])}
               aria-describedby={errors[intervalKey] ? `${intervalKey}-error` : undefined}
               type="number"
@@ -784,11 +804,11 @@ function HoldingEditor({
               onChange={(event) => onChange({ investment: { ...position.investment, intervalValue: safeNumber(event.target.value) } })}
             />
             <select
-              aria-label={`Holding ${index + 1} interval unit`}
+              aria-label={t("holding.intervalUnit", { count: index + 1 })}
               value={position.investment.intervalUnit}
               onChange={(event) => onChange({ investment: { ...position.investment, intervalUnit: event.target.value as IntervalUnit } })}
             >
-              {intervalOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+              {intervalOptions.map((option) => <option key={option.value} value={option.value}>{t(option.labelKey)}</option>)}
             </select>
           </div>
         </Field>
@@ -814,6 +834,7 @@ function ResultsWorkspace({
   onResultMode: (mode: ResultMode) => void;
   onToggleTransactions: () => void;
 }) {
+  const { t } = useLanguage();
   const projectionOptions = report.projection?.scenarios ?? [];
   const baselineProjection = projectionOptions.find((scenario) => scenario.id === "baseline") ?? projectionOptions[0];
   const positive = result.totalProfit >= 0;
@@ -824,63 +845,63 @@ function ResultsWorkspace({
       <div className={styles.resultHeader}>
         <div>
           <div className={styles.resultTitleRow}>
-            <h1>Portfolio performance</h1>
+            <h1>{t("result.performance")}</h1>
             <span className={report.source === "demo" ? styles.demoPill : styles.livePill}>
-              <i /> {report.source === "demo" ? "SYNTHETIC PREVIEW" : "VERIFIED LIVE DATA"}
+              <i /> {report.source === "demo" ? t("result.synthetic") : t("result.verified")}
             </span>
           </div>
-          <div className={styles.scenarioTabs} aria-label="Report scenario">
+          <div className={styles.scenarioTabs} aria-label={t("result.scenario")}>
             <button
               type="button"
               className={resultMode === "historical" ? styles.scenarioActive : undefined}
               disabled={!report.historical}
               onClick={() => onResultMode("historical")}
             >
-              Historical
+              {t("result.historical")}
             </button>
             <button
               type="button"
               className={resultMode !== "historical" ? styles.scenarioActive : undefined}
               disabled={!baselineProjection}
-              title={baselineProjection ? "Open simulated estimate" : "Choose a future end date to create a simulated estimate"}
+              title={baselineProjection ? t("result.openSimulation") : t("result.chooseFuture")}
               onClick={() => baselineProjection && onResultMode(baselineProjection.id)}
             >
-              Projected
+              {t("result.projected")}
             </button>
           </div>
         </div>
         <div className={styles.resultContext}>
-          <button type="button" aria-label="Portfolio result details" title={`${portfolioTitle(holdingResults.map((item) => item.ticker))} · ${result.startDate} to ${result.endDate}`}><Info size={16} /></button>
-          <p>{result.startDate} — {result.endDate} · {result.holdingsCount} holdings · {formatDuration(result.durationDays)}</p>
+          <button type="button" aria-label={t("result.details")} title={`${portfolioTitle(holdingResults.map((item) => item.ticker))} · ${result.startDate} ${t("date.to")} ${result.endDate}`}><Info size={16} /></button>
+          <p>{result.startDate} — {result.endDate} · {t("builder.holdingsTitle", { count: result.holdingsCount })} · {formatLocalizedDuration(result.durationDays, t)}</p>
         </div>
       </div>
 
       {resultMode !== "historical" ? (
         <div className={styles.simulationBanner}>
           <Zap size={15} />
-          <span><strong>Simulated estimate — not a forecast.</strong> This scenario is separated from historical performance and is not a prediction or guaranteed return.</span>
-          <div className={styles.projectionScenarioTabs} aria-label="Projection assumption">
+          <span><strong>{t("result.simulationTitle")}</strong> {t("result.simulationText")}</span>
+          <div className={styles.projectionScenarioTabs} aria-label={t("result.projectionAssumption")}>
             {projectionOptions.map((scenario) => (
-              <button type="button" key={scenario.id} className={resultMode === scenario.id ? styles.projectionScenarioActive : undefined} onClick={() => onResultMode(scenario.id)}>{scenario.label}</button>
+              <button type="button" key={scenario.id} className={resultMode === scenario.id ? styles.projectionScenarioActive : undefined} onClick={() => onResultMode(scenario.id)}>{labelScenario(scenario.id, t)}</button>
             ))}
           </div>
         </div>
       ) : null}
 
       <div className={styles.metricGrid}>
-        <Metric label="Final value" value={result.finalAmount} formatter={formatCurrency} />
-        <Metric label="Total return" value={result.totalReturnPercent} formatter={formatPercent} tone={positive ? "positive" : "negative"} />
-        <Metric label="Net contributions" value={result.totalContributions} formatter={formatCurrency} />
-        <Metric label="Max drawdown" value={result.maxDrawdown.percent} formatter={formatPercent} tone="negative" />
+        <Metric label={t("result.finalValue")} value={result.finalAmount} formatter={formatCurrency} />
+        <Metric label={t("result.totalReturn")} value={result.totalReturnPercent} formatter={formatPercent} tone={positive ? "positive" : "negative"} />
+        <Metric label={t("result.netContributions")} value={result.totalContributions} formatter={formatCurrency} />
+        <Metric label={t("result.maxDrawdown")} value={result.maxDrawdown.percent} formatter={formatPercent} tone="negative" />
       </div>
 
       <PortfolioPerformanceChart result={result} />
 
       <div className={styles.lowerGrid}>
         <motion.section className={styles.panel} initial={{ opacity: 0, y: 14 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, amount: 0.18 }} transition={{ duration: 0.42 }}>
-          <PanelHeader title="Holding attribution" meta="Contribution-weighted" />
+          <PanelHeader title={t("result.attribution")} meta={t("result.contributionWeighted")} />
           <div className={styles.attributionHeader}>
-            <span>Ticker</span><span>Final value</span><span>Return</span><span>Portfolio</span>
+            <span>{t("result.ticker")}</span><span>{t("result.finalValue")}</span><span>{t("result.return")}</span><span>{t("result.portfolio")}</span>
           </div>
           {holdingResults.map((holding) => {
             const allocation = result.finalAmount > 0 ? holding.result.finalAmount / result.finalAmount * 100 : 0;
@@ -896,23 +917,23 @@ function ResultsWorkspace({
         </motion.section>
 
         <motion.section className={styles.panel} initial={{ opacity: 0, y: 14 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, amount: 0.18 }} transition={{ duration: 0.42, delay: 0.06 }}>
-          <PanelHeader title="Recent transactions" meta={`${result.transactions.length} total`} />
+          <PanelHeader title={t("result.recentTransactions")} meta={t("result.totalCount", { count: result.transactions.length })} />
           <div className={styles.transactionScroller}>
             <div className={styles.transactionHeader}>
-              <span>Date</span><span>Ticker</span><span>Action</span><span>Shares</span><span>Price</span>
+              <span>{t("result.date")}</span><span>{t("result.ticker")}</span><span>{t("result.action")}</span><span>{t("holding.shares")}</span><span>{t("result.price")}</span>
             </div>
             {transactions.map((transaction, index) => (
               <div className={styles.transactionRow} key={`${transaction.date}-${transaction.ticker}-${transaction.type}-${index}`}>
                 <span>{transaction.date}</span>
                 <strong>{transaction.ticker ?? "—"}</strong>
-                <span>{transaction.type === "contribution-buy" ? "Buy" : transaction.type === "dividend-reinvestment" ? "Dividend reinvest" : "Liquidate"}</span>
+                <span>{transaction.type === "contribution-buy" ? t("result.buy") : transaction.type === "dividend-reinvestment" ? t("result.dividendReinvest") : t("result.liquidate")}</span>
                 <span>{transaction.shares.toFixed(3)}</span>
                 <span>{formatCurrency(transaction.price)}</span>
               </div>
             ))}
           </div>
           <button type="button" className={styles.tableAction} onClick={onToggleTransactions}>
-            {showAllTransactions ? "Show recent only" : "View all transactions"} <ArrowRight size={14} />
+            {showAllTransactions ? t("result.showRecent") : t("result.viewAll")} <ArrowRight size={14} />
           </button>
         </motion.section>
       </div>
@@ -931,43 +952,44 @@ function InsightsRail({
   holdingResults: Array<{ ticker: string; result: BacktestResult }>;
   onAssistant: () => void;
 }) {
+  const { t } = useLanguage();
   const topHolding = [...holdingResults].sort((a, b) => b.result.totalProfit - a.result.totalProfit)[0];
   const contributionBase = Math.max(result.totalContributions, 0.000001);
   return (
     <div className={styles.insightScroll}>
-      <RailSection title="Execution summary">
-        <AuditRow label="Purchase price" value="Daily high" />
-        <AuditRow label="Non-trading date" value="Next session" />
-        <AuditRow label="OHLC basis" value="Split-adjusted" />
-        <AuditRow label="Dividends" value="Pay-date reinvested" />
-        <AuditRow label="Data source" value={report.source === "demo" ? "Synthetic demo" : "Yahoo + Massive"} verified={report.source !== "demo"} />
+      <RailSection title={t("audit.execution")}>
+        <AuditRow label={t("audit.purchasePrice")} value={t("audit.dailyHigh")} />
+        <AuditRow label={t("audit.nonTrading")} value={t("audit.nextSession")} />
+        <AuditRow label={t("audit.ohlc")} value={t("audit.splitAdjusted")} />
+        <AuditRow label={t("audit.dividends")} value={t("audit.payDate")} />
+        <AuditRow label={t("audit.dataSource")} value={report.source === "demo" ? t("audit.syntheticDemo") : t("audit.liveSource")} verified={report.source !== "demo"} />
       </RailSection>
 
-      <RailSection title="Return breakdown">
-        <AuditRow label="Stock return" value={formatPercent(result.priceReturn / contributionBase * 100)} tone={result.priceReturn >= 0 ? "positive" : "negative"} />
-        <AuditRow label="Dividend return" value={formatPercent(result.grossDividends / contributionBase * 100)} tone="positive" />
-        <AuditRow label="Fees" value={formatPercent(-result.totalFees / contributionBase * 100)} tone="negative" />
-        <AuditRow label="Taxes" value={formatPercent(-(result.dividendTax + result.capitalGainsTax) / contributionBase * 100)} tone="negative" />
-        <AuditRow label="Total return" value={formatPercent(result.totalReturnPercent)} tone={result.totalProfit >= 0 ? "positive" : "negative"} strong />
+      <RailSection title={t("audit.returnBreakdown")}>
+        <AuditRow label={t("audit.stockReturn")} value={formatPercent(result.priceReturn / contributionBase * 100)} tone={result.priceReturn >= 0 ? "positive" : "negative"} />
+        <AuditRow label={t("audit.dividendReturn")} value={formatPercent(result.grossDividends / contributionBase * 100)} tone="positive" />
+        <AuditRow label={t("audit.fees")} value={formatPercent(-result.totalFees / contributionBase * 100)} tone="negative" />
+        <AuditRow label={t("audit.taxes")} value={formatPercent(-(result.dividendTax + result.capitalGainsTax) / contributionBase * 100)} tone="negative" />
+        <AuditRow label={t("result.totalReturn")} value={formatPercent(result.totalReturnPercent)} tone={result.totalProfit >= 0 ? "positive" : "negative"} strong />
       </RailSection>
 
-      <RailSection title="Risk">
-        <div className={styles.riskValue}><span>Max drawdown</span><strong>{formatPercent(result.maxDrawdown.percent)}</strong></div>
+      <RailSection title={t("audit.risk")}>
+        <div className={styles.riskValue}><span>{t("result.maxDrawdown")}</span><strong>{formatPercent(result.maxDrawdown.percent)}</strong></div>
         <div className={styles.drawdownStrip}><i style={{ width: `${Math.min(100, Math.abs(result.maxDrawdown.percent) * 2.1)}%` }} /></div>
-        <AuditRow label="Peak" value={result.maxDrawdown.peakDate ?? "—"} />
-        <AuditRow label="Trough" value={result.maxDrawdown.troughDate ?? "—"} />
-        <AuditRow label="Recovery" value={result.maxDrawdown.recoveryDate ?? "Not recovered"} />
-        <p className={styles.railFootnote}>Cash-flow-neutral unit value prevents contributions from being counted as performance.</p>
+        <AuditRow label={t("audit.peak")} value={result.maxDrawdown.peakDate ?? "—"} />
+        <AuditRow label={t("audit.trough")} value={result.maxDrawdown.troughDate ?? "—"} />
+        <AuditRow label={t("audit.recovery")} value={result.maxDrawdown.recoveryDate ?? t("audit.notRecovered")} />
+        <p className={styles.railFootnote}>{t("audit.cashFlowFootnote")}</p>
       </RailSection>
 
       <button type="button" className={styles.aiCard} onClick={onAssistant}>
-        <div><Sparkles size={18} /><strong>AI analysis</strong><ArrowRight size={16} /></div>
+        <div><Sparkles size={18} /><strong>{t("ai.analysis")}</strong><ArrowRight size={16} /></div>
         <p>
           {topHolding
-            ? `${topHolding.ticker} is the strongest profit contributor in this run. Ask for a plain-language explanation grounded only in this report.`
-            : "Ask a plain-language question about this portfolio report."}
+            ? t("ai.topHolding", { ticker: topHolding.ticker })
+            : t("ai.askReport")}
         </p>
-        <span>Open report assistant</span>
+        <span>{t("ai.open")}</span>
       </button>
     </div>
   );
@@ -982,6 +1004,7 @@ function AssistantDrawer({
   mode: ResultMode;
   onClose: () => void;
 }) {
+  const { t } = useLanguage();
   const [messages, setMessages] = useState<AssistantMessage[]>([]);
   const [question, setQuestion] = useState("");
   const [loading, setLoading] = useState(false);
@@ -1005,7 +1028,7 @@ function AssistantDrawer({
       });
       setMessages([...prior, { role: "user", text: nextQuestion }, { role: "assistant", text: answer }]);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "The assistant is temporarily unavailable.");
+      setError(caught instanceof Error ? caught.message : t("error.assistant"));
     } finally {
       setLoading(false);
     }
@@ -1022,21 +1045,21 @@ function AssistantDrawer({
         onMouseDown={(event) => event.stopPropagation()}
         role="dialog"
         aria-modal="true"
-        aria-label="AI report analyst"
+        aria-label={t("ai.dialog")}
       >
         <div className={styles.drawerHeader}>
-          <div><span><Sparkles size={16} /></span><div><strong>Stock Lens AI</strong><small>Report-grounded analyst</small></div></div>
-          <button type="button" aria-label="Close AI analyst" onClick={onClose}><X size={18} /></button>
+          <div><span><Sparkles size={16} /></span><div><strong>Stock Lens AI</strong><small>{t("ai.subtitle")}</small></div></div>
+          <button type="button" aria-label={t("ai.close")} onClick={onClose}><X size={18} /></button>
         </div>
-        <div className={styles.aiGuardrail}><ShieldCheck size={15} /><span>Uses only this report. It explains results but never gives buy, sell, timing, or allocation advice.</span></div>
+        <div className={styles.aiGuardrail}><ShieldCheck size={15} /><span>{t("ai.guardrail")}</span></div>
         <div className={styles.messageList}>
           {messages.length === 0 ? (
             <div className={styles.aiEmpty}>
               <Bot size={30} />
-              <h2>Understand the numbers.</h2>
-              <p>Ask why the return differs from the stock chart, how taxes affected the result, or what caused the drawdown.</p>
+              <h2>{t("ai.understand")}</h2>
+              <p>{t("ai.help")}</p>
               <div>
-                {["Explain my total return", "What caused the max drawdown?", "Break down fees and taxes"].map((prompt) => (
+                {[t("ai.promptReturn"), t("ai.promptDrawdown"), t("ai.promptFees")].map((prompt) => (
                   <button key={prompt} type="button" onClick={() => setQuestion(prompt)}>{prompt}</button>
                 ))}
               </div>
@@ -1048,22 +1071,22 @@ function AssistantDrawer({
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
             >
-              <span>{message.role === "assistant" ? <Sparkles size={13} /> : "YOU"}</span>
+              <span>{message.role === "assistant" ? <Sparkles size={13} /> : t("ai.you")}</span>
               <p>{message.text}</p>
             </motion.div>
           ))}
-          {loading ? <div className={styles.thinking}><i /><i /><i /><span>Reading your report</span></div> : null}
+          {loading ? <div className={styles.thinking}><i /><i /><i /><span>{t("ai.reading")}</span></div> : null}
           {error ? <div className={styles.aiError}>{error}</div> : null}
         </div>
         <form className={styles.aiComposer} onSubmit={(event) => void submit(event)}>
           <textarea
             value={question}
             onChange={(event) => setQuestion(event.target.value)}
-            placeholder="Ask about this backtest…"
+            placeholder={t("ai.placeholder")}
             maxLength={500}
             rows={3}
           />
-          <div><span>{question.length}/500</span><button type="submit" disabled={!question.trim() || loading}>Ask analyst <ArrowRight size={14} /></button></div>
+          <div><span>{question.length}/500</span><button type="submit" disabled={!question.trim() || loading}>{t("ai.ask")} <ArrowRight size={14} /></button></div>
         </form>
       </motion.aside>
     </motion.div>
@@ -1120,12 +1143,13 @@ function FeeEditor({
   errors: FieldErrors;
   onChange: (value: FeeRule) => void;
 }) {
+  const { t } = useLanguage();
   const fields: Array<{ key: keyof FeeRule; label: string }> = [
-    { key: "fixed", label: "Fixed $" },
-    { key: "perShare", label: "$/share" },
-    { key: "percentOfValue", label: "% value" },
-    { key: "minimum", label: "Minimum $" },
-    { key: "maximum", label: "Maximum $" },
+    { key: "fixed", label: t("fee.fixed") },
+    { key: "perShare", label: t("fee.perShare") },
+    { key: "percentOfValue", label: t("fee.percent") },
+    { key: "minimum", label: t("fee.minimum") },
+    { key: "maximum", label: t("fee.maximum") },
   ];
   return (
     <fieldset className={styles.feeEditor}>
@@ -1143,7 +1167,7 @@ function FeeEditor({
                 min="0"
                 step="0.000001"
                 value={value[field.key] ?? ""}
-                placeholder="None"
+                placeholder={t("fee.none")}
                 aria-invalid={Boolean(errors[errorKey])}
                 aria-describedby={errors[errorKey] ? `${errorKey}-error` : undefined}
                 onChange={(event) => onChange({
@@ -1262,18 +1286,20 @@ function TickerBadge({ ticker }: { ticker: string }) {
 }
 
 function WorkspaceLoading({ loading }: { loading: boolean }) {
+  const { t } = useLanguage();
   return (
     <div className={styles.emptyWorkspace}>
       <span><Activity size={26} /></span>
-      <h1>{loading ? "Building your portfolio timeline" : "Ready for an exact-session backtest"}</h1>
-      <p>{loading ? "Aligning trading dates, adjusted prices, dividends, taxes, and fees." : "Configure any number of US stocks or ETFs, then run the model."}</p>
+      <h1>{loading ? t("workspace.loadingTitle") : t("workspace.readyTitle")}</h1>
+      <p>{loading ? t("workspace.loadingText") : t("workspace.readyText")}</p>
       {loading ? <div className={styles.loadingTrack}><i /></div> : null}
     </div>
   );
 }
 
 function InsightsLoading() {
-  return <div className={styles.insightsEmpty}><Sparkles size={24} /><strong>Audit-ready results</strong><p>Execution, return attribution, risk, and AI explanations will appear here.</p></div>;
+  const { t } = useLanguage();
+  return <div className={styles.insightsEmpty}><Sparkles size={24} /><strong>{t("audit.readyTitle")}</strong><p>{t("audit.readyText")}</p></div>;
 }
 
 function AmbientBackground() {
@@ -1298,47 +1324,47 @@ function createDefaultInput(): PortfolioInput {
   };
 }
 
-function validatePortfolio(input: PortfolioInput): { summary?: string; fields: FieldErrors } {
+function validatePortfolio(input: PortfolioInput, t: Translate): { summary?: string; fields: FieldErrors } {
   const fields: FieldErrors = {};
   let formError: string | undefined;
 
-  if (input.positions.length === 0) formError = "Add at least one holding.";
+  if (input.positions.length === 0) formError = t("validation.addHolding");
 
   const tickers = input.positions.map((position) => position.ticker.trim().toUpperCase());
   input.positions.forEach((position, index) => {
     const ticker = tickers[index];
     if (!/^[A-Z0-9.-]{1,12}$/.test(ticker)) {
-      fields[`ticker-${position.id}`] = "Enter a valid US ticker, such as NVDA, VOO, or BRK.B.";
+      fields[`ticker-${position.id}`] = t("validation.ticker");
     } else if (tickers.filter((candidate) => candidate === ticker).length > 1) {
-      fields[`ticker-${position.id}`] = "Each ticker can appear only once.";
+      fields[`ticker-${position.id}`] = t("validation.uniqueTicker");
     }
 
     if (!Number.isFinite(position.investment.value) || position.investment.value <= 0) {
       fields[`order-${position.id}`] = position.investment.mode === "amount"
-        ? "Cash per order must be greater than $0."
-        : "Shares per order must be greater than 0.";
+        ? t("validation.cash")
+        : t("validation.shares");
     }
     if (!Number.isInteger(position.investment.intervalValue) || position.investment.intervalValue <= 0) {
-      fields[`interval-${position.id}`] = "Interval must be a positive whole number.";
+      fields[`interval-${position.id}`] = t("validation.interval");
     }
   });
 
   if (!isValidDateString(input.startDate) || input.startDate < "1990-01-01") {
-    fields.startDate = "Choose a valid date on or after Jan 1, 1990.";
+    fields.startDate = t("validation.startDate");
   }
   if (!isValidDateString(input.endDate)) {
-    fields.endDate = "Choose a valid end date.";
+    fields.endDate = t("validation.endDate");
   }
   if (!fields.startDate && !fields.endDate && input.startDate > input.endDate) {
-    fields.startDate = "Start date must be on or before the end date.";
-    fields.endDate = "End date must be on or after the start date.";
+    fields.startDate = t("validation.startBeforeEnd");
+    fields.endDate = t("validation.endAfterStart");
   }
 
   if (input.taxMode === "after-tax" && !isPercent(input.dividendTaxRate)) {
-    fields.dividendTaxRate = "Dividend withholding must be between 0% and 100%.";
+    fields.dividendTaxRate = t("validation.dividendTax");
   }
   if (input.liquidateAtEnd && !isPercent(input.capitalGainsTaxRate)) {
-    fields.capitalGainsTaxRate = "Capital gains tax must be between 0% and 100%.";
+    fields.capitalGainsTaxRate = t("validation.capitalTax");
   }
 
   const feeRules: Array<{ key: "buy" | "sell" | "dividendReinvestment"; value: FeeRule }> = [
@@ -1351,18 +1377,18 @@ function validatePortfolio(input: PortfolioInput): { summary?: string; fields: F
     feeFields.forEach((field) => {
       const amount = value[field];
       if (amount !== undefined && (!Number.isFinite(amount) || amount < 0)) {
-        fields[`fee-${key}-${String(field)}`] = "Fee values cannot be negative.";
+        fields[`fee-${key}-${String(field)}`] = t("validation.feeNegative");
       }
     });
     if (value.maximum !== undefined && value.maximum < value.minimum) {
-      fields[`fee-${key}-maximum`] = "Maximum must be at least the minimum fee.";
+      fields[`fee-${key}-maximum`] = t("validation.maximum");
     }
   });
 
   const hasFieldErrors = Object.keys(fields).length > 0;
   return {
     fields,
-    summary: formError ?? (hasFieldErrors ? "Fix the highlighted fields before running the backtest." : undefined),
+    summary: formError ?? (hasFieldErrors ? t("validation.fix") : undefined),
   };
 }
 
@@ -1381,7 +1407,7 @@ function portfolioTitle(tickers: string[]): string {
   return `${tickers.slice(0, 4).join(" · ")} +${tickers.length - 4}`;
 }
 
-function companyLabel(ticker: string): string {
+function companyLabel(ticker: string, t: Translate): string {
   const names: Record<string, string> = {
     AAPL: "Apple Inc.",
     GOOG: "Alphabet Inc., Class C",
@@ -1392,7 +1418,7 @@ function companyLabel(ticker: string): string {
     SOXL: "Direxion Semiconductor Bull 3X",
     RYCEY: "Rolls-Royce Holdings ADR",
   };
-  return names[ticker.trim().toUpperCase()] ?? "US stock or ETF";
+  return names[ticker.trim().toUpperCase()] ?? t("holding.unknownCompany");
 }
 
 function selectResult(report: PortfolioReport | undefined, mode: ResultMode): PortfolioAggregateResult | undefined {
@@ -1411,15 +1437,39 @@ function selectHoldingResults(report: PortfolioReport | undefined, mode: ResultM
   });
 }
 
-function labelScenario(mode: Exclude<ResultMode, "historical">) {
-  if (mode === "conservative") return "Conservative";
-  if (mode === "optimistic") return "Optimistic";
-  return "Baseline";
+function labelScenario(mode: Exclude<ResultMode, "historical">, t: Translate) {
+  if (mode === "conservative") return t("result.conservative");
+  if (mode === "optimistic") return t("result.optimistic");
+  return t("result.baseline");
+}
+
+function formatLocalizedDuration(days: number, t: Translate) {
+  if (days < 31) return t("duration.days", { count: days });
+  const years = Math.floor(days / 365.25);
+  const months = Math.floor((days - years * 365.25) / 30.44);
+  if (years === 0) return t("duration.months", { count: months });
+  if (months > 0) return `${years}y ${months}m`;
+  return t("duration.years", { count: years });
 }
 
 function compactCurrency(value: number) {
   if (Math.abs(value) >= 1_000_000) return `$${(value / 1_000_000).toFixed(2)}M`;
   return formatCurrency(value);
+}
+
+function localizedBrokerNote(brokerId: string, fallback: string, t: Translate) {
+  const keys: Record<string, TranslationKey> = {
+    robinhood: "broker.note.robinhood",
+    webull: "broker.note.webull",
+    "moomoo-us": "broker.note.moomooUs",
+    "moomoo-non-us": "broker.note.moomooNonUs",
+    firstrade: "broker.note.firstrade",
+    "ibkr-lite": "broker.note.ibkrLite",
+    "ibkr-pro-fixed": "broker.note.ibkrFixed",
+    "ibkr-pro-tiered": "broker.note.ibkrTiered",
+    custom: "broker.note.custom",
+  };
+  return keys[brokerId] ? t(keys[brokerId]) : fallback;
 }
 
 function safeNumber(value: string) {
