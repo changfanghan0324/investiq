@@ -11,6 +11,7 @@ import {
 } from "react";
 
 export type Language = "en" | "zh-CN" | "es" | "ja";
+export type FontScale = "25" | "50" | "75" | "100";
 
 export const languageOptions: Array<{ code: Language; flag: string; label: string; shortLabel: string }> = [
   { code: "en", flag: "🇺🇸", label: "English", shortLabel: "EN" },
@@ -19,8 +20,16 @@ export const languageOptions: Array<{ code: Language; flag: string; label: strin
   { code: "ja", flag: "🇯🇵", label: "日本語", shortLabel: "日本" },
 ];
 
+export const fontScaleOptions: Array<{ value: FontScale; label: string; multiplier: number }> = [
+  { value: "25", label: "25%", multiplier: 1 },
+  { value: "50", label: "50%", multiplier: 1.15 },
+  { value: "75", label: "75%", multiplier: 1.3 },
+  { value: "100", label: "100%", multiplier: 1.45 },
+];
+
 const en = {
   "language.label": "Language",
+  "display.fontSize": "Text size",
   "brand.market": "US EQUITIES",
   "nav.portfolio": "Portfolio Lab",
   "nav.methodology": "How it works",
@@ -260,6 +269,7 @@ type Catalog = Record<TranslationKey, string>;
 const zhCN: Catalog = {
   ...en,
   "language.label": "语言",
+  "display.fontSize": "字体大小",
   "brand.market": "美国股票",
   "nav.portfolio": "投资组合实验室",
   "nav.methodology": "计算方法",
@@ -496,6 +506,7 @@ const zhCN: Catalog = {
 const es: Catalog = {
   ...en,
   "language.label": "Idioma",
+  "display.fontSize": "Tamaño de texto",
   "brand.market": "ACCIONES DE EE. UU.",
   "nav.portfolio": "Laboratorio de cartera",
   "nav.methodology": "Cómo funciona",
@@ -731,6 +742,7 @@ const es: Catalog = {
 const ja: Catalog = {
   ...en,
   "language.label": "言語",
+  "display.fontSize": "文字サイズ",
   "brand.market": "米国株式",
   "nav.portfolio": "ポートフォリオラボ",
   "nav.methodology": "計算方法",
@@ -971,23 +983,33 @@ interface LanguageContextValue {
   language: Language;
   locale: string;
   setLanguage: (language: Language) => void;
+  fontScale: FontScale;
+  setFontScale: (fontScale: FontScale) => void;
   t: Translate;
 }
 
 const LanguageContext = createContext<LanguageContextValue | undefined>(undefined);
 const STORAGE_KEY = "stock-lens-language";
+const FONT_SCALE_STORAGE_KEY = "stock-lens-font-scale";
 
 function isLanguage(value: string | null): value is Language {
   return value === "en" || value === "zh-CN" || value === "es" || value === "ja";
 }
 
+function isFontScale(value: string | null): value is FontScale {
+  return value === "25" || value === "50" || value === "75" || value === "100";
+}
+
 export function LanguageProvider({ children }: { children: ReactNode }) {
   const [language, setLanguageState] = useState<Language>("en");
+  const [fontScale, setFontScaleState] = useState<FontScale>("25");
 
   useEffect(() => {
     const restoreLanguage = window.setTimeout(() => {
       const saved = window.localStorage.getItem(STORAGE_KEY);
       if (isLanguage(saved)) setLanguageState(saved);
+      const savedFontScale = window.localStorage.getItem(FONT_SCALE_STORAGE_KEY);
+      if (isFontScale(savedFontScale)) setFontScaleState(savedFontScale);
     });
     return () => window.clearTimeout(restoreLanguage);
   }, []);
@@ -997,9 +1019,20 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
     window.localStorage.setItem(STORAGE_KEY, next);
   }, []);
 
+  const setFontScale = useCallback((next: FontScale) => {
+    setFontScaleState(next);
+    window.localStorage.setItem(FONT_SCALE_STORAGE_KEY, next);
+  }, []);
+
   useEffect(() => {
     document.documentElement.lang = language;
   }, [language]);
+
+  useEffect(() => {
+    const selectedScale = fontScaleOptions.find((option) => option.value === fontScale) ?? fontScaleOptions[0];
+    document.documentElement.dataset.fontScale = fontScale;
+    document.documentElement.style.setProperty("--ui-font-scale", String(selectedScale.multiplier));
+  }, [fontScale]);
 
   const t = useCallback<Translate>((key, params) => {
     let value: string = messages[language][key] ?? en[key];
@@ -1010,11 +1043,13 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
   }, [language]);
 
   const value = useMemo<LanguageContextValue>(() => ({
+    fontScale,
     language,
     locale: language === "zh-CN" ? "zh-CN" : language === "ja" ? "ja-JP" : language === "es" ? "es-ES" : "en-US",
+    setFontScale,
     setLanguage,
     t,
-  }), [language, setLanguage, t]);
+  }), [fontScale, language, setFontScale, setLanguage, t]);
 
   return <LanguageContext.Provider value={value}>{children}</LanguageContext.Provider>;
 }

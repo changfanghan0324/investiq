@@ -10,9 +10,10 @@ import {
   RefreshCw,
   ShieldCheck,
   TrendingDown,
+  Type,
 } from "lucide-react";
 
-import { languageOptions, type TranslationKey, useLanguage } from "@/i18n/language";
+import { fontScaleOptions, languageOptions, type FontScale, type TranslationKey, useLanguage } from "@/i18n/language";
 
 import styles from "./methodology.module.css";
 
@@ -31,7 +32,7 @@ const rules: Array<{
 ];
 
 export function MethodologyContent() {
-  const { language, setLanguage, t } = useLanguage();
+  const { fontScale, language, setFontScale, setLanguage, t } = useLanguage();
   const activeLanguage = languageOptions.find((option) => option.code === language) ?? languageOptions[0];
   return (
     <main className={styles.page}>
@@ -48,6 +49,14 @@ export function MethodologyContent() {
               {languageOptions.map((option) => <option key={option.code} value={option.code}>{option.flag} {option.label}</option>)}
             </select>
             <ChevronDown size={13} aria-hidden="true" />
+          </label>
+          <label className={styles.fontScaleControl} title={t("display.fontSize")}>
+            <span className={styles.visuallyHidden}>{t("display.fontSize")}</span>
+            <span className={styles.fontScaleCurrent} aria-hidden="true"><Type size={13} /><b>{fontScale}%</b></span>
+            <select value={fontScale} aria-label={t("display.fontSize")} onChange={(event) => setFontScale(event.target.value as FontScale)}>
+              {fontScaleOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+            </select>
+            <ChevronDown size={12} aria-hidden="true" />
           </label>
           <Link className={styles.backLink} href="/"><ArrowLeft size={15} /> {t("method.back")}</Link>
         </div>

@@ -30,6 +30,7 @@ import {
   ShieldCheck,
   Sparkles,
   Trash2,
+  Type,
   X,
   Zap,
 } from "lucide-react";
@@ -37,7 +38,7 @@ import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 
 import { brokerPresets, getBrokerPreset } from "@/constants/broker-presets";
 import { PortfolioPerformanceChart } from "@/components/portfolio-performance-chart";
-import { languageOptions, type Translate, type TranslationKey, useLanguage } from "@/i18n/language";
+import { fontScaleOptions, languageOptions, type FontScale, type Translate, type TranslationKey, useLanguage } from "@/i18n/language";
 import { createPortfolioReport } from "@/services/create-portfolio-report";
 import {
   askPortfolioAssistant,
@@ -547,7 +548,7 @@ function Header({
   onAssistant: () => void;
   onExport: () => void;
 }) {
-  const { language, setLanguage, t } = useLanguage();
+  const { fontScale, language, setFontScale, setLanguage, t } = useLanguage();
   const activeLanguage = languageOptions.find((option) => option.code === language) ?? languageOptions[0];
   return (
     <header className={styles.topbar}>
@@ -579,6 +580,20 @@ function Header({
             ))}
           </select>
           <ChevronDown size={13} aria-hidden="true" />
+        </label>
+        <label className={styles.fontScaleControl} title={t("display.fontSize")}>
+          <span className={styles.visuallyHidden}>{t("display.fontSize")}</span>
+          <span className={styles.fontScaleCurrent} aria-hidden="true"><Type size={13} /><b>{fontScale}%</b></span>
+          <select
+            value={fontScale}
+            aria-label={t("display.fontSize")}
+            onChange={(event) => setFontScale(event.target.value as FontScale)}
+          >
+            {fontScaleOptions.map((option) => (
+              <option key={option.value} value={option.value}>{option.label}</option>
+            ))}
+          </select>
+          <ChevronDown size={12} aria-hidden="true" />
         </label>
         <motion.button type="button" className={styles.secondaryAction} disabled={!reportReady} onClick={onAssistant} whileTap={reportReady ? { scale: 0.96 } : undefined}>
           <Sparkles size={15} /> <span>{t("header.aiAnalyst")}</span>
