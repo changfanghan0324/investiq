@@ -18,11 +18,21 @@ const uiMono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Stock Lens — Portfolio Backtest Lab",
+  title: {
+    default: "InvestIQ — Personalized Investment Analytics Platform",
+    template: "%s — InvestIQ",
+  },
   description:
-    "Professional recurring-investment backtests for US stocks and ETFs, with exact trading-day execution, dividends, fees, taxes, and drawdown.",
-  applicationName: "Stock Lens",
-  keywords: ["stock backtest", "recurring investment", "portfolio analytics", "US equities"],
+    "Personalized investment analytics for US stocks and ETFs: market overview, per-symbol analysis, comparison, portfolio construction, and recurring-investment backtests built on end-of-day data.",
+  applicationName: "InvestIQ",
+  keywords: [
+    "investment analytics",
+    "portfolio analysis",
+    "stock comparison",
+    "stock backtest",
+    "recurring investment",
+    "US equities",
+  ],
   icons: { icon: "/icon.svg" },
 };
 

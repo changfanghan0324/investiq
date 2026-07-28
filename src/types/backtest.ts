@@ -66,6 +66,8 @@ export interface PriceBar {
   high: number;
   low: number;
   close: number;
+  /** Daily share volume when the data source supplies it. */
+  volume?: number;
   projected?: boolean;
 }
 

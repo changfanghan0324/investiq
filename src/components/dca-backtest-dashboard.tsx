@@ -7,6 +7,7 @@ import {
   useRef,
   useState,
 } from "react";
+import Link from "next/link";
 import {
   Activity,
   Apple,
@@ -30,15 +31,15 @@ import {
   ShieldCheck,
   Sparkles,
   Trash2,
-  Type,
   X,
   Zap,
 } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 
+import { AppShell } from "@/components/app-shell";
 import { brokerPresets, getBrokerPreset } from "@/constants/broker-presets";
 import { PortfolioPerformanceChart } from "@/components/portfolio-performance-chart";
-import { fontScaleOptions, languageOptions, type FontScale, type Translate, type TranslationKey, useLanguage } from "@/i18n/language";
+import { type Translate, type TranslationKey, useLanguage } from "@/i18n/language";
 import { createPortfolioReport } from "@/services/create-portfolio-report";
 import {
   askPortfolioAssistant,
@@ -58,12 +59,15 @@ import type {
 import { addYearsClamped, todayDateString } from "@/utils/date";
 import { formatCurrency, formatPercent } from "@/utils/format";
 
-import styles from "./stock-lens-dashboard.module.css";
+import styles from "./dca-backtest-dashboard.module.css";
 
 type LoadingMode = "live" | "demo";
 type ResultMode = ProjectionScenarioId | "historical";
 type HealthState = "checking" | "ready" | "degraded";
 type FieldErrors = Record<string, string>;
+
+/** Browser-local portfolio label, stored under the shared `investiq-` key namespace. */
+const PORTFOLIO_NAME_STORAGE_KEY = "investiq-dca-portfolio-name";
 
 const intervalOptions: Array<{ labelKey: TranslationKey; value: IntervalUnit }> = [
   { labelKey: "holding.day", value: "trading-days" },
@@ -72,7 +76,7 @@ const intervalOptions: Array<{ labelKey: TranslationKey; value: IntervalUnit }> 
   { labelKey: "holding.year", value: "years" },
 ];
 
-export function StockLensDashboard() {
+export function DcaBacktestDashboard() {
   const { t } = useLanguage();
   const [input, setInput] = useState<PortfolioInput>(createDefaultInput);
   const [portfolioName, setPortfolioName] = useState("Portfolio 01");
@@ -91,7 +95,7 @@ export function StockLensDashboard() {
 
   useEffect(() => {
     const restoreName = window.setTimeout(() => {
-      const savedName = window.localStorage.getItem("stock-lens-portfolio-name")?.trim();
+      const savedName = window.localStorage.getItem(PORTFOLIO_NAME_STORAGE_KEY)?.trim();
       if (savedName) setPortfolioName(savedName);
     });
     return () => window.clearTimeout(restoreName);
@@ -149,7 +153,7 @@ export function StockLensDashboard() {
   function renamePortfolio(name: string) {
     const nextName = name.trim() || "Portfolio 01";
     setPortfolioName(nextName);
-    window.localStorage.setItem("stock-lens-portfolio-name", nextName);
+    window.localStorage.setItem(PORTFOLIO_NAME_STORAGE_KEY, nextName);
   }
 
   function addHolding() {
@@ -231,14 +235,18 @@ export function StockLensDashboard() {
   }
 
   return (
-    <main className={styles.appShell}>
+    <AppShell
+      status={<ServiceStatus health={health} />}
+      actions={
+        <HeaderActions
+          reportReady={Boolean(report && selected)}
+          onAssistant={() => setAssistantOpen(true)}
+          onExport={exportPdf}
+        />
+      }
+    >
+      <div className={styles.appShell}>
       <AmbientBackground />
-      <Header
-        health={health}
-        reportReady={Boolean(report && selected)}
-        onAssistant={() => setAssistantOpen(true)}
-        onExport={exportPdf}
-      />
 
       <div className={`${styles.dashboardGrid} ${setupCollapsed ? styles.setupCollapsed : ""}`}>
         <aside className={`${styles.builder} ${setupCollapsed ? styles.builderCollapsed : ""}`} aria-label={t("builder.setup")}>
@@ -533,76 +541,60 @@ export function StockLensDashboard() {
           />
         ) : null}
       </AnimatePresence>
-    </main>
+      </div>
+    </AppShell>
   );
 }
 
-function Header({
-  health,
+function ServiceStatus({ health }: { health: HealthState }) {
+  const { t } = useLanguage();
+  return (
+    <>
+      <HeaderMarketPulse />
+      <div className={styles.marketStatus} title={t("header.serviceStatus")}>
+        <span className={health === "ready" ? styles.statusReady : health === "checking" ? styles.statusChecking : styles.statusMuted} />
+        <div><strong>{health === "ready" ? t("header.dataReady") : health === "checking" ? t("header.checkingData") : t("header.dataDegraded")}</strong><small>{t("header.serverVerified")}</small></div>
+      </div>
+    </>
+  );
+}
+
+function HeaderActions({
   reportReady,
   onAssistant,
   onExport,
 }: {
-  health: HealthState;
   reportReady: boolean;
   onAssistant: () => void;
   onExport: () => void;
 }) {
-  const { fontScale, language, setFontScale, setLanguage, t } = useLanguage();
-  const activeLanguage = languageOptions.find((option) => option.code === language) ?? languageOptions[0];
+  const { t } = useLanguage();
   return (
-    <header className={styles.topbar}>
-      <a className={styles.brand} href="#portfolio-lab" aria-label="Stock Lens portfolio lab">
-        <span className={styles.brandMark}><i /><b /></span>
-        <strong>STOCK LENS</strong>
-        <em>{t("brand.market")}</em>
-      </a>
-      <nav className={styles.navLinks} aria-label={t("nav.primary")}>
-        <a className={styles.navActive} href="#portfolio-lab">{t("nav.portfolio")}</a>
-        <a href="/methodology">{t("nav.methodology")}</a>
-      </nav>
-      <div className={styles.headerActions}>
-        <HeaderMarketPulse />
-        <div className={styles.marketStatus} title={t("header.serviceStatus")}>
-          <span className={health === "ready" ? styles.statusReady : health === "checking" ? styles.statusChecking : styles.statusMuted} />
-          <div><strong>{health === "ready" ? t("header.dataReady") : health === "checking" ? t("header.checkingData") : t("header.dataDegraded")}</strong><small>{t("header.serverVerified")}</small></div>
-        </div>
-        <label className={styles.languageControl} title={t("language.label")}>
-          <span className={styles.visuallyHidden}>{t("language.label")}</span>
-          <span className={styles.languageCurrent} aria-hidden="true"><span>{activeLanguage.flag}</span><b>{activeLanguage.shortLabel}</b></span>
-          <select
-            value={language}
-            aria-label={t("language.label")}
-            onChange={(event) => setLanguage(event.target.value as typeof language)}
-          >
-            {languageOptions.map((option) => (
-              <option key={option.code} value={option.code}>{option.flag} {option.label}</option>
-            ))}
-          </select>
-          <ChevronDown size={13} aria-hidden="true" />
-        </label>
-        <label className={styles.fontScaleControl} title={t("display.fontSize")}>
-          <span className={styles.visuallyHidden}>{t("display.fontSize")}</span>
-          <span className={styles.fontScaleCurrent} aria-hidden="true"><Type size={13} /><b>{fontScale}%</b></span>
-          <select
-            value={fontScale}
-            aria-label={t("display.fontSize")}
-            onChange={(event) => setFontScale(event.target.value as FontScale)}
-          >
-            {fontScaleOptions.map((option) => (
-              <option key={option.value} value={option.value}>{option.label}</option>
-            ))}
-          </select>
-          <ChevronDown size={12} aria-hidden="true" />
-        </label>
-        <motion.button type="button" className={styles.secondaryAction} disabled={!reportReady} onClick={onAssistant} whileTap={reportReady ? { scale: 0.96 } : undefined}>
-          <Sparkles size={15} /> <span>{t("header.aiAnalyst")}</span>
-        </motion.button>
-        <motion.button type="button" className={styles.primaryAction} disabled={!reportReady} onClick={onExport} whileTap={reportReady ? { scale: 0.96 } : undefined}>
-          <Download size={15} /> <span>{t("header.exportPdf")}</span>
-        </motion.button>
-      </div>
-    </header>
+    <>
+      <Link className={styles.secondaryAction} href="/methodology" aria-label={t("nav.methodology")}>
+        <CircleHelp size={15} /> <span>{t("nav.methodology")}</span>
+      </Link>
+      <motion.button
+        type="button"
+        className={styles.secondaryAction}
+        disabled={!reportReady}
+        onClick={onAssistant}
+        aria-label={t("header.aiAnalyst")}
+        whileTap={reportReady ? { scale: 0.96 } : undefined}
+      >
+        <Sparkles size={15} /> <span>{t("header.aiAnalyst")}</span>
+      </motion.button>
+      <motion.button
+        type="button"
+        className={styles.primaryAction}
+        disabled={!reportReady}
+        onClick={onExport}
+        aria-label={t("header.exportPdf")}
+        whileTap={reportReady ? { scale: 0.96 } : undefined}
+      >
+        <Download size={15} /> <span>{t("header.exportPdf")}</span>
+      </motion.button>
+    </>
   );
 }
 
@@ -913,7 +905,9 @@ function ResultsWorkspace({
       <PortfolioPerformanceChart result={result} />
 
       <div className={styles.lowerGrid}>
-        <motion.section className={styles.panel} initial={{ opacity: 0, y: 14 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, amount: 0.18 }} transition={{ duration: 0.42 }}>
+        {/* Reveals on mount, not on scroll: a scroll-triggered fade left these panels blank
+            below the fold, which read as a large empty gap on mobile. */}
+        <motion.section className={styles.panel} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.42 }}>
           <PanelHeader title={t("result.attribution")} meta={t("result.contributionWeighted")} />
           <div className={styles.attributionHeader}>
             <span>{t("result.ticker")}</span><span>{t("result.finalValue")}</span><span>{t("result.return")}</span><span>{t("result.portfolio")}</span>
@@ -931,7 +925,7 @@ function ResultsWorkspace({
           })}
         </motion.section>
 
-        <motion.section className={styles.panel} initial={{ opacity: 0, y: 14 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, amount: 0.18 }} transition={{ duration: 0.42, delay: 0.06 }}>
+        <motion.section className={styles.panel} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.42, delay: 0.06 }}>
           <PanelHeader title={t("result.recentTransactions")} meta={t("result.totalCount", { count: result.transactions.length })} />
           <div className={styles.transactionScroller}>
             <div className={styles.transactionHeader}>
@@ -1063,7 +1057,7 @@ function AssistantDrawer({
         aria-label={t("ai.dialog")}
       >
         <div className={styles.drawerHeader}>
-          <div><span><Sparkles size={16} /></span><div><strong>Stock Lens AI</strong><small>{t("ai.subtitle")}</small></div></div>
+          <div><span><Sparkles size={16} /></span><div><strong>InvestIQ AI</strong><small>{t("ai.subtitle")}</small></div></div>
           <button type="button" aria-label={t("ai.close")} onClick={onClose}><X size={18} /></button>
         </div>
         <div className={styles.aiGuardrail}><ShieldCheck size={15} /><span>{t("ai.guardrail")}</span></div>

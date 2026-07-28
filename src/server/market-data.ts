@@ -27,6 +27,8 @@ export type PriceBar = {
   high: number;
   low: number;
   close: number;
+  /** Daily share volume when the data source supplies it. */
+  volume?: number;
 };
 
 export type DividendEvent = {
@@ -71,6 +73,7 @@ type YahooQuote = {
   high?: Array<number | null>;
   low?: Array<number | null>;
   close?: Array<number | null>;
+  volume?: Array<number | null>;
 };
 
 export type YahooSplit = {
@@ -319,7 +322,7 @@ async function requestYahooChart(ticker: string, from: string, to: string): Prom
     `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(yahooTicker)}?${query}`,
     {
       cache: 'no-store',
-      headers: { Accept: 'application/json', 'User-Agent': 'StockLensWeb/1.0' },
+      headers: { Accept: 'application/json', 'User-Agent': 'InvestIQ/1.0' },
       signal: AbortSignal.timeout(30_000),
     },
   );
@@ -343,7 +346,7 @@ function assertNoUnsupportedCorporateActions(chart: YahooChartResult) {
   }
 }
 
-function parseYahooPrices(chart: YahooChartResult): PriceBar[] {
+export function parseYahooPrices(chart: YahooChartResult): PriceBar[] {
   const quote = chart.indicators?.quote?.[0] ?? {};
   return (chart.timestamp ?? []).flatMap((timestamp, index) => {
     const values = [
@@ -354,6 +357,10 @@ function parseYahooPrices(chart: YahooChartResult): PriceBar[] {
     ];
     if (values.some((value) => typeof value !== 'number' || !Number.isFinite(value))) return [];
 
+    // Volume is supplementary: a bar with valid OHLC survives a missing or invalid volume.
+    const volume = quote.volume?.[index];
+    const hasVolume = typeof volume === 'number' && Number.isFinite(volume) && volume >= 0;
+
     return [
       {
         date: new Date(timestamp * 1_000).toISOString().slice(0, 10),
@@ -361,6 +368,7 @@ function parseYahooPrices(chart: YahooChartResult): PriceBar[] {
         high: values[1] as number,
         low: values[2] as number,
         close: values[3] as number,
+        ...(hasVolume ? { volume } : {}),
       },
     ];
   });

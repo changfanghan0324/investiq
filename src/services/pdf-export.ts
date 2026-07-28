@@ -30,7 +30,7 @@ export function exportPortfolioPdf({ report, result, holdings, scenarioLabel }: 
   doc.setTextColor(40, 201, 244);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(11);
-  doc.text("STOCK LENS  /  PORTFOLIO LAB", margin, 34);
+  doc.text("INVESTIQ  /  DCA BACKTEST", margin, 34);
   doc.setTextColor(245, 250, 252);
   doc.setFontSize(23);
   doc.text("Portfolio Backtest Report", margin, 64);
@@ -179,10 +179,10 @@ export function exportPortfolioPdf({ report, result, holdings, scenarioLabel }: 
   doc.setFontSize(9.5);
   const paragraphs = [
     "Historical execution. Each recurring order is moved to the next available market session when its scheduled date is not a trading day. Purchases use that day's split-adjusted high. Period-end holdings are valued at the split-adjusted close unless liquidation is enabled.",
-    "Corporate actions. Prices reflect splits and reverse splits without embedding dividend reinvestment. Ordinary dividends are modeled separately. If Stock Lens detects an unsupported or unreliable company action, calculation stops instead of silently producing a result.",
+    "Corporate actions. Prices reflect splits and reverse splits without embedding dividend reinvestment. Ordinary dividends are modeled separately. If InvestIQ detects an unsupported or unreliable company action, calculation stops instead of silently producing a result.",
     "Drawdown. Maximum drawdown uses a cash-flow-neutral portfolio unit value, so new contributions do not appear as investment performance.",
     "Future periods. Any future figures are labeled simulated estimates and remain separate from historical results. Scenarios use the security's available history beginning no earlier than 1990 and no earlier than its actual listing data. They are not predictions, forecasts, advice, or guaranteed returns.",
-    "Data and fees. Market data and broker fee schedules can be delayed, incomplete, revised, or region-specific. Confirm any decision against official filings and your brokerage statement. Stock Lens is an educational research tool, not a broker, adviser, tax professional, or execution venue.",
+    "Data and fees. Market data and broker fee schedules can be delayed, incomplete, revised, or region-specific. Confirm any decision against official filings and your brokerage statement. InvestIQ is an educational research tool, not a broker, adviser, tax professional, or execution venue.",
   ];
   let textY = 78;
   paragraphs.forEach((paragraph) => {
@@ -198,14 +198,14 @@ export function exportPortfolioPdf({ report, result, holdings, scenarioLabel }: 
     doc.setFontSize(8);
     doc.setTextColor(110, 126, 138);
     doc.text(
-      `Stock Lens complete report  |  Page ${pageNumber} of ${pageCount}`,
+      `InvestIQ DCA backtest report  |  Page ${pageNumber} of ${pageCount}`,
       margin,
       doc.internal.pageSize.getHeight() - 20,
     );
   }
 
   const tickerPart = holdings.map((item) => item.ticker).join("-").slice(0, 40) || "portfolio";
-  doc.save(`stock-lens-${tickerPart}-${result.endDate}.pdf`);
+  doc.save(`investiq-dca-${tickerPart}-${result.endDate}.pdf`);
 }
 
 function sectionTitle(doc: jsPDF, title: string, y: number) {

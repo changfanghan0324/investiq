@@ -1,5 +1,7 @@
 :root {
   --ui-font-scale: 1;
+  --iq-header-height: 60px;
+  --iq-bottom-nav-height: 0px;
   --background: #0b0e14;
   --foreground: #d1d4dc;
   --panel: #131722;
@@ -26,6 +28,13 @@ body {
 
 html {
   scroll-padding-top: 76px;
+}
+
+/* Reserves room for the fixed five-item bottom navigation on compact viewports. */
+@media (max-width: 980px) {
+  :root {
+    --iq-bottom-nav-height: calc(56px + env(safe-area-inset-bottom));
+  }
 }
 
 body {

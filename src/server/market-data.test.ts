@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'vitest';
 
-import { areYahooSplitsVerified, classifyYahooSplit } from '@/server/market-data';
+import { areYahooSplitsVerified, classifyYahooSplit, parseYahooPrices } from '@/server/market-data';
 
 describe('Yahoo split classification', () => {
   it('fails closed for the AT&T 2022 spin-off ratio Yahoo labels as a split', () => {
@@ -106,6 +106,51 @@ describe('Yahoo split classification', () => {
         }],
       ),
       false,
+    );
+  });
+});
+
+describe('Yahoo price volume parsing', () => {
+  const timestamps = [Date.parse('2024-01-02T14:30:00Z') / 1_000];
+  const ohlc = { open: [10], high: [12], low: [9], close: [11] };
+
+  const parse = (quote: Record<string, Array<number | null>>) =>
+    parseYahooPrices({ timestamp: timestamps, indicators: { quote: [{ ...ohlc, ...quote }] } });
+
+  it('retains a valid volume, including zero', () => {
+    assert.deepEqual(parse({ volume: [1_234_567] }), [
+      { date: '2024-01-02', open: 10, high: 12, low: 9, close: 11, volume: 1_234_567 },
+    ]);
+    assert.deepEqual(parse({ volume: [0] })[0].volume, 0);
+  });
+
+  it('keeps a valid OHLC bar when volume is missing', () => {
+    const withoutVolumeArray = parse({});
+    assert.deepEqual(withoutVolumeArray, [
+      { date: '2024-01-02', open: 10, high: 12, low: 9, close: 11 },
+    ]);
+    assert.equal('volume' in withoutVolumeArray[0], false);
+
+    const withNullVolume = parse({ volume: [null] });
+    assert.equal(withNullVolume.length, 1);
+    assert.equal('volume' in withNullVolume[0], false);
+  });
+
+  it('omits negative and non-finite volume without dropping the bar', () => {
+    for (const invalid of [-1, Number.NaN, Number.POSITIVE_INFINITY]) {
+      const bars = parse({ volume: [invalid] });
+      assert.equal(bars.length, 1);
+      assert.equal('volume' in bars[0], false);
+    }
+  });
+
+  it('drops a bar with invalid OHLC regardless of volume', () => {
+    assert.deepEqual(
+      parseYahooPrices({
+        timestamp: timestamps,
+        indicators: { quote: [{ ...ohlc, close: [null], volume: [500] }] },
+      }),
+      [],
     );
   });
 });

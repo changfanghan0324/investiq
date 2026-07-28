@@ -1342,7 +1342,8 @@
 }
 
 @media (max-width: 720px) {
-  .appShell { padding-bottom: calc(66px + env(safe-area-inset-bottom)); }
+  /* Clears the run bar only. The shell already reserves the bottom nav and its safe area. */
+  .appShell { padding-bottom: 66px; }
   .topbar { position: sticky; min-height: 60px; padding: 0 12px; }
   .brand strong { font-size: calc(14px * var(--ui-font-scale, 1)); }
   .brandMark { width: 27px; height: 27px; }
@@ -1380,18 +1381,20 @@
   .railSection { border-right: 0; border-bottom: 1px solid #2a2e39; }
   .methodGrid article { min-height: auto; }
   .footer { align-items: flex-start; flex-direction: column; padding: 24px 0; }
+  /* Sits directly above the shared bottom navigation so both stay tappable. */
   .mobileRunBar {
     position: fixed;
     z-index: 60;
     right: 0;
-    bottom: 0;
+    bottom: var(--iq-bottom-nav-height);
     left: 0;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    min-height: calc(58px + env(safe-area-inset-bottom));
-    padding: 8px 12px calc(8px + env(safe-area-inset-bottom));
+    min-height: 58px;
+    padding: 8px 12px;
     border-top: 1px solid #363a45;
+    border-bottom: 1px solid #363a45;
     background: rgba(15, 19, 27, 0.96);
     box-shadow: 0 -14px 35px rgba(0, 0, 0, 0.38);
     backdrop-filter: blur(18px);

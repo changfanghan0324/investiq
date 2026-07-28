@@ -37,10 +37,13 @@ yarn-error.log*
 # vercel
 .vercel
 
-# local QA artifacts
+# local QA artifacts and generated reports/downloads
 .playwright-cli/
+/.qa/
 /output/
 /tmp/
+/downloads/
+*.pdf
 
 # typescript
 *.tsbuildinfo

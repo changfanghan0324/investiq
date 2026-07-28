@@ -15,7 +15,7 @@ import {
 import type { PortfolioAggregateResult } from "@/types/backtest";
 import { type Translate, useLanguage } from "@/i18n/language";
 
-import styles from "./stock-lens-dashboard.module.css";
+import styles from "./dca-backtest-dashboard.module.css";
 
 type ChartMode = "value" | "return" | "drawdown";
 type ChartRange = "ytd" | "1y" | "3y" | "all";
@@ -81,11 +81,11 @@ export function PortfolioPerformanceChart({ result }: { result: PortfolioAggrega
         <ResponsiveContainer className={styles.chartResponsive} width="100%" height="100%">
           <AreaChart data={data} margin={{ top: 12, right: 8, left: 0, bottom: 0 }}>
             <defs>
-              <linearGradient id="stockLensValue" x1="0" y1="0" x2="0" y2="1">
+              <linearGradient id="dcaValueFill" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stopColor="#24aef2" stopOpacity={0.24} />
                 <stop offset="88%" stopColor="#24aef2" stopOpacity={0.01} />
               </linearGradient>
-              <linearGradient id="stockLensNegative" x1="0" y1="0" x2="0" y2="1">
+              <linearGradient id="dcaDrawdownFill" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stopColor="#f23645" stopOpacity={0.05} />
                 <stop offset="100%" stopColor="#f23645" stopOpacity={0.32} />
               </linearGradient>
@@ -114,7 +114,7 @@ export function PortfolioPerformanceChart({ result }: { result: PortfolioAggrega
                   dataKey="value"
                   stroke="#24aef2"
                   strokeWidth={2.25}
-                  fill="url(#stockLensValue)"
+                  fill="url(#dcaValueFill)"
                   animationDuration={900}
                   animationEasing="ease-out"
                   activeDot={{ r: 4, fill: "#ffffff", stroke: "#24aef2", strokeWidth: 2 }}
@@ -134,7 +134,7 @@ export function PortfolioPerformanceChart({ result }: { result: PortfolioAggrega
                 dataKey={mode === "return" ? "returnPercent" : "drawdown"}
                 stroke={mode === "return" ? "#089981" : "#f23645"}
                 strokeWidth={2.1}
-                fill={mode === "return" ? "url(#stockLensValue)" : "url(#stockLensNegative)"}
+                fill={mode === "return" ? "url(#dcaValueFill)" : "url(#dcaDrawdownFill)"}
                 animationDuration={850}
                 animationEasing="ease-out"
                 activeDot={{ r: 4, fill: "#f4fbff", strokeWidth: 2 }}
