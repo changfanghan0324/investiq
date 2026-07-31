@@ -5,8 +5,12 @@ import autoTable from "jspdf-autotable";
 
 import type {
   BacktestResult,
+  FeeComponentKind,
+  MoneyWeightedReturn,
   PortfolioAggregateResult,
   PortfolioReport,
+  TimeWeightedReturn,
+  TransactionType,
 } from "@/types/backtest";
 import { formatCurrency, formatPercent, formatShares } from "@/utils/format";
 
@@ -47,12 +51,12 @@ export function exportPortfolioPdf({ report, result, holdings, scenarioLabel }: 
     startY: y,
     margin: { left: margin, right: margin },
     theme: "grid",
-    head: [["Ending value", "Contributions", "Total profit", "Total return", "Max drawdown", "Time"]],
+    head: [["Ending value", "Contributions", "Net gain / loss", "Net gain ÷ contrib", "Max drawdown", "Time"]],
     body: [[
       formatCurrency(result.finalAmount),
       formatCurrency(result.totalContributions),
       formatCurrency(result.totalProfit),
-      formatPercent(result.totalReturnPercent),
+      formatPercent(result.netGainRatioPercent),
       formatPercent(result.maxDrawdown.percent),
       `${result.durationDays} days`,
     ]],
@@ -60,17 +64,45 @@ export function exportPortfolioPdf({ report, result, holdings, scenarioLabel }: 
   });
   y = tableEnd(doc) + 26;
 
+  sectionTitle(doc, "Performance measures", y);
+  autoTable(doc, {
+    startY: y + 13,
+    margin: { left: margin, right: margin },
+    body: [
+      ["Net gain ÷ contributions (dollar-efficiency ratio, not annualized)", formatPercent(result.netGainRatioPercent)],
+      ["Time-weighted return (TWR), since inception — cash-flow neutral", formatPercent(result.twr.cumulative * 100)],
+      ["TWR annualized", annualizedTwrLabel(result.twr)],
+      ["Money-weighted return (MWRR / annualized XIRR), investor experience", mwrrLabel(result.mwrr)],
+    ],
+    ...tableTheme(),
+    theme: "plain",
+    columnStyles: { 0: { textColor: [91, 111, 126] }, 1: { halign: "right", fontStyle: "bold" } },
+  });
+  y = tableEnd(doc) + 8;
+  doc.setTextColor(70, 88, 103);
+  doc.setFontSize(8.5);
+  const measuresNote = doc.splitTextToSize(
+    "Net gain ÷ contributions is a simple dollar-efficiency ratio, not a return and not annualized. TWR removes the effect of contribution timing (dividends, dividend tax, and fees stay inside it); MWRR reflects the timing and size of your contributions. Annualization is shown only after at least one calendar year. These are educational estimates, not GIPS-compliant, audited, or investment advice.",
+    width - margin * 2,
+  );
+  doc.text(measuresNote, margin, y, { lineHeightFactor: 1.4 });
+  y += measuresNote.length * 11 + 26;
+
+  if (y > 600) {
+    doc.addPage();
+    y = 48;
+  }
   sectionTitle(doc, "Holding attribution", y);
   autoTable(doc, {
     startY: y + 13,
     margin: { left: margin, right: margin },
-    head: [["Ticker", "Company", "Ending value", "Contributed", "Return", "Final shares"]],
+    head: [["Ticker", "Company", "Ending value", "Contributed", "Net gain ÷ contrib", "Final shares"]],
     body: holdings.map(({ ticker, result: item }) => [
       ticker,
       item.companyName,
       formatCurrency(item.finalAmount),
       formatCurrency(item.totalContributions),
-      formatPercent(item.totalReturnPercent),
+      formatPercent(item.netGainRatioPercent),
       formatShares(item.finalShares),
     ]),
     ...tableTheme(),
@@ -98,6 +130,69 @@ export function exportPortfolioPdf({ report, result, holdings, scenarioLabel }: 
     columnStyles: { 0: { textColor: [91, 111, 126] }, 1: { halign: "right", fontStyle: "bold" } },
   });
   y = tableEnd(doc) + 26;
+
+  if (result.feeComponents.length > 0) {
+    if (y > 600) {
+      doc.addPage();
+      y = 48;
+    }
+    sectionTitle(doc, "Fee breakdown (audited components)", y);
+    autoTable(doc, {
+      startY: y + 13,
+      margin: { left: margin, right: margin },
+      body: [
+        ...result.feeComponents.map((line) => [feeComponentLabel(line.kind), `-${formatCurrency(line.amount)}`]),
+        ["Total fees", `-${formatCurrency(result.totalFees)}`],
+      ],
+      ...tableTheme(),
+      theme: "plain",
+      columnStyles: { 0: { textColor: [91, 111, 126] }, 1: { halign: "right", fontStyle: "bold" } },
+    });
+    y = tableEnd(doc) + 8;
+    doc.setTextColor(70, 88, 103);
+    doc.setFontSize(8.5);
+    const feeNote = doc.splitTextToSize(
+      "Each broker preset is a dated, source-backed fee scenario applying the broker's current schedule to every modeled order — not reconstructed historical charges. Regulatory components (SEC Section 31, FINRA TAF, CAT) are shown apart from broker commissions.",
+      width - margin * 2,
+    );
+    doc.text(feeNote, margin, y, { lineHeightFactor: 1.4 });
+    y += feeNote.length * 11 + 26;
+  }
+
+  if (result.liquidation) {
+    if (y > 560) {
+      doc.addPage();
+      y = 48;
+    }
+    sectionTitle(doc, "Liquidation tax estimate (simplified flat rate)", y);
+    autoTable(doc, {
+      startY: y + 13,
+      margin: { left: margin, right: margin },
+      body: [
+        ["Purchase principal", formatCurrency(result.purchaseCost)],
+        ["Acquisition fees", formatCurrency(result.acquisitionFees)],
+        ["Adjusted tax basis", formatCurrency(result.liquidation.adjustedTaxBasis)],
+        ["Gross market value", formatCurrency(result.stockValue)],
+        ["Sell fee", `-${formatCurrency(result.liquidation.sellFee)}`],
+        ["Net amount realized", formatCurrency(result.liquidation.netAmountRealized)],
+        ["Realized gain / loss", formatCurrency(result.liquidation.realizedGainLoss)],
+        ["Taxable gain (netted, floored at 0)", formatCurrency(result.liquidation.taxableGain)],
+        ["Capital gains tax estimate", `-${formatCurrency(result.liquidation.capitalGainsTax)}`],
+      ],
+      ...tableTheme(),
+      theme: "plain",
+      columnStyles: { 0: { textColor: [91, 111, 126] }, 1: { halign: "right", fontStyle: "bold" } },
+    });
+    y = tableEnd(doc) + 8;
+    doc.setTextColor(70, 88, 103);
+    doc.setFontSize(8.5);
+    const basisNote = doc.splitTextToSize(
+      "Simplified flat-rate estimate, not lot-level tax accounting. Across a portfolio, gains and losses net (IRS Topic 409) and the flat rate is applied once to the netted gain. It does not model FIFO/specific identification, holding-period rates, wash sales, lot identification, carryovers, NIIT, return of capital, or jurisdiction/account-specific rules.",
+      width - margin * 2,
+    );
+    doc.text(basisNote, margin, y, { lineHeightFactor: 1.4 });
+    y += basisNote.length * 11 + 26;
+  }
 
   if (y > 650) {
     doc.addPage();
@@ -139,13 +234,17 @@ export function exportPortfolioPdf({ report, result, holdings, scenarioLabel }: 
   y = tableEnd(doc) + 14;
   doc.setTextColor(70, 88, 103);
   doc.setFontSize(8.5);
+  const fees = report.input.fees;
   const assumptionLines = [
     `Reporting basis: ${report.input.taxMode === "after-tax" ? "After-tax" : "Pre-tax"}; dividend withholding: ${report.input.dividendTaxRate.toFixed(2)}%.`,
-    `End treatment: ${report.input.liquidateAtEnd ? `Liquidated; capital gains tax ${report.input.capitalGainsTaxRate.toFixed(2)}%` : "Holdings valued at final adjusted close"}.`,
-    `Broker: ${report.input.fees.brokerName}. Preset effective ${report.input.fees.effectiveDate}. ${report.input.fees.notes}`,
+    `End treatment: ${report.input.liquidateAtEnd ? `Liquidated; capital gains tax ${report.input.capitalGainsTaxRate.toFixed(2)}% (netted once across holdings)` : "Holdings valued at final adjusted close"}.`,
+    `Broker: ${fees.brokerName} (${fees.kind === "custom" ? "custom fees" : "source-backed scenario"}). Effective ${fees.effectiveDate}; checked ${fees.checkedDate}. ${fees.notes}`,
+    "Broker fees are dated scenarios: the current schedule is applied to every modeled order and one order is treated as one execution. The app does not reconstruct historical broker charges; real order minimums, fractional precision, routing, spread, and slippage are not enforced.",
+    fees.sources.length > 0 ? `Fee sources: ${fees.sources.map((source) => source.url).join("  ·  ")}.` : undefined,
     "Non-trading scheduled dates roll forward. Fractional shares are rounded down to 0.001 share.",
     "Dividend eligibility is measured on ex-date and ordinary dividends are reinvested on payment date at that day's high.",
-  ];
+    provenanceLine(report),
+  ].filter((line): line is string => Boolean(line));
   doc.text(assumptionLines.flatMap((line) => doc.splitTextToSize(line, width - margin * 2)), margin, y, { lineHeightFactor: 1.45 });
 
   doc.addPage();
@@ -155,20 +254,19 @@ export function exportPortfolioPdf({ report, result, holdings, scenarioLabel }: 
     margin: { left: margin, right: margin, bottom: 38 },
     showHead: "everyPage",
     head: [["Date", "Ticker", "Action", "Shares", "Price", "Gross cash", "Fee", "Tax"]],
-    body: result.transactions.map((transaction) => [
-      transaction.date,
-      transaction.ticker ?? "—",
-      transaction.type === "contribution-buy"
-        ? "Recurring buy"
-        : transaction.type === "dividend-reinvestment"
-          ? "Dividend reinvestment"
-          : "Final liquidation",
-      transaction.shares.toFixed(3),
-      formatCurrency(transaction.price),
-      formatCurrency(transaction.grossCash),
-      formatCurrency(transaction.fee),
-      formatCurrency(transaction.tax),
-    ]),
+    body: result.transactions.map((transaction) => {
+      const isAdjustment = transaction.type === "portfolio-tax-adjustment";
+      return [
+        transaction.date,
+        transaction.ticker ?? "—",
+        transactionActionLabel(transaction.type),
+        isAdjustment ? "—" : transaction.shares.toFixed(3),
+        isAdjustment ? "—" : formatCurrency(transaction.price),
+        isAdjustment ? "—" : formatCurrency(transaction.grossCash),
+        formatCurrency(transaction.fee),
+        formatCurrency(transaction.tax),
+      ];
+    }),
     ...tableTheme(7),
   });
 
@@ -208,6 +306,22 @@ export function exportPortfolioPdf({ report, result, holdings, scenarioLabel }: 
   doc.save(`investiq-dca-${tickerPart}-${result.endDate}.pdf`);
 }
 
+function provenanceLine(report: PortfolioReport): string {
+  const provenance = report.provenance;
+  if (report.source === "demo") {
+    return "Data provenance: clearly labelled synthetic demo data — not market data.";
+  }
+  const coverage = (value: string) =>
+    value === "cross-checked" ? "cross-checked" : value === "none-reported" ? "none reported" : value;
+  return (
+    `Data provenance: Yahoo split-adjusted OHLC with dividends excluded from prices; ` +
+    `dividend coverage ${coverage(provenance.dividendCoverage)}, split coverage ${coverage(provenance.splitCoverage)}, ` +
+    `reorganizations provider-reported only. Last completed session ${provenance.lastCompletedSession ?? "n/a"}; fetched ${provenance.fetchedAt}. ` +
+    `This DCA report models dividends directly from cross-checked events; it does not use a vendor adjusted-close total-return proxy. ` +
+    `Not official, real-time, or licensed institutional data; an action absent from both providers cannot be detected.`
+  );
+}
+
 function sectionTitle(doc: jsPDF, title: string, y: number) {
   doc.setTextColor(13, 49, 69);
   doc.setFont("helvetica", "bold");
@@ -234,4 +348,41 @@ function labelInterval(unit: string) {
   if (unit === "weeks") return "Week";
   if (unit === "years") return "Year";
   return "Month";
+}
+
+const FEE_COMPONENT_LABELS: Record<FeeComponentKind, string> = {
+  commission: "Broker commission",
+  platform: "Platform fee",
+  settlement: "Settlement fee",
+  "sec-31": "SEC Section 31",
+  "finra-taf": "FINRA TAF",
+  cat: "CAT (Consolidated Audit Trail)",
+  custom: "Custom fee",
+};
+
+function feeComponentLabel(kind: FeeComponentKind): string {
+  return FEE_COMPONENT_LABELS[kind];
+}
+
+function annualizedTwrLabel(twr: TimeWeightedReturn): string {
+  if (!twr.annualizationEligible || twr.annualized === undefined) {
+    return "Not annualized (under 1 year)";
+  }
+  return formatPercent(twr.annualized * 100);
+}
+
+function mwrrLabel(mwrr: MoneyWeightedReturn): string {
+  if (mwrr.status === "available" && mwrr.annualizedRate !== undefined) {
+    return formatPercent(mwrr.annualizedRate * 100);
+  }
+  if (mwrr.status === "no-external-flows") return "Unavailable (no external cash flows)";
+  if (mwrr.status === "not-converged") return "Unavailable (did not converge)";
+  return "Unavailable (no unique solution)";
+}
+
+function transactionActionLabel(type: TransactionType): string {
+  if (type === "contribution-buy") return "Recurring buy";
+  if (type === "dividend-reinvestment") return "Dividend reinvestment";
+  if (type === "portfolio-tax-adjustment") return "Portfolio capital-gains tax (netted)";
+  return "Final liquidation";
 }

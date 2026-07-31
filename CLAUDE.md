@@ -1,26 +1,28 @@
 # CLAUDE.md — InvestIQ working agreement
 
-InvestIQ is an educational US-market investment analytics platform. It explains risk and
-return from end-of-day data. It never places trades and never gives investment advice.
+InvestIQ is an educational, evidence-first investment research and portfolio analytics
+platform for US-listed equities. It connects official filings, transparent valuation
+assumptions, and end-of-day price/risk analytics. It never places trades or gives advice.
 
 Full product detail: [docs/INVESTIQ_PRODUCT_SPEC.md](docs/INVESTIQ_PRODUCT_SPEC.md).
 
 ## Routes
 
-Five primary workspaces, declared in `src/config/navigation.ts`:
+Four primary workspaces, declared in `src/config/navigation.ts`:
 
 | Route | Workspace | State |
 | --- | --- | --- |
-| `/` | Market Overview | layout preview |
-| `/stock` | Stock Analysis | layout preview |
-| `/compare` | Stock Comparison | layout preview |
-| `/portfolio` | Portfolio Lab | layout preview |
-| `/dca` | DCA Backtest | fully functional |
+| `/` | Research launcher | functional |
+| `/compare` | Stock Comparison | functional price/risk analysis |
+| `/portfolio` | Portfolio Analytics | functional price/risk analysis |
+| `/tools` | Supporting calculators and context | functional hub |
 
-`/methodology` is standalone documentation and stays out of the primary navigation.
+Company research uses nested routes: `/company/[ticker]`, `/financials`, `/valuation`,
+and `/memo`. Historical DCA lives at `/tools/dca`; `/dca` remains a compatibility redirect.
+Market context lives at `/market`. `/methodology` stays out of primary navigation.
 
-Layout previews must stay honest: no invented prices, metrics, or calculated values. Every
-placeholder region says it is not connected to market data yet.
+No invented prices, metrics, classifications, or calculated values. Every unavailable
+field stays unavailable and every research figure carries a source/date or formula receipt.
 
 ## Localization and display
 
@@ -32,8 +34,8 @@ placeholder region says it is not connected to market data yet.
 ## Visual concepts
 
 Reference designs live under `design/investiq/`:
-`market-overview-concept.png`, `stock-analysis-concept.png`, `stock-comparison-concept.png`,
-`portfolio-lab-concept.png`, `dca-backtest-concept.png`, `mobile-dca-concept.png`.
+Legacy concepts remain under `design/investiq/`. The accepted redesign references are the
+Research launcher and Company Summary concepts created in the active Codex task.
 
 ## Change-controlled files
 
@@ -56,9 +58,11 @@ regression tests:
 ## Workflow
 
 1. Codex owns product acceptance and review.
-2. Claude Opus 5 implements the code.
-3. Codex verifies the implementation.
-4. The user approves all product decisions.
+2. Claude uses the highest officially available Opus model with high effort for its assigned
+   data/domain work; never label an unavailable model as Opus 5.
+3. Codex owns IA/UI integration. Both sides cross-review; an engine author cannot solely
+   approve their own calculation code.
+4. Product decisions follow the agreed progressive-disclosure and evidence-first contract.
 
 Run `npm run typecheck`, `npm run lint`, and `npm run test` (or `npm run check`) before
 handing work back to Codex.

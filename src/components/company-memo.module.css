@@ -1,0 +1,54 @@
+.page { display: grid; gap: 12px; }
+.heading { min-height: 76px; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 16px; border: 1px solid #2a2e39; border-radius: 3px; background: #11151e; }
+.heading > div > span { color: #7898db; font-size: calc(8px * var(--ui-font-scale, 1)); letter-spacing: .09em; text-transform: uppercase; }
+.heading h1 { margin-top: 4px; color: #edf0f6; font-size: calc(18px * var(--ui-font-scale, 1)); font-weight: 540; }
+.heading p { margin-top: 4px; color: #7b838e; font-size: calc(9px * var(--ui-font-scale, 1)); }
+.actions { display: flex; gap: 7px; }
+.actions button { min-height: 34px; display: flex; align-items: center; gap: 6px; padding: 0 11px; border: 1px solid #343b49; border-radius: 2px; color: #b8c0cc; background: #0d1219; font-size: calc(8px * var(--ui-font-scale, 1)); cursor: pointer; }
+.actions button:last-child { border-color: #3d70ba; color: #d8e6fb; background: #234f8f; }
+.memo { border: 1px solid #2a2e39; border-radius: 3px; background: #11151e; overflow: hidden; }
+.memoHeader { min-height: 88px; display: flex; justify-content: space-between; align-items: center; gap: 18px; padding: 15px 18px; border-bottom: 1px solid #2a2e39; }
+.memoHeader small, .memoHeader span { color: #747c88; font-size: calc(8px * var(--ui-font-scale, 1)); }
+.memoHeader h2 { margin-top: 5px; color: #e8ebf1; font-size: calc(18px * var(--ui-font-scale, 1)); font-weight: 520; }
+.memoHeader p { margin-top: 4px; color: #7e8794; font-size: calc(9px * var(--ui-font-scale, 1)); }
+.memoHeader > div:last-child { display: grid; justify-items: end; gap: 4px; }
+.memoHeader > div:last-child strong { color: #9db1d8; font-size: calc(9px * var(--ui-font-scale, 1)); font-weight: 500; }
+.memoGrid { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(280px, .75fr); }
+.memoGrid > main { border-right: 1px solid #2a2e39; }
+.section { padding: 15px 17px; border-bottom: 1px solid #292e39; }
+.section > header { display: flex; align-items: center; gap: 9px; margin-bottom: 12px; }
+.section > header span { color: #627eb7; font-family: var(--font-geist-mono), monospace; font-size: calc(8px * var(--ui-font-scale, 1)); }
+.section h3, .memoGrid > aside h3 { color: #d8dde5; font-size: calc(10px * var(--ui-font-scale, 1)); font-weight: 510; }
+.overviewGrid, .evidenceGrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: #292f39; }
+.fact { min-height: 64px; padding: 10px; background: #0f131b; }
+.fact span { display: block; color: #747c88; font-size: calc(8px * var(--ui-font-scale, 1)); }
+.fact strong { display: block; margin-top: 7px; color: #e0e4eb; font-family: var(--font-geist-mono), monospace; font-size: calc(11px * var(--ui-font-scale, 1)); font-weight: 500; }
+.fact small { display: block; margin-top: 4px; color: #6d88bd; font-size: calc(7px * var(--ui-font-scale, 1)); }
+.coverageNote, .interpretation { margin-top: 10px; color: #777f8b; font-size: calc(8px * var(--ui-font-scale, 1)); line-height: 1.5; }
+.interpretation { padding-left: 9px; border-left: 2px solid #4c6fae; color: #9aa3af; }
+.section textarea, .conclusionCard textarea { width: 100%; min-height: 82px; resize: vertical; padding: 10px; border: 1px solid #303745; border-radius: 2px; outline: 0; color: #cfd5df; background: #0d1118; font: inherit; font-size: calc(9px * var(--ui-font-scale, 1)); line-height: 1.55; }
+.section textarea:focus, .conclusionCard textarea:focus { border-color: #4c78c1; box-shadow: 0 0 0 2px rgba(76,120,193,.1); }
+.splitSections { display: grid; grid-template-columns: 1fr 1fr; }
+.splitSections .section:first-child { border-right: 1px solid #292e39; }
+.memoGrid > aside { background: #0f131b; }
+.valuationCard, .conclusionCard, .sourceCard { padding: 15px; border-bottom: 1px solid #292e39; }
+.valuationCard > header, .sourceCard > header { display: flex; align-items: center; gap: 7px; margin-bottom: 12px; color: #7393d1; }
+.scenarios { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: #292f39; }
+.scenarios .fact { min-height: 58px; }
+.scenarios .fact strong { font-size: calc(9px * var(--ui-font-scale, 1)); }
+.valuationCard dl, .sourceCard dl { display: grid; gap: 0; margin-top: 11px; }
+.valuationCard dl div, .sourceCard dl div { display: flex; justify-content: space-between; gap: 12px; padding: 7px 0; border-bottom: 1px solid #252b35; font-size: calc(8px * var(--ui-font-scale, 1)); }
+.valuationCard dt, .sourceCard dt { color: #707884; }
+.valuationCard dd, .sourceCard dd { color: #b8c0cb; text-align: right; }
+.valuationCard > p, .conclusionCard > p { margin-top: 11px; color: #727a86; font-size: calc(8px * var(--ui-font-scale, 1)); line-height: 1.5; }
+.conclusionCard h3 { margin-bottom: 10px; }
+.conclusionCard textarea { min-height: 105px; }
+.sourceCard a, .missing a { display: inline-flex; align-items: center; gap: 5px; margin-top: 11px; color: #759cff; font-size: calc(8px * var(--ui-font-scale, 1)); }
+.missing { min-height: 150px; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #747c88; text-align: center; font-size: calc(8px * var(--ui-font-scale, 1)); }
+.state { min-height: 420px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 11px; border: 1px solid #2a2e39; color: #7598e7; background: #11151e; }
+.state h1 { color: #b7bdc8; font-size: calc(14px * var(--ui-font-scale, 1)); font-weight: 500; }
+.spin { animation: spin 850ms linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (max-width: 920px) { .memoGrid { grid-template-columns: 1fr; } .memoGrid > main { border-right: 0; } }
+@media (max-width: 620px) { .heading, .memoHeader { align-items: flex-start; flex-direction: column; } .actions { width: 100%; } .actions button { flex: 1; justify-content: center; } .memoHeader > div:last-child { justify-items: start; } .overviewGrid, .evidenceGrid, .scenarios, .splitSections { grid-template-columns: 1fr; } .splitSections .section:first-child { border-right: 0; } }
+@media print { .heading { display: none; } .page { display: block; } .memo { border: 0; color: #111; background: #fff; } .memoGrid { grid-template-columns: 1.55fr .75fr; } .memoGrid > main { border-color: #ccd1d8; } .memoHeader, .section, .valuationCard, .conclusionCard, .sourceCard { break-inside: avoid; border-color: #ccd1d8; } .memoHeader h2, .section h3, .memoGrid > aside h3, .fact strong { color: #111; } .memoHeader p, .memoHeader span, .memoHeader small, .fact span, .coverageNote, .interpretation, .valuationCard dt, .sourceCard dt, .valuationCard dd, .sourceCard dd, .valuationCard > p, .conclusionCard > p { color: #424954; } .fact, .memoGrid > aside, .section textarea, .conclusionCard textarea { color: #111; background: #fff; } .overviewGrid, .evidenceGrid, .scenarios { gap: 0; background: #fff; } .fact, .section textarea, .conclusionCard textarea { border: 1px solid #ccd1d8; } }

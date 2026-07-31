@@ -722,6 +722,19 @@
 .feeDisclosure .chevronOpen { transform: rotate(180deg); }
 
 .advancedFees { overflow: hidden; }
+.scenarioDisclosure { margin-top: 10px; padding: 11px; border: 1px solid #2a2e39; border-radius: 4px; background: #0f131b; }
+.scenarioDisclosure p { color: #9aa0ad; font-size: calc(9px * var(--ui-font-scale, 1)); line-height: 1.55; }
+.scenarioDisclosure p + p { margin-top: 7px; }
+.scenarioMeta { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 9px; }
+.scenarioMeta div { display: flex; gap: 6px; }
+.scenarioMeta dt { color: #666a75; font-size: calc(8px * var(--ui-font-scale, 1)); }
+.scenarioMeta dd { color: #b7c0cc; font-family: var(--font-geist-mono); font-size: calc(8px * var(--ui-font-scale, 1)); }
+.scenarioSources { margin-top: 10px; }
+.scenarioSources > span { display: block; margin-bottom: 4px; color: #666a75; font-size: calc(8px * var(--ui-font-scale, 1)); font-weight: 500; }
+.scenarioSources ul { display: flex; flex-direction: column; gap: 3px; margin: 0; padding: 0; list-style: none; }
+.scenarioSources a { color: #5b8cff; font-size: calc(8.5px * var(--ui-font-scale, 1)); text-decoration: none; word-break: break-word; }
+.scenarioSources a:hover { text-decoration: underline; }
+.feeBreakdownNote { margin-top: 8px; }
 .feeEditor { margin-top: 10px; padding: 10px; border: 1px solid #2a2e39; border-radius: 4px; }
 .feeEditor legend { padding: 0 5px; color: #9aa0ad; font-size: calc(8px * var(--ui-font-scale, 1)); font-weight: 500; }
 .feeEditor > div { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }

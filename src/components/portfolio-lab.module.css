@@ -372,6 +372,12 @@
   background: #262b39;
 }
 
+.equalButton:disabled {
+  color: var(--muted);
+  background: #161a23;
+  cursor: default;
+}
+
 .equalButton > svg {
   flex: none;
 }

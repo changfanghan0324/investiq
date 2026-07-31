@@ -1,6 +1,6 @@
 import type { TranslationKey } from "@/i18n/language";
 
-export type NavRouteId = "market" | "stock" | "compare" | "portfolio" | "dca";
+export type NavRouteId = "research" | "compare" | "portfolio" | "tools";
 
 export interface NavRoute {
   /** Stable identifier used to pick the route icon in the shell. */
@@ -12,13 +12,12 @@ export interface NavRoute {
   shortLabelKey: TranslationKey;
 }
 
-/** The five primary workspaces. /methodology is documentation and stays out of this list. */
+/** Primary decision workspaces. Market context and methodology are reached in context. */
 export const primaryRoutes: readonly NavRoute[] = [
-  { id: "market", href: "/", labelKey: "nav.market", shortLabelKey: "nav.marketShort" },
-  { id: "stock", href: "/stock", labelKey: "nav.stock", shortLabelKey: "nav.stockShort" },
+  { id: "research", href: "/", labelKey: "nav.research", shortLabelKey: "nav.researchShort" },
   { id: "compare", href: "/compare", labelKey: "nav.compare", shortLabelKey: "nav.compareShort" },
   { id: "portfolio", href: "/portfolio", labelKey: "nav.portfolio", shortLabelKey: "nav.portfolioShort" },
-  { id: "dca", href: "/dca", labelKey: "nav.dca", shortLabelKey: "nav.dcaShort" },
+  { id: "tools", href: "/tools", labelKey: "nav.tools", shortLabelKey: "nav.toolsShort" },
 ];
 
 /** Exact match for "/", prefix match for nested segments of every other route. */

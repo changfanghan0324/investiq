@@ -1,11 +1,5 @@
-import type { Metadata } from "next";
-import { StockAnalysis } from "@/components/stock-analysis";
-
-export const metadata: Metadata = {
-  title: "Stock Analysis",
-  description: "Per-symbol risk and return history for a single US stock or ETF.",
-};
+import { redirect } from "next/navigation";
 
 export default function StockAnalysisRoute() {
-  return <StockAnalysis />;
+  redirect("/company/AAPL");
 }

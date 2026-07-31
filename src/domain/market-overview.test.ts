@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'vitest';
 
-import { AnalyticsError, TRADING_DAYS_PER_YEAR } from '@/domain/analytics';
+import { AnalyticsError, MIN_RISK_OBSERVATIONS, TRADING_DAYS_PER_YEAR } from '@/domain/analytics';
 import {
   BENCHMARK_SYMBOLS,
   DRAWDOWN_BAND_LIMITS,
@@ -18,12 +18,37 @@ import {
   removeWatchlistSymbol,
   summarizePriceWindow,
   trailingWindow,
+  windowHasTotalReturn,
 } from '@/domain/market-overview';
 import type { PriceWindowSummary } from '@/domain/market-overview';
 import type { DateString, PriceBar } from '@/types/backtest';
+import { addDays } from '@/utils/date';
 
 function bars(entries: [DateString, number][]): PriceBar[] {
   return entries.map(([date, close]) => ({ date, open: close, high: close, low: close, close }));
+}
+
+/** Bars from a list of closes on consecutive calendar days. */
+function sequentialClosingBars(closes: number[], start: DateString = '2025-01-02'): PriceBar[] {
+  return closes.map((close, index) => ({
+    date: addDays(start, index),
+    open: close,
+    high: close,
+    low: close,
+    close,
+  }));
+}
+
+function dailyReturnValues(closes: number[]): number[] {
+  const out: number[] = [];
+  for (let index = 1; index < closes.length; index += 1) out.push(closes[index] / closes[index - 1] - 1);
+  return out;
+}
+
+function sampleStdDev(values: number[]): number {
+  const mean = values.reduce((total, value) => total + value, 0) / values.length;
+  const variance = values.reduce((total, value) => total + (value - mean) ** 2, 0) / (values.length - 1);
+  return Math.sqrt(variance);
 }
 
 function assertClose(actual: number | undefined, expected: number, tolerance = 1e-12): void {
@@ -89,16 +114,16 @@ describe('summarizePriceWindow', () => {
     assertClose(result.maxDrawdown, -0.2);
   });
 
-  it('annualizes the sample standard deviation of daily closes', () => {
-    // Daily returns of +10% then -10% have a mean of 0 and a sample variance of 0.02.
-    const result = summarizePriceWindow(
-      bars([
-        ['2025-01-02', 100],
-        ['2025-01-03', 110],
-        ['2025-01-06', 99],
-      ]),
-    );
-    assertClose(result.volatility, Math.sqrt(0.02) * Math.sqrt(TRADING_DAYS_PER_YEAR), 1e-12);
+  it('annualizes the sample standard deviation of daily closes over a sufficient window', () => {
+    // 61 closes → 60 daily returns (the minimum a risk figure is reported on),
+    // alternating +10% / -10% so the sample deviation is well defined.
+    const closes = [100];
+    for (let index = 0; index < MIN_RISK_OBSERVATIONS; index += 1) {
+      closes.push(closes[closes.length - 1] * (index % 2 === 0 ? 1.1 : 0.9));
+    }
+    const result = summarizePriceWindow(sequentialClosingBars(closes));
+    const expected = sampleStdDev(dailyReturnValues(closes)) * Math.sqrt(TRADING_DAYS_PER_YEAR);
+    assertClose(result.volatility, expected, 1e-12);
   });
 
   it('leaves return and volatility undefined for a single bar rather than reporting zero', () => {
@@ -171,6 +196,65 @@ describe('buildNormalizedSeries', () => {
       ]),
       [],
     );
+  });
+});
+
+/** Bars carrying an adjusted close, so a window has total-return coverage. */
+function coveredBars(entries: [DateString, number, number][]): PriceBar[] {
+  return entries.map(([date, close, adjustedClose]) => ({
+    date,
+    open: close,
+    high: close,
+    low: close,
+    close,
+    adjustedClose,
+  }));
+}
+
+describe('return basis (price vs vendor-adjusted total)', () => {
+  it('exposes total return only when every bar in the window is covered', () => {
+    const covered = summarizePriceWindow(coveredBars([['2025-01-02', 100, 90], ['2025-01-03', 110, 108]]));
+    assertClose(covered.priceReturn, 0.1);
+    assertClose(covered.totalReturn, 108 / 90 - 1);
+
+    const partial = summarizePriceWindow([
+      { date: '2025-01-02', open: 100, high: 100, low: 100, close: 100, adjustedClose: 90 },
+      { date: '2025-01-03', open: 110, high: 110, low: 110, close: 110 },
+    ]);
+    assertClose(partial.priceReturn, 0.1);
+    assert.equal(partial.totalReturn, undefined);
+  });
+
+  it('windowHasTotalReturn reflects complete adjusted-close coverage', () => {
+    assert.equal(windowHasTotalReturn(coveredBars([['2025-01-02', 100, 90], ['2025-01-03', 110, 108]])), true);
+    assert.equal(windowHasTotalReturn(bars([['2025-01-02', 100], ['2025-01-03', 110]])), false);
+    assert.equal(windowHasTotalReturn([]), false);
+  });
+
+  it('never mixes bases: one uncovered member forces price return for every symbol', () => {
+    const spy = coveredBars([['2025-01-02', 100, 90], ['2025-01-03', 110, 108]]); // price +10%, total +20%
+    const qqqUncovered = bars([['2025-01-02', 50], ['2025-01-03', 55]]); // no coverage, price +10%
+
+    const mixedBasis = [spy, qqqUncovered].every(windowHasTotalReturn) ? 'total' : 'price';
+    assert.equal(mixedBasis, 'price');
+    const priced = buildNormalizedSeries(
+      [{ symbol: 'SPY', bars: spy }, { symbol: 'QQQ', bars: qqqUncovered }],
+      mixedBasis,
+    );
+    // SPY uses its raw close (+10%), NOT its adjusted close (+20%): no mixing.
+    assertClose(priced[1].values.SPY, 0.1);
+    assertClose(priced[1].values.QQQ, 0.1);
+
+    const qqqCovered = coveredBars([['2025-01-02', 50, 45], ['2025-01-03', 55, 54]]); // total +20%
+    const sharedBasis = [spy, qqqCovered].every(windowHasTotalReturn) ? 'total' : 'price';
+    assert.equal(sharedBasis, 'total');
+    const totals = buildNormalizedSeries(
+      [{ symbol: 'SPY', bars: spy }, { symbol: 'QQQ', bars: qqqCovered }],
+      sharedBasis,
+    );
+    // Both symbols now use adjusted close (+20%).
+    assertClose(totals[1].values.SPY, 108 / 90 - 1);
+    assertClose(totals[1].values.QQQ, 54 / 45 - 1);
   });
 });
 

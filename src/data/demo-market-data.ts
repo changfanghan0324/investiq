@@ -1,6 +1,6 @@
 // Purpose: Clearly labelled synthetic data so the complete app can be tried without an API key.
 
-import type { DividendEvent, MarketData, PriceBar } from '@/types/backtest';
+import type { DataProvenance, DividendEvent, MarketData, PriceBar } from '@/types/backtest';
 import { addDays, isWeekday, nextWeekday, todayDateString } from '@/utils/date';
 
 export function createDemoMarketData(ticker = 'DEMO', seed = 1): MarketData {
@@ -65,5 +65,20 @@ export function createDemoMarketData(ticker = 'DEMO', seed = 1): MarketData {
     tickerChanges: [],
     source: 'demo',
     fetchedAt: new Date().toISOString(),
+    provenance: demoProvenance(),
+  };
+}
+
+/** Distinctly labelled provenance so demo runs never read as checked live data. */
+export function demoProvenance(): DataProvenance {
+  return {
+    priceProvider: 'demo',
+    priceBasis: 'split-adjusted',
+    fetchedAt: new Date().toISOString(),
+    dividendCoverage: 'demo',
+    totalReturnCoverage: 'demo',
+    splitCoverage: 'demo',
+    reorganizationCoverage: 'demo',
+    mode: 'demo',
   };
 }

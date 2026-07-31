@@ -1,8 +1,7 @@
-// Purpose: Coordinates real/demo loading, historical calculation, and optional future scenarios.
+// Purpose: Coordinates real/demo loading and historical calculation.
 
 import { createDemoMarketData } from '@/data/demo-market-data';
 import { runBacktest } from '@/domain/backtest-engine';
-import { buildProjectionReport } from '@/domain/projection-engine';
 import { loadMarketData } from '@/services/market-data-api';
 import type { BacktestInput, BacktestReport } from '@/types/backtest';
 import { todayDateString } from '@/utils/date';
@@ -13,6 +12,9 @@ export async function createReport(options: {
   demoSeed?: number;
 }): Promise<BacktestReport> {
   const today = todayDateString();
+  if (options.input.endDate > today) {
+    throw new Error('Future simulations are temporarily unavailable while the projection methodology is under review. Choose today or an earlier date.');
+  }
   const historicalEnd = options.input.endDate < today ? options.input.endDate : today;
   const marketData = options.demo
     ? createDemoMarketData(options.input.ticker, options.demoSeed)
@@ -21,13 +23,15 @@ export async function createReport(options: {
         from: options.input.endDate > today ? '1990-01-01' : options.input.startDate,
         to: historicalEnd,
         requiredStart: options.input.startDate,
+        // DCA requires strict, cross-checked income and corporate-action coverage.
+        mode: 'dca',
       });
 
   const lastRealPrice = marketData.prices.filter((bar) => bar.date <= historicalEnd).at(-1);
   if (!lastRealPrice) throw new Error('No market price is available on or before the end date.');
 
   const normalizedInput = options.input;
-  const isFutureRequest = normalizedInput.endDate > today;
+  const isFutureRequest = false;
   const historical =
     normalizedInput.startDate <= lastRealPrice.date
       ? runBacktest(
@@ -39,14 +43,10 @@ export async function createReport(options: {
           marketData,
         )
       : undefined;
-  const projection = isFutureRequest
-    ? buildProjectionReport(normalizedInput, marketData, lastRealPrice.date)
-    : undefined;
-
   return {
     input: normalizedInput,
     marketData,
     historical,
-    projection,
+    projection: undefined,
   };
 }

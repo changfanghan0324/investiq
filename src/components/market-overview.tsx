@@ -39,11 +39,13 @@ import {
   removeWatchlistSymbol,
   summarizePriceWindow,
   trailingWindow,
+  windowHasTotalReturn,
   type DrawdownBand,
   type PriceWindowSummary,
   type VolatilityBand,
   type WatchlistRejection,
 } from "@/domain/market-overview";
+import type { ReturnBasis } from "@/domain/analytics";
 import { MarketDataError, loadMarketData } from "@/services/market-data-api";
 import { type Translate, type TranslationKey, useLanguage } from "@/i18n/language";
 import type { DateString, PriceBar } from "@/types/backtest";
@@ -137,6 +139,7 @@ async function loadSymbolWindow(symbol: string, range: DateRange): Promise<LoadO
       from: range.from,
       to: range.to,
       requiredStart: range.from,
+      mode: "analysis",
     });
     const bars = trailingWindow(data.prices, range.from);
     if (bars.length === 0) return { errorKey: "market.errorEmptyWindow" };
@@ -288,9 +291,24 @@ export function MarketOverview() {
     [readyRows, hiddenSeries],
   );
 
-  const chartSeries = useMemo(
-    () => buildNormalizedSeries(chartRows.map((row) => ({ symbol: row.symbol, bars: row.bars ?? [] }))),
+  // One shared basis for the whole comparison: total return only when every charted
+  // symbol has complete adjusted-close coverage; otherwise price return for all of them,
+  // so the normalized chart never mixes an adjusted close against a raw close.
+  const returnBasis: ReturnBasis = useMemo(
+    () =>
+      chartRows.length > 0 && chartRows.every((row) => windowHasTotalReturn(row.bars ?? []))
+        ? "total"
+        : "price",
     [chartRows],
+  );
+
+  const chartSeries = useMemo(
+    () =>
+      buildNormalizedSeries(
+        chartRows.map((row) => ({ symbol: row.symbol, bars: row.bars ?? [] })),
+        returnBasis,
+      ),
+    [chartRows, returnBasis],
   );
 
   const chartData = useMemo(
@@ -369,7 +387,10 @@ export function MarketOverview() {
 
         <div className={styles.explainers}>
           <Explainer titleKey="market.etfProxyTitle" bodyKey="market.etfProxy" />
-          <Explainer titleKey="market.priceReturnTitle" bodyKey="market.priceReturnOnly" />
+          <Explainer
+            titleKey={returnBasis === "total" ? "market.totalReturnTitle" : "market.priceReturnTitle"}
+            bodyKey={returnBasis === "total" ? "market.totalReturnBasis" : "market.priceReturnOnly"}
+          />
         </div>
 
         {failedRows.length > 0 ? (
@@ -681,12 +702,22 @@ function BenchmarkCard({
           <div className={styles.cardPrimary}>
             <strong>{formatPrice(summary.close, locale)}</strong>
             <div className={styles.cardReturn}>
-              <span>{t("metric.oneYearReturn")}</span>
+              <span>{t("market.priceReturnLabel")}</span>
               <ReturnValue value={summary.priceReturn} locale={locale} t={t} />
             </div>
           </div>
           <Sparkline bars={row.bars ?? []} accent={accent} />
           <dl className={styles.cardFooter}>
+            <div>
+              <dt>{t("market.totalReturnLabel")}</dt>
+              <dd>
+                {summary.totalReturn === undefined ? (
+                  <NotAvailable t={t} />
+                ) : (
+                  <ReturnValue value={summary.totalReturn} locale={locale} t={t} />
+                )}
+              </dd>
+            </div>
             <div>
               <dt>{t("metric.volatility")}</dt>
               <dd>{summary.volatility === undefined ? <NotAvailable t={t} /> : formatRate(summary.volatility, locale)}</dd>

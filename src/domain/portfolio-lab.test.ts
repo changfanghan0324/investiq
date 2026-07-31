@@ -4,17 +4,22 @@ import { describe, it } from 'vitest';
 import {
   AnalyticsError,
   HOLDING_CONCENTRATION_THRESHOLD,
+  MIN_RISK_OBSERVATIONS,
   WEIGHT_SUM_TOLERANCE,
   annualizedSharpeRatio,
+  annualizedSortinoRatio,
   annualizedVolatility,
   compoundAnnualGrowthRate,
   dailyCloseReturns,
+  historicalValueAtRisk,
+  jensenAlpha,
   maxCloseDrawdown,
 } from '@/domain/analytics';
 import {
   ATTRIBUTION_CROSS_CHECK_TOLERANCE,
   MAX_PORTFOLIO_HOLDINGS,
   MIN_PORTFOLIO_HOLDINGS,
+  PORTFOLIO_VAR_CONFIDENCE,
   analyzePortfolioConcentration,
   buildPortfolioLab,
   classifyConcentration,
@@ -22,6 +27,7 @@ import {
 import type { PortfolioLabHoldingInput } from '@/domain/portfolio-lab';
 import { MIN_COMMON_CLOSES } from '@/domain/stock-comparison';
 import type { DateString, DividendEvent, MarketData, PriceBar } from '@/types/backtest';
+import { addDays } from '@/utils/date';
 
 function bars(dates: DateString[], closes: number[]): PriceBar[] {
   return dates.map((date, index) => {
@@ -43,6 +49,16 @@ function security(ticker: string, prices: PriceBar[], overrides: Partial<MarketD
     tickerChanges: [],
     source: 'demo',
     fetchedAt: '2026-07-27T00:00:00.000Z',
+    provenance: {
+      priceProvider: 'demo',
+      priceBasis: 'split-adjusted',
+      fetchedAt: '2026-07-27T00:00:00.000Z',
+      dividendCoverage: 'demo',
+      totalReturnCoverage: 'demo',
+      splitCoverage: 'demo',
+      reorganizationCoverage: 'demo',
+      mode: 'demo',
+    },
     ...overrides,
   };
 }
@@ -55,6 +71,34 @@ function holding(
   weight: number,
 ): PortfolioLabHoldingInput {
   return { marketData: security(ticker, bars(dates, closes)), weight };
+}
+
+/** A holding whose provider supplied a complete aligned adjusted-close axis. */
+function coveredHolding(
+  ticker: string,
+  dates: DateString[],
+  closes: number[],
+  adjusted: number[],
+  weight: number,
+): PortfolioLabHoldingInput {
+  const prices = bars(dates, closes).map((bar, index) => ({ ...bar, adjustedClose: adjusted[index] }));
+  return {
+    marketData: security(ticker, prices, {
+      source: 'yahoo',
+      provenance: {
+        priceProvider: 'yahoo',
+        priceBasis: 'split-adjusted',
+        lastCompletedSession: dates[dates.length - 1],
+        fetchedAt: '2026-07-27T00:00:00.000Z',
+        dividendCoverage: 'not-requested',
+        totalReturnCoverage: 'yahoo-adjusted-close',
+        splitCoverage: 'none-reported',
+        reorganizationCoverage: 'provider-reported-only',
+        mode: 'analysis',
+      },
+    }),
+    weight,
+  };
 }
 
 function assertClose(actual: number | undefined, expected: number, tolerance = 1e-12): void {
@@ -84,10 +128,57 @@ function doubleAndFlat(): PortfolioLabHoldingInput[] {
   ];
 }
 
-function equalWeighted(count: number, closes: number[] = SWING): PortfolioLabHoldingInput[] {
+function equalWeighted(
+  count: number,
+  closes: number[] = SWING,
+  dates: DateString[] = THREE,
+): PortfolioLabHoldingInput[] {
   return Array.from({ length: count }, (unused, index) =>
-    holding(`SYM${index}`, THREE, closes, 1 / count),
+    holding(`SYM${index}`, dates, closes, 1 / count),
   );
+}
+
+/** `count` consecutive calendar dates from `start`. */
+function days(count: number, start: DateString = '2025-02-03'): DateString[] {
+  return Array.from({ length: count }, (unused, index) => addDays(start, index));
+}
+
+function closesFromReturns(returnValues: number[], base = 100): number[] {
+  const closes = [base];
+  for (const value of returnValues) closes.push(closes[closes.length - 1] * (1 + value));
+  return closes;
+}
+
+/** `count + 1` closes producing `count` alternating ±magnitude daily returns from `base`. */
+function alternatingCloses(magnitude: number, count: number, base = 100): number[] {
+  return closesFromReturns(
+    Array.from({ length: count }, (unused, index) => (index % 2 === 0 ? magnitude : -magnitude)),
+    base,
+  );
+}
+
+/** Flat closes over `count + 1` sessions (no movement). */
+function flatCloses(count: number, level = 100): number[] {
+  return Array.from({ length: count + 1 }, () => level);
+}
+
+/**
+ * 60 daily returns whose ±10%/−6% oscillation is a stressed volatility band, with a
+ * sustained decline that carries the value into the deep (not severe) drawdown band.
+ */
+function deepStressedCloses(): number[] {
+  const returnValues: number[] = [];
+  // Rising, high-volatility section; the last move is an up that sets the global peak.
+  for (let index = 0; index < 45; index += 1) returnValues.push(index % 2 === 0 ? 0.1 : -0.06);
+  // Four −4% sessions ≈ −15% from that peak: the deep (not severe) drawdown band.
+  returnValues.push(-0.04, -0.04, -0.04, -0.04);
+  // Recover with the same oscillation, starting on an up so the drawdown stays ≈ −15%.
+  let up = true;
+  while (returnValues.length < MIN_RISK_OBSERVATIONS) {
+    returnValues.push(up ? 0.1 : -0.06);
+    up = !up;
+  }
+  return closesFromReturns(returnValues);
 }
 
 describe('holding-count bounds', () => {
@@ -334,7 +425,7 @@ describe('price-series validation', () => {
 
 describe('one-asset equivalence', () => {
   it('reproduces the security’s own price metrics exactly', () => {
-    const prices = bars(FOUR, [100, 110, 99, 120]);
+    const prices = bars(days(MIN_RISK_OBSERVATIONS + 1), alternatingCloses(0.1, MIN_RISK_OBSERVATIONS));
     const view = buildPortfolioLab({
       holdings: [{ marketData: security('AAA', prices), weight: 1 }],
       initialCapital: CAPITAL,
@@ -342,7 +433,7 @@ describe('one-asset equivalence', () => {
     });
 
     const returns = dailyCloseReturns(prices);
-    assertClose(view.totalPriceReturn, 120 / 100 - 1);
+    assertClose(view.totalPriceReturn, prices[prices.length - 1].close / prices[0].close - 1);
     assertClose(view.cagr, compoundAnnualGrowthRate(prices) as number);
     assertClose(view.volatility, annualizedVolatility(returns) as number);
     assertClose(view.sharpeRatio, annualizedSharpeRatio(returns, 0.02) as number);
@@ -569,10 +660,11 @@ describe('attribution', () => {
 
 describe('capital scale invariance', () => {
   it('leaves every percentage metric unchanged and scales every dollar figure', () => {
+    const dates = days(MIN_RISK_OBSERVATIONS + 1);
     const request = (initialCapital: number) => ({
       holdings: [
-        holding('AAA', FOUR, [137.42, 141.03, 129.87, 152.11], 0.6),
-        holding('BBB', FOUR, [12.05, 11.4, 13.77, 13.02], 0.4),
+        holding('AAA', dates, alternatingCloses(0.06, MIN_RISK_OBSERVATIONS, 137.42), 0.6),
+        holding('BBB', dates, alternatingCloses(0.03, MIN_RISK_OBSERVATIONS, 12.05), 0.4),
       ],
       initialCapital,
       annualRiskFreeRate: 0.03,
@@ -599,10 +691,11 @@ describe('capital scale invariance', () => {
 
 describe('flat prices', () => {
   it('reports zero movement without inventing a Sharpe ratio or a correlation', () => {
+    const dates = days(MIN_RISK_OBSERVATIONS + 1);
     const view = buildPortfolioLab({
       holdings: [
-        holding('AAA', THREE, [100, 100, 100], 0.5),
-        holding('BBB', THREE, [40, 40, 40], 0.5),
+        holding('AAA', dates, flatCloses(MIN_RISK_OBSERVATIONS), 0.5),
+        holding('BBB', dates, flatCloses(MIN_RISK_OBSERVATIONS, 40), 0.5),
       ],
       initialCapital: CAPITAL,
       annualRiskFreeRate: 0.02,
@@ -683,10 +776,11 @@ describe('concentration diagnostics', () => {
 
 describe('correlation matrix', () => {
   it('is symmetric with a unit diagonal', () => {
+    const dates = days(MIN_RISK_OBSERVATIONS + 1);
     const view = buildPortfolioLab({
       holdings: [
-        holding('AAA', FOUR, [100, 110, 99, 120], 0.5),
-        holding('BBB', FOUR, [50, 48, 52, 51], 0.5),
+        holding('AAA', dates, alternatingCloses(0.1, MIN_RISK_OBSERVATIONS), 0.5),
+        holding('BBB', dates, alternatingCloses(0.05, MIN_RISK_OBSERVATIONS, 50), 0.5),
       ],
       initialCapital: CAPITAL,
       annualRiskFreeRate: 0,
@@ -701,10 +795,11 @@ describe('correlation matrix', () => {
   });
 
   it('reports a perfectly opposed pair as -1 and a perfectly aligned pair as 1', () => {
+    const dates = days(MIN_RISK_OBSERVATIONS + 1);
     const opposed = buildPortfolioLab({
       holdings: [
-        holding('AAA', THREE, [100, 110, 99], 0.5),
-        holding('BBB', THREE, [100, 90, 99], 0.5),
+        holding('AAA', dates, alternatingCloses(0.1, MIN_RISK_OBSERVATIONS), 0.5),
+        holding('BBB', dates, alternatingCloses(-0.1, MIN_RISK_OBSERVATIONS), 0.5),
       ],
       initialCapital: CAPITAL,
       annualRiskFreeRate: 0,
@@ -713,8 +808,8 @@ describe('correlation matrix', () => {
 
     const aligned = buildPortfolioLab({
       holdings: [
-        holding('AAA', THREE, [100, 110, 99], 0.5),
-        holding('BBB', THREE, [50, 55, 49.5], 0.5),
+        holding('AAA', dates, alternatingCloses(0.1, MIN_RISK_OBSERVATIONS), 0.5),
+        holding('BBB', dates, alternatingCloses(0.1, MIN_RISK_OBSERVATIONS, 50), 0.5),
       ],
       initialCapital: CAPITAL,
       annualRiskFreeRate: 0,
@@ -723,10 +818,11 @@ describe('correlation matrix', () => {
   });
 
   it('leaves a never-moving holding’s row undefined rather than 0', () => {
+    const dates = days(MIN_RISK_OBSERVATIONS + 1);
     const view = buildPortfolioLab({
       holdings: [
-        holding('AAA', THREE, SWING, 0.5),
-        holding('BBB', THREE, [40, 40, 40], 0.5),
+        holding('AAA', dates, alternatingCloses(0.1, MIN_RISK_OBSERVATIONS), 0.5),
+        holding('BBB', dates, flatCloses(MIN_RISK_OBSERVATIONS, 40), 0.5),
       ],
       initialCapital: CAPITAL,
       annualRiskFreeRate: 0,
@@ -753,40 +849,45 @@ describe('benchmark', () => {
   });
 
   it('measures beta and correlation against SPY on the shared return dates', () => {
-    // The portfolio moves exactly twice as far as SPY on both sessions.
+    // The single-holding portfolio moves exactly twice as far as SPY every session.
+    const dates = days(MIN_RISK_OBSERVATIONS + 1);
     const view = buildPortfolioLab({
-      holdings: [holding('AAA', THREE, [100, 120, 96], 1)],
+      holdings: [holding('AAA', dates, alternatingCloses(0.2, MIN_RISK_OBSERVATIONS), 1)],
       initialCapital: CAPITAL,
-      benchmark: security('SPY', bars(THREE, [100, 110, 99]), { type: 'ETF' }),
+      benchmark: security('SPY', bars(dates, alternatingCloses(0.1, MIN_RISK_OBSERVATIONS)), { type: 'ETF' }),
       annualRiskFreeRate: 0,
     });
 
     assert.ok(view.benchmark);
     assert.equal(view.benchmark.symbol, 'SPY');
-    assert.equal(view.benchmark.overlappingSessions, 3);
+    assert.equal(view.benchmark.overlappingSessions, dates.length);
     assert.equal(view.benchmark.coversCommonWindow, true);
-    assert.equal(view.benchmark.startDate, THREE[0]);
-    assert.equal(view.benchmark.endDate, THREE[2]);
+    assert.equal(view.benchmark.startDate, dates[0]);
+    assert.equal(view.benchmark.endDate, dates[dates.length - 1]);
     assertClose(view.benchmark.beta, 2, 1e-9);
     assertClose(view.benchmark.correlation, 1, 1e-9);
   });
 
   it('uses only the sessions a partially overlapping benchmark also traded', () => {
+    const dates = days(MIN_RISK_OBSERVATIONS + 2);
+    // The benchmark trades every common session but the last, leaving a partial
+    // overlap that still spans enough returns to regress.
+    const benchmarkDates = dates.slice(0, MIN_RISK_OBSERVATIONS + 1);
     const view = buildPortfolioLab({
       holdings: [
-        holding('AAA', FOUR, [100, 110, 121, 133.1], 0.5),
-        holding('BBB', FOUR, [50, 55, 60.5, 66.55], 0.5),
+        holding('AAA', dates, alternatingCloses(0.1, MIN_RISK_OBSERVATIONS + 1), 0.5),
+        holding('BBB', dates, alternatingCloses(0.05, MIN_RISK_OBSERVATIONS + 1), 0.5),
       ],
       initialCapital: CAPITAL,
-      benchmark: security('SPY', bars([WEEK[0], WEEK[1], WEEK[3]], [400, 404, 412]), {
+      benchmark: security('SPY', bars(benchmarkDates, alternatingCloses(0.08, MIN_RISK_OBSERVATIONS)), {
         type: 'ETF',
       }),
       annualRiskFreeRate: 0,
     });
 
     assert.ok(view.benchmark);
-    assert.equal(view.window.sessions, 4);
-    assert.equal(view.benchmark.overlappingSessions, 3);
+    assert.equal(view.window.sessions, MIN_RISK_OBSERVATIONS + 2);
+    assert.equal(view.benchmark.overlappingSessions, MIN_RISK_OBSERVATIONS + 1);
     assert.equal(view.benchmark.coversCommonWindow, false);
     assert.notEqual(view.benchmark.beta, undefined);
     assert.ok(view.diagnosis.notes.some((note) => note.code === 'benchmark-partial-overlap'));
@@ -808,9 +909,9 @@ describe('benchmark', () => {
 
 describe('educational risk diagnosis', () => {
   it('emits codes in a fixed order and never prose', () => {
-    // Up 10% then down to 85% of the peak: unambiguously inside the `deep` drawdown band.
+    // A stressed-volatility series with a sustained decline into the deep drawdown band.
     const view = buildPortfolioLab({
-      holdings: equalWeighted(4, [100, 110, 93.5]),
+      holdings: equalWeighted(4, deepStressedCloses(), days(MIN_RISK_OBSERVATIONS + 1)),
       initialCapital: CAPITAL,
       annualRiskFreeRate: 0,
     });
@@ -822,6 +923,8 @@ describe('educational risk diagnosis', () => {
         'drawdown-deep',
         'volatility-stressed',
         'benchmark-unavailable',
+        // 60 aligned returns is a sufficient but sub-year (limited) sample.
+        'limited-sample',
         'sector-data-unavailable',
         'price-return-only',
         'no-rebalancing',
@@ -871,15 +974,16 @@ describe('educational risk diagnosis', () => {
   });
 
   it('bands volatility from the portfolio’s own daily returns', () => {
+    const dates = days(MIN_RISK_OBSERVATIONS + 1);
     const calm = buildPortfolioLab({
-      holdings: [holding('AAA', THREE, [1000, 1005, 999.975], 1)],
+      holdings: [holding('AAA', dates, alternatingCloses(0.005, MIN_RISK_OBSERVATIONS), 1)],
       initialCapital: CAPITAL,
       annualRiskFreeRate: 0,
     });
     assert.equal(calm.diagnosis.volatilityBand, 'calm');
 
     const stressed = buildPortfolioLab({
-      holdings: [holding('AAA', THREE, SWING, 1)],
+      holdings: [holding('AAA', dates, alternatingCloses(0.04, MIN_RISK_OBSERVATIONS), 1)],
       initialCapital: CAPITAL,
       annualRiskFreeRate: 0,
     });
@@ -944,13 +1048,184 @@ describe('reported series', () => {
   });
 
   it('echoes the risk-free rate the Sharpe ratio used', () => {
+    const dates = days(MIN_RISK_OBSERVATIONS + 1);
     const view = buildPortfolioLab({
-      holdings: doubleAndFlat(),
+      holdings: [
+        holding('AAA', dates, alternatingCloses(0.1, MIN_RISK_OBSERVATIONS), 0.5),
+        holding('BBB', dates, alternatingCloses(0.05, MIN_RISK_OBSERVATIONS), 0.5),
+      ],
       initialCapital: CAPITAL,
       annualRiskFreeRate: 0.045,
     });
 
     assert.equal(view.annualRiskFreeRate, 0.045);
     assertClose(view.sharpeRatio, annualizedSharpeRatio(view.dailyReturns, 0.045) as number);
+  });
+});
+
+describe('return basis', () => {
+  const dates = days(MIN_RISK_OBSERVATIONS + 1);
+  const closes = alternatingCloses(0.1, MIN_RISK_OBSERVATIONS);
+  const adjusted = closes.map((close, index) => close * (0.9 + (0.1 * index) / closes.length));
+
+  it('uses total return only when every holding has adjusted-close coverage', () => {
+    const view = buildPortfolioLab({
+      holdings: [
+        coveredHolding('AAA', dates, closes, adjusted, 0.5),
+        coveredHolding('BBB', dates, closes, adjusted, 0.5),
+      ],
+      initialCapital: CAPITAL,
+      annualRiskFreeRate: 0,
+    });
+
+    assert.equal(view.returnBasis, 'total');
+    assert.equal(view.excludesDividends, false);
+    assert.notEqual(view.totalReturn, undefined);
+    view.holdings.forEach((holding) => assert.notEqual(holding.totalReturn, undefined));
+  });
+
+  it('degrades to price return for the whole portfolio when any holding lacks coverage, never mixing', () => {
+    const view = buildPortfolioLab({
+      holdings: [
+        coveredHolding('AAA', dates, closes, adjusted, 0.5),
+        holding('BBB', dates, closes, 0.5), // demo coverage: no adjusted close
+      ],
+      initialCapital: CAPITAL,
+      annualRiskFreeRate: 0,
+    });
+
+    assert.equal(view.returnBasis, 'price');
+    assert.equal(view.excludesDividends, true);
+    assert.equal(view.totalReturn, undefined);
+    // Measured on the raw close for everyone, not the adjusted close of the covered holding.
+    assertClose(view.totalPriceReturn, closes[closes.length - 1] / closes[0] - 1);
+  });
+
+  it('builds the total-return proxy from fixed initial weights, not raw-close shares (hand calc)', () => {
+    // Both hold 50% at a constant raw close of 100, so price return is 0. Holding A's adjusted
+    // close doubles (50 → 100, +100% on its $500 sleeve) while B's is flat (0%): the fixed-weight
+    // total-return proxy ends at $1,500 = +50%, NOT the 0.3333 that shares × adjusted close gives.
+    const three = ['2025-01-06', '2025-01-07', '2025-01-08'];
+    const view = buildPortfolioLab({
+      holdings: [
+        coveredHolding('AAA', three, [100, 100, 100], [50, 75, 100], 0.5),
+        coveredHolding('BBB', three, [100, 100, 100], [100, 100, 100], 0.5),
+      ],
+      initialCapital: 1000,
+      annualRiskFreeRate: 0,
+    });
+
+    assert.equal(view.returnBasis, 'total');
+    assertClose(view.totalReturn as number, 0.5);
+    assertClose(view.cumulativeReturns[view.cumulativeReturns.length - 1].value, 0.5);
+    // Dollar path, price return, and final value stay on the raw split-adjusted close.
+    assertClose(view.totalPriceReturn, 0);
+    assertClose(view.finalValue, 1000);
+    assertClose(view.allocatedCapital, 1000);
+  });
+
+  it('is invariant to the vendor adjusted-close scale of any holding', () => {
+    const longDates = days(MIN_RISK_OBSERVATIONS + 1);
+    const rawA = alternatingCloses(0.03, MIN_RISK_OBSERVATIONS);
+    const rawB = alternatingCloses(0.05, MIN_RISK_OBSERVATIONS, 40);
+    const adjA = alternatingCloses(0.06, MIN_RISK_OBSERVATIONS, 12);
+    const adjB = alternatingCloses(0.04, MIN_RISK_OBSERVATIONS, 80);
+    const benchmark = coveredHolding('SPY', longDates, rawB, adjB, 1).marketData;
+
+    const build = (scale: number) =>
+      buildPortfolioLab({
+        holdings: [
+          coveredHolding('AAA', longDates, rawA, adjA.map((value) => value * scale), 0.5),
+          coveredHolding('BBB', longDates, rawB, adjB, 0.5),
+        ],
+        initialCapital: 1000,
+        benchmark,
+        annualRiskFreeRate: 0.02,
+      });
+
+    const base = build(1);
+    const scaled = build(1000); // multiply holding A's entire adjusted-close axis by 1000
+
+    assert.equal(base.returnBasis, 'total');
+    assert.equal(scaled.returnBasis, 'total');
+    assertClose(scaled.totalReturn as number, base.totalReturn as number, 1e-9);
+    assertClose(scaled.cagr as number, base.cagr as number, 1e-9);
+    assertClose(scaled.volatility as number, base.volatility as number, 1e-9);
+    assertClose(scaled.sharpeRatio as number, base.sharpeRatio as number, 1e-9);
+    assertClose(scaled.maxDrawdown.drawdown, base.maxDrawdown.drawdown, 1e-9);
+    assertClose(scaled.benchmark?.beta as number, base.benchmark?.beta as number, 1e-9);
+    assertClose(scaled.benchmark?.correlation as number, base.benchmark?.correlation as number, 1e-9);
+    base.cumulativeReturns.forEach((point, index) => {
+      assertClose(scaled.cumulativeReturns[index].value, point.value, 1e-9);
+    });
+  });
+});
+
+describe('sortino, value at risk, and benchmark alpha', () => {
+  it('reports a Sortino ratio and a 95% one-day VaR consistent with the pure helpers', () => {
+    const dates = days(MIN_RISK_OBSERVATIONS + 1);
+    const view = buildPortfolioLab({
+      holdings: [
+        holding('AAA', dates, alternatingCloses(0.03, MIN_RISK_OBSERVATIONS), 0.5),
+        holding('BBB', dates, alternatingCloses(0.05, MIN_RISK_OBSERVATIONS, 40), 0.5),
+      ],
+      initialCapital: CAPITAL,
+      annualRiskFreeRate: 0.02,
+    });
+
+    assertClose(view.sortinoRatio, annualizedSortinoRatio(view.dailyReturns, 0.02) as number);
+    assert.equal(view.historicalValueAtRisk.confidence, PORTFOLIO_VAR_CONFIDENCE);
+    assert.equal(view.historicalValueAtRisk.method, 'historical-nearest-rank');
+    assert.equal(view.historicalValueAtRisk.sample, view.dailyReturns.length);
+    assertClose(
+      view.historicalValueAtRisk.value,
+      historicalValueAtRisk(view.dailyReturns, PORTFOLIO_VAR_CONFIDENCE) as number,
+    );
+  });
+
+  it('gates Sortino and the VaR value on the same sample as volatility and Sharpe', () => {
+    // THREE shared sessions → two daily returns, far below the 60-observation floor.
+    const view = buildPortfolioLab({
+      holdings: [holding('AAA', THREE, SWING, 1)],
+      initialCapital: CAPITAL,
+      annualRiskFreeRate: 0,
+    });
+
+    assert.equal(view.riskSample.sufficient, false);
+    assert.equal(view.volatility, undefined);
+    assert.equal(view.sharpeRatio, undefined);
+    assert.equal(view.sortinoRatio, undefined);
+    assert.equal(view.historicalValueAtRisk.value, undefined);
+    // The confidence, method, and sample stay exposed even when the value is unavailable.
+    assert.equal(view.historicalValueAtRisk.confidence, PORTFOLIO_VAR_CONFIDENCE);
+    assert.equal(view.historicalValueAtRisk.sample, view.dailyReturns.length);
+  });
+
+  it('measures benchmark alpha on the overlap and omits it when beta is unavailable', () => {
+    const dates = days(MIN_RISK_OBSERVATIONS + 1);
+    const benchmarkCloses = alternatingCloses(0.1, MIN_RISK_OBSERVATIONS);
+    const view = buildPortfolioLab({
+      holdings: [holding('AAA', dates, alternatingCloses(0.2, MIN_RISK_OBSERVATIONS), 1)],
+      initialCapital: CAPITAL,
+      benchmark: security('SPY', bars(dates, benchmarkCloses), { type: 'ETF' }),
+      annualRiskFreeRate: 0.02,
+    });
+
+    assert.ok(view.benchmark);
+    assertClose(view.benchmark.beta, 2, 1e-9);
+    assertClose(
+      view.benchmark.alpha,
+      jensenAlpha(view.dailyReturns, dailyCloseReturns(bars(dates, benchmarkCloses)), 0.02) as number,
+    );
+
+    const flatBenchmark = buildPortfolioLab({
+      holdings: [holding('AAA', dates, alternatingCloses(0.2, MIN_RISK_OBSERVATIONS), 1)],
+      initialCapital: CAPITAL,
+      benchmark: security('SPY', bars(dates, flatCloses(MIN_RISK_OBSERVATIONS)), { type: 'ETF' }),
+      annualRiskFreeRate: 0.02,
+    });
+
+    assert.equal(flatBenchmark.benchmark?.beta, undefined);
+    assert.equal(flatBenchmark.benchmark?.alpha, undefined);
   });
 });

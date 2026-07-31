@@ -24,10 +24,19 @@ import {
   cumulativePriceReturns,
   dailyCloseReturns,
   maxCloseDrawdown,
+  resolveReturnBasis,
+  riskSampleStatus,
   simpleMovingAverages,
+  toReturnBasisBars,
   validatePriceSeries,
 } from '@/domain/analytics';
-import type { DatedValue, MaxDrawdownResult, MovingAverageSeries } from '@/domain/analytics';
+import type {
+  DatedValue,
+  MaxDrawdownResult,
+  MovingAverageSeries,
+  ReturnBasis,
+  RiskSampleStatus,
+} from '@/domain/analytics';
 import type { DateString, MarketData, PriceBar } from '@/types/backtest';
 import { daysBetween } from '@/utils/date';
 
@@ -82,19 +91,35 @@ export interface StockAnalysisViewModel {
   latestClose: number;
   latestDate: DateString;
   history: HistoryCoverage;
-  /** Cumulative price return from the first bar, which is always 0. */
+  /**
+   * The return basis every daily/cumulative/risk figure below is measured on. `total`
+   * only when this security (and any benchmark) has complete adjusted-close coverage;
+   * otherwise `price`, so nothing mixes bases.
+   */
+  returnBasis: ReturnBasis;
+  /** Whole-window price return from split-adjusted close; always available. */
+  priceReturn: number;
+  /**
+   * Whole-window vendor-adjusted total return; present only when this security has
+   * complete adjusted-close coverage. A total-return proxy, not audited dividend
+   * accounting, and no dividend count is derived from it.
+   */
+  totalReturn?: number;
+  /** Cumulative return from the first bar on `returnBasis`, which is always 0. */
   cumulativeReturns: DatedValue[];
-  /** Close-to-close daily price returns; n bars yield n-1 points. */
+  /** Close-to-close daily returns on `returnBasis`; n bars yield n-1 points. */
   dailyReturns: DatedValue[];
-  /** 50- and 200-session simple moving averages, each emitted only once its window is full. */
+  /** 50- and 200-session simple moving averages of split-adjusted close, once each window is full. */
   movingAverages: MovingAverageSeries[];
-  /** Compound annual growth rate of price; undefined with one bar or no elapsed time. */
+  /** Compound annual growth rate on `returnBasis`; undefined with one bar or no elapsed time. */
   cagr?: number;
-  /** Annualized volatility of daily price returns; undefined with fewer than two returns. */
+  /** Annualized volatility on `returnBasis`; undefined below the minimum observation count. */
   volatility?: number;
-  /** Annualized Sharpe ratio against `annualRiskFreeRate`; undefined when volatility is zero. */
+  /** Annualized Sharpe ratio against `annualRiskFreeRate`; undefined when unavailable. */
   sharpeRatio?: number;
-  /** Worst close-to-close decline; the fraction is always present, the dates only if it declined. */
+  /** Observation count behind the risk figures and whether the sample is sufficient/limited. */
+  riskSample: RiskSampleStatus;
+  /** Worst close-to-close decline on `returnBasis`; dates only if it declined. */
   maxDrawdown: MaxDrawdownResult;
   /** Absent when the caller supplied no benchmark. */
   benchmark?: BenchmarkComparison;
@@ -131,8 +156,26 @@ export function buildStockAnalysis(request: StockAnalysisRequest): StockAnalysis
 
   const first = bars[0];
   const last = bars[bars.length - 1];
-  const dailyReturns = dailyCloseReturns(bars);
   const calendarDays = daysBetween(first.date, last.date);
+
+  // One return basis for every risk figure. Total return only when this security and,
+  // if supplied, the benchmark both carry complete adjusted-close coverage; otherwise
+  // price return for both so beta and correlation never mix bases.
+  const coverages = [marketData.provenance.totalReturnCoverage];
+  if (benchmark) coverages.push(benchmark.provenance.totalReturnCoverage);
+  const returnBasis = resolveReturnBasis(coverages);
+  const basisBars = toReturnBasisBars(bars, returnBasis);
+  const dailyReturns = dailyCloseReturns(basisBars);
+
+  // Scalar returns shown side by side: price return always; total return only when this
+  // security itself has full adjusted-close coverage, independent of the risk basis.
+  const priceReturn = last.close / first.close - 1;
+  const totalReturn =
+    marketData.provenance.totalReturnCoverage === 'yahoo-adjusted-close' &&
+    first.adjustedClose !== undefined &&
+    last.adjustedClose !== undefined
+      ? last.adjustedClose / first.adjustedClose - 1
+      : undefined;
 
   return {
     ticker: marketData.ticker,
@@ -147,14 +190,18 @@ export function buildStockAnalysis(request: StockAnalysisRequest): StockAnalysis
       calendarDays,
       years: calendarDays / CALENDAR_DAYS_PER_YEAR,
     },
-    cumulativeReturns: cumulativePriceReturns(bars),
+    returnBasis,
+    priceReturn,
+    totalReturn,
+    cumulativeReturns: cumulativePriceReturns(basisBars),
     dailyReturns,
     movingAverages: simpleMovingAverages(bars, [...MOVING_AVERAGE_WINDOWS]),
-    cagr: compoundAnnualGrowthRate(bars),
+    cagr: compoundAnnualGrowthRate(basisBars),
     volatility: annualizedVolatility(dailyReturns),
     sharpeRatio: annualizedSharpeRatio(dailyReturns, annualRiskFreeRate),
-    maxDrawdown: maxCloseDrawdown(bars),
-    benchmark: benchmark && compareToBenchmark(dailyReturns, benchmark),
+    riskSample: riskSampleStatus(dailyReturns.length),
+    maxDrawdown: maxCloseDrawdown(basisBars),
+    benchmark: benchmark && compareToBenchmark(dailyReturns, benchmark, returnBasis),
     dividendCount: marketData.dividends.filter((event) =>
       isWithin(event.exDate, first.date, last.date),
     ).length,
@@ -173,9 +220,12 @@ export function buildStockAnalysis(request: StockAnalysisRequest): StockAnalysis
 export function compareToBenchmark(
   dailyReturns: DatedValue[],
   benchmark: MarketData,
+  basis: ReturnBasis = 'price',
 ): BenchmarkComparison {
   validatePriceSeries(benchmark.prices);
-  const benchmarkReturns = dailyCloseReturns(benchmark.prices);
+  // Same basis for both legs: `basis` is only 'total' when the caller confirmed the
+  // benchmark also has adjusted-close coverage.
+  const benchmarkReturns = dailyCloseReturns(toReturnBasisBars(benchmark.prices, basis));
   const benchmarkDates = new Set(benchmarkReturns.map((point) => point.date));
 
   return {

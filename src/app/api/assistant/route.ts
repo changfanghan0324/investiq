@@ -1,10 +1,5 @@
-import {
-  getClientIdentifier,
-  jsonResponse,
-  readJsonBody,
-  routeErrorResponse,
-  withinRateLimit,
-} from '@/server/errors';
+import { jsonResponse, readJsonBody, routeErrorResponse } from '@/server/errors';
+import { enforceRateLimit } from '@/server/rate-limit';
 import {
   isAssistantConfigured,
   requestReportExplanation,
@@ -15,8 +10,9 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request): Promise<Response> {
-  if (!withinRateLimit('assistant', getClientIdentifier(request), 10)) {
-    return jsonResponse({ message: 'The AI assistant is busy.' }, 429);
+  const limit = await enforceRateLimit('assistant', request);
+  if (!limit.ok) {
+    return jsonResponse({ message: limit.message }, limit.status);
   }
   if (!isAssistantConfigured()) {
     console.error('Assistant request rejected: GEMINI_API_KEY is not configured.');

@@ -1,0 +1,6 @@
+.state { min-height: 420px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; border: 1px solid #2a2e39; border-radius: 3px; color: #668ee9; background: #11151e; text-align: center; }
+.state h1 { color: #e5e8ef; font-size: calc(20px * var(--ui-font-scale, 1)); font-weight: 500; }
+.state > p { max-width: 560px; color: #858b97; font-size: calc(12px * var(--ui-font-scale, 1)); line-height: 1.55; }
+.state div { display: flex; gap: 17px; margin-top: 12px; color: #79808d; font-size: calc(10px * var(--ui-font-scale, 1)); }
+.state span { display: inline-flex; align-items: center; gap: 6px; }
+@media (max-width: 520px) { .state { min-height: 350px; padding: 24px; } .state div { flex-direction: column; align-items: flex-start; } }

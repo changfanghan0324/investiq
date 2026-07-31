@@ -1,7 +1,12 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'vitest';
 
-import { AnalyticsError, CALENDAR_DAYS_PER_YEAR, TRADING_DAYS_PER_YEAR } from '@/domain/analytics';
+import {
+  AnalyticsError,
+  CALENDAR_DAYS_PER_YEAR,
+  MIN_RISK_OBSERVATIONS,
+  TRADING_DAYS_PER_YEAR,
+} from '@/domain/analytics';
 import {
   MAX_COMPARISON_SECURITIES,
   MIN_COMMON_CLOSES,
@@ -24,6 +29,37 @@ function series(dates: DateString[], closes: number[]): PriceBar[] {
   return bars(dates.map((date, index) => [date, closes[index]]));
 }
 
+/** `count` consecutive calendar dates from `start`. */
+function days(count: number, start: DateString = '2025-02-03'): DateString[] {
+  return Array.from({ length: count }, (unused, index) => addDays(start, index));
+}
+
+/** `count + 1` closes producing `count` alternating ±magnitude daily returns from `base`. */
+function alternatingCloses(magnitude: number, count: number, base = 100): number[] {
+  return driftingCloses(magnitude, magnitude, count, base);
+}
+
+/** `count + 1` closes with `up` on even days and `down` on odd days, so drift and volatility differ. */
+function driftingCloses(up: number, down: number, count: number, base = 100): number[] {
+  const closes = [base];
+  for (let index = 0; index < count; index += 1) {
+    closes.push(closes[closes.length - 1] * (1 + (index % 2 === 0 ? up : -down)));
+  }
+  return closes;
+}
+
+function dailyReturnValues(closes: number[]): number[] {
+  const out: number[] = [];
+  for (let index = 1; index < closes.length; index += 1) out.push(closes[index] / closes[index - 1] - 1);
+  return out;
+}
+
+function sampleStdDev(values: number[]): number {
+  const mean = values.reduce((total, value) => total + value, 0) / values.length;
+  const variance = values.reduce((total, value) => total + (value - mean) ** 2, 0) / (values.length - 1);
+  return Math.sqrt(variance);
+}
+
 function security(ticker: string, prices: PriceBar[], overrides: Partial<MarketData> = {}): MarketData {
   return {
     ticker,
@@ -37,6 +73,16 @@ function security(ticker: string, prices: PriceBar[], overrides: Partial<MarketD
     tickerChanges: [],
     source: 'demo',
     fetchedAt: '2026-07-27T00:00:00.000Z',
+    provenance: {
+      priceProvider: 'demo',
+      priceBasis: 'split-adjusted',
+      fetchedAt: '2026-07-27T00:00:00.000Z',
+      dividendCoverage: 'demo',
+      totalReturnCoverage: 'demo',
+      splitCoverage: 'demo',
+      reorganizationCoverage: 'demo',
+      mode: 'demo',
+    },
     ...overrides,
   };
 }
@@ -352,16 +398,19 @@ describe('metrics recalculated on the common window', () => {
   });
 
   it('annualizes volatility and Sharpe from the aligned daily returns', () => {
+    const dates = days(MIN_RISK_OBSERVATIONS + 1);
+    const closes = alternatingCloses(0.1, MIN_RISK_OBSERVATIONS);
     const view = buildStockComparison({
       securities: [
-        security('AAA', series(SHORT_WEEK, [100, 110, 99])),
-        security('BBB', series(SHORT_WEEK, [50, 52, 55])),
+        security('AAA', series(dates, closes)),
+        security('BBB', series(dates, alternatingCloses(0.05, MIN_RISK_OBSERVATIONS))),
       ],
       annualRiskFreeRate: 0,
     });
 
-    // Returns of +10% and -10%: mean 0, sample variance 0.02.
-    assertClose(view.securities[0].volatility, Math.sqrt(0.02 * TRADING_DAYS_PER_YEAR));
+    // Alternating ±10% returns: mean 0, so Sharpe at a 0 risk-free rate is 0.
+    const expected = sampleStdDev(dailyReturnValues(closes)) * Math.sqrt(TRADING_DAYS_PER_YEAR);
+    assertClose(view.securities[0].volatility, expected);
     assertClose(view.securities[0].sharpeRatio, 0);
   });
 
@@ -387,11 +436,12 @@ describe('metrics recalculated on the common window', () => {
 
 describe('correlation matrix', () => {
   it('is symmetric with 1 on the diagonal', () => {
+    const dates = days(MIN_RISK_OBSERVATIONS + 1);
     const view = buildStockComparison({
       securities: [
-        security('AAA', series(WEEK, [100, 110, 99, 105])),
-        security('BBB', series(WEEK, [50, 48, 52, 51])),
-        security('CCC', series(WEEK, [10, 11, 12, 11])),
+        security('AAA', series(dates, alternatingCloses(0.1, MIN_RISK_OBSERVATIONS))),
+        security('BBB', series(dates, alternatingCloses(0.05, MIN_RISK_OBSERVATIONS, 50))),
+        security('CCC', series(dates, alternatingCloses(0.02, MIN_RISK_OBSERVATIONS, 10))),
       ],
       annualRiskFreeRate: 0,
     });
@@ -406,13 +456,14 @@ describe('correlation matrix', () => {
   });
 
   it('reads +1 for series that move together and -1 for series that move opposite', () => {
+    const dates = days(MIN_RISK_OBSERVATIONS + 1);
     const view = buildStockComparison({
       securities: [
-        security('AAA', series(WEEK, [100, 110, 99, 108.9])),
+        security('AAA', series(dates, alternatingCloses(0.1, MIN_RISK_OBSERVATIONS))),
         // The same daily returns on a different price level.
-        security('BBB', series(WEEK, [10, 11, 9.9, 10.89])),
+        security('BBB', series(dates, alternatingCloses(0.1, MIN_RISK_OBSERVATIONS, 10))),
         // Exactly the opposite daily returns.
-        security('CCC', series(WEEK, [100, 90, 99, 89.1])),
+        security('CCC', series(dates, alternatingCloses(-0.1, MIN_RISK_OBSERVATIONS))),
       ],
       annualRiskFreeRate: 0,
     });
@@ -423,10 +474,11 @@ describe('correlation matrix', () => {
   });
 
   it('leaves the whole row undefined for a series that never moved, including its diagonal', () => {
+    const dates = days(MIN_RISK_OBSERVATIONS + 1);
     const view = buildStockComparison({
       securities: [
-        security('FLAT', series(SHORT_WEEK, [100, 100, 100])),
-        security('BBB', series(SHORT_WEEK, [50, 55, 60])),
+        security('FLAT', series(dates, Array.from({ length: MIN_RISK_OBSERVATIONS + 1 }, () => 100))),
+        security('BBB', series(dates, alternatingCloses(0.1, MIN_RISK_OBSERVATIONS))),
       ],
       annualRiskFreeRate: 0,
     });
@@ -468,41 +520,48 @@ describe('benchmark', () => {
   });
 
   it('measures beta against the benchmark over the common window', () => {
+    const dates = days(MIN_RISK_OBSERVATIONS + 1);
+    const benchmarkCloses = alternatingCloses(0.1, MIN_RISK_OBSERVATIONS);
     const view = buildStockComparison({
       securities: [
-        security('AAA', series(SHORT_WEEK, DOUBLE_BETA_CLOSES)),
-        security('BBB', series(SHORT_WEEK, BENCHMARK_CLOSES)),
+        security('AAA', series(dates, alternatingCloses(0.2, MIN_RISK_OBSERVATIONS))),
+        security('BBB', series(dates, benchmarkCloses)),
       ],
-      benchmark: security('SPY', series(SHORT_WEEK, BENCHMARK_CLOSES), { type: 'ETF' }),
+      benchmark: security('SPY', series(dates, benchmarkCloses), { type: 'ETF' }),
       annualRiskFreeRate: 0,
     });
 
     assert.equal(view.benchmark?.symbol, 'SPY');
     assert.equal(view.benchmark?.type, 'ETF');
-    assert.equal(view.benchmark?.overlappingSessions, 3);
+    assert.equal(view.benchmark?.overlappingSessions, dates.length);
     assert.equal(view.benchmark?.coversCommonWindow, true);
-    assert.equal(view.benchmark?.startDate, '2025-01-06');
-    assert.equal(view.benchmark?.endDate, '2025-01-08');
+    assert.equal(view.benchmark?.startDate, dates[0]);
+    assert.equal(view.benchmark?.endDate, dates[dates.length - 1]);
     assertClose(view.securities[0].beta, 2, 1e-12);
     assertClose(view.securities[1].beta, 1, 1e-12);
     assert.ok(!view.narrative.notes.includes('benchmark-partial-overlap'));
   });
 
   it('uses only the sessions the benchmark shares and says the overlap was partial', () => {
-    const benchmarkDates = ['2025-01-06', '2025-01-07', '2025-01-09'];
+    const dates = days(MIN_RISK_OBSERVATIONS + 2);
+    // The benchmark trades every common session but the last, so the overlap is one
+    // session short of the window while still spanning enough returns to regress.
+    const benchmarkDates = dates.slice(0, MIN_RISK_OBSERVATIONS + 1);
     const view = buildStockComparison({
       securities: [
-        security('AAA', series(WEEK, [100, 120, 96, 100])),
-        security('BBB', series(WEEK, [50, 52, 55, 54])),
+        security('AAA', series(dates, alternatingCloses(0.2, MIN_RISK_OBSERVATIONS + 1))),
+        security('BBB', series(dates, alternatingCloses(0.05, MIN_RISK_OBSERVATIONS + 1))),
       ],
-      benchmark: security('SPY', series(benchmarkDates, [100, 110, 99]), { type: 'ETF' }),
+      benchmark: security('SPY', series(benchmarkDates, alternatingCloses(0.1, MIN_RISK_OBSERVATIONS)), {
+        type: 'ETF',
+      }),
       annualRiskFreeRate: 0,
     });
 
-    assert.equal(view.commonWindow.sessions, 4);
-    assert.equal(view.benchmark?.overlappingSessions, 3);
+    assert.equal(view.commonWindow.sessions, MIN_RISK_OBSERVATIONS + 2);
+    assert.equal(view.benchmark?.overlappingSessions, MIN_RISK_OBSERVATIONS + 1);
     assert.equal(view.benchmark?.coversCommonWindow, false);
-    assert.equal(view.benchmark?.endDate, '2025-01-09');
+    assert.equal(view.benchmark?.endDate, benchmarkDates[benchmarkDates.length - 1]);
     assert.ok(view.narrative.notes.includes('benchmark-partial-overlap'));
     assert.ok(view.securities[0].beta !== undefined);
   });
@@ -535,21 +594,76 @@ describe('benchmark', () => {
   });
 });
 
+/** A security whose provider supplied a complete aligned adjusted-close axis. */
+function covered(ticker: string, dates: DateString[], closes: number[], adjusted: number[]): MarketData {
+  const prices = series(dates, closes).map((bar, index) => ({ ...bar, adjustedClose: adjusted[index] }));
+  return security(ticker, prices, {
+    source: 'yahoo',
+    provenance: {
+      priceProvider: 'yahoo',
+      priceBasis: 'split-adjusted',
+      lastCompletedSession: dates[dates.length - 1],
+      fetchedAt: '2026-07-27T00:00:00.000Z',
+      dividendCoverage: 'not-requested',
+      totalReturnCoverage: 'yahoo-adjusted-close',
+      splitCoverage: 'none-reported',
+      reorganizationCoverage: 'provider-reported-only',
+      mode: 'analysis',
+    },
+  });
+}
+
+describe('return basis', () => {
+  it('uses total return for every asset only when all have adjusted-close coverage', () => {
+    const dates = days(MIN_RISK_OBSERVATIONS + 1);
+    const closes = alternatingCloses(0.1, MIN_RISK_OBSERVATIONS);
+    const adjusted = closes.map((close, index) => close * (0.9 + (0.1 * index) / closes.length));
+    const view = buildStockComparison({
+      securities: [covered('AAA', dates, closes, adjusted), covered('BBB', dates, closes, adjusted)],
+      annualRiskFreeRate: 0,
+    });
+
+    assert.equal(view.returnBasis, 'total');
+    assert.equal(view.excludesDividends, false);
+    assert.ok(view.narrative.notes.includes('total-return-basis'));
+    assert.ok(!view.narrative.notes.includes('price-return-only'));
+    view.securities.forEach((entry) => assert.notEqual(entry.totalReturn, undefined));
+  });
+
+  it('degrades to price return for ALL assets when any lacks coverage, never mixing', () => {
+    const dates = days(MIN_RISK_OBSERVATIONS + 1);
+    const closes = alternatingCloses(0.1, MIN_RISK_OBSERVATIONS);
+    const adjusted = closes.map((close, index) => close * (0.9 + (0.1 * index) / closes.length));
+    const view = buildStockComparison({
+      // BBB is demo data with no adjusted-close coverage.
+      securities: [covered('AAA', dates, closes, adjusted), security('BBB', series(dates, closes))],
+      annualRiskFreeRate: 0,
+    });
+
+    assert.equal(view.returnBasis, 'price');
+    assert.equal(view.excludesDividends, true);
+    assert.ok(view.narrative.notes.includes('price-return-only'));
+  });
+});
+
 describe('comparison narrative', () => {
   it('names the highest historical CAGR and the lowest historical volatility', () => {
+    const dates = days(MIN_RISK_OBSERVATIONS + 1);
     const view = buildStockComparison({
       securities: [
-        security('CALM', series(SHORT_WEEK, [100, 101, 102])),
-        security('FAST', series(SHORT_WEEK, [100, 130, 150])),
+        // Small daily swings with a gentle upward drift: lowest volatility.
+        security('CALM', series(dates, driftingCloses(0.003, 0.002, MIN_RISK_OBSERVATIONS))),
+        // Large daily swings with a strong upward drift: highest CAGR, higher volatility.
+        security('FAST', series(dates, driftingCloses(0.08, 0.04, MIN_RISK_OBSERVATIONS))),
       ],
       annualRiskFreeRate: 0,
     });
 
     assert.equal(view.narrative.highestCagr?.symbol, 'FAST');
     assert.equal(view.narrative.lowestVolatility?.symbol, 'CALM');
-    assert.equal(view.narrative.startDate, '2025-01-06');
-    assert.equal(view.narrative.endDate, '2025-01-08');
-    assert.equal(view.narrative.sessions, 3);
+    assert.equal(view.narrative.startDate, dates[0]);
+    assert.equal(view.narrative.endDate, dates[dates.length - 1]);
+    assert.equal(view.narrative.sessions, dates.length);
     assert.ok(view.narrative.notes.includes('price-return-only'));
     assert.ok(view.narrative.notes.includes('not-investment-advice'));
     assert.ok(!view.narrative.notes.includes('common-window-shortened'));
@@ -567,13 +681,14 @@ describe('comparison narrative', () => {
   });
 
   it('resolves a volatility tie the same way regardless of input order', () => {
-    const closes = [100, 110, 99];
+    const dates = days(MIN_RISK_OBSERVATIONS + 1);
+    const closes = alternatingCloses(0.1, MIN_RISK_OBSERVATIONS);
     const forward = buildStockComparison({
-      securities: [security('ZZZ', series(SHORT_WEEK, closes)), security('AAA', series(SHORT_WEEK, closes))],
+      securities: [security('ZZZ', series(dates, closes)), security('AAA', series(dates, closes))],
       annualRiskFreeRate: 0,
     });
     const reversed = buildStockComparison({
-      securities: [security('AAA', series(SHORT_WEEK, closes)), security('ZZZ', series(SHORT_WEEK, closes))],
+      securities: [security('AAA', series(dates, closes)), security('ZZZ', series(dates, closes))],
       annualRiskFreeRate: 0,
     });
 

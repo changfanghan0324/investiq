@@ -148,12 +148,10 @@ function BrandMark() {
 /** Inline outline icons keep the bottom navigation legible at 18px without extra dependencies. */
 function NavIcon({ id }: { id: NavRouteId }) {
   const paths: Record<NavRouteId, ReactNode> = {
-    market: <path d="M3 15.5 L8 9.5 L12 13 L21 4.5" />,
-    stock: (
+    research: (
       <>
-        <path d="M5 20 L5 11" />
-        <path d="M12 20 L12 5" />
-        <path d="M19 20 L19 14" />
+        <circle cx="10.5" cy="10.5" r="6.5" />
+        <path d="M15.5 15.5 L21 21" />
       </>
     ),
     compare: (
@@ -170,11 +168,12 @@ function NavIcon({ id }: { id: NavRouteId }) {
         <path d="M9 7 L9 4.5 L15 4.5 L15 7" />
       </>
     ),
-    dca: (
+    tools: (
       <>
-        <circle cx="12" cy="12" r="8.5" />
-        <path d="M12 7.5 L12 16.5" />
-        <path d="M14.5 9.75 A2.5 2.5 0 0 0 9.5 10.5 A2.2 2.2 0 0 0 12 12.4 A2.2 2.2 0 0 1 14.5 14.3 A2.5 2.5 0 0 1 9.5 15" />
+        <path d="M4 7 L20 7" />
+        <path d="M4 17 L20 17" />
+        <circle cx="9" cy="7" r="2" />
+        <circle cx="15" cy="17" r="2" />
       </>
     ),
   };

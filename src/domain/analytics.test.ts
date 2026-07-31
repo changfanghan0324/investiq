@@ -3,9 +3,13 @@ import { describe, it } from 'vitest';
 
 import {
   AnalyticsError,
+  INVERSE_VOLATILITY_MAX_SERIES,
+  LIMITED_SAMPLE_OBSERVATIONS,
+  MIN_RISK_OBSERVATIONS,
   alignReturns,
   analyzeConcentration,
   annualizedSharpeRatio,
+  annualizedSortinoRatio,
   annualizedVolatility,
   beta,
   compoundAnnualGrowthRate,
@@ -13,16 +17,24 @@ import {
   correlation,
   cumulativePriceReturns,
   dailyCloseReturns,
+  downsideDeviation,
+  historicalValueAtRisk,
+  inverseVolatilityWeights,
+  jensenAlpha,
   maxCloseDrawdown,
   portfolioDailyReturns,
+  resolveReturnBasis,
+  riskSampleStatus,
   simpleMovingAverage,
   simpleMovingAverages,
+  toReturnBasisBars,
   validatePriceSeries,
   validateWeights,
   TRADING_DAYS_PER_YEAR,
 } from '@/domain/analytics';
 import type { DatedValue } from '@/domain/analytics';
 import type { DateString, PriceBar } from '@/types/backtest';
+import { addDays } from '@/utils/date';
 
 function bar(date: DateString, close: number): PriceBar {
   return { date, open: close, high: close, low: close, close };
@@ -34,6 +46,37 @@ function bars(entries: [DateString, number][]): PriceBar[] {
 
 function returns(entries: [DateString, number][]): DatedValue[] {
   return entries.map(([date, value]) => ({ date, value }));
+}
+
+/** `count` dated returns on consecutive calendar days, valued by `valueAt`. */
+function seriesReturns(
+  count: number,
+  valueAt: (index: number) => number,
+  start: DateString = '2024-01-02',
+): DatedValue[] {
+  return Array.from({ length: count }, (unused, index) => ({
+    date: addDays(start, index),
+    value: valueAt(index),
+  }));
+}
+
+function sampleMean(values: number[]): number {
+  return values.reduce((total, value) => total + value, 0) / values.length;
+}
+
+function sampleStdDev(values: number[]): number {
+  const mean = sampleMean(values);
+  const variance = values.reduce((total, value) => total + (value - mean) ** 2, 0) / (values.length - 1);
+  return Math.sqrt(variance);
+}
+
+/** Independent target downside deviation: RMS shortfall below `target`, averaged over every value. */
+function targetDownsideDeviation(values: number[], target: number): number {
+  const sum = values.reduce((total, value) => {
+    const shortfall = Math.min(0, value - target);
+    return total + shortfall * shortfall;
+  }, 0);
+  return Math.sqrt(sum / values.length);
 }
 
 function assertClose(actual: number | undefined, expected: number, tolerance = 1e-12): void {
@@ -137,48 +180,110 @@ describe('compound annual growth rate', () => {
 });
 
 describe('volatility and Sharpe', () => {
-  it('annualizes the sample standard deviation with 252 trading days', () => {
-    const series = returns([
-      ['2024-01-03', 0.01],
-      ['2024-01-04', -0.01],
-      ['2024-01-05', 0.01],
-      ['2024-01-08', -0.01],
-    ]);
+  it('is unavailable below 60 returns and available at exactly 60', () => {
+    const under = seriesReturns(MIN_RISK_OBSERVATIONS - 1, (index) => (index % 2 === 0 ? 0.01 : -0.01));
+    const at = seriesReturns(MIN_RISK_OBSERVATIONS, (index) => (index % 2 === 0 ? 0.01 : -0.01));
 
-    // Mean 0, sample variance = (4 × 0.0001) / 3, annualized by sqrt(252).
-    assertClose(annualizedVolatility(series), Math.sqrt(0.0004 / 3) * Math.sqrt(252));
+    assert.equal(annualizedVolatility(under), undefined);
+    assert.equal(annualizedSharpeRatio(under, 0), undefined);
+    assert.ok(annualizedVolatility(at) !== undefined);
+    assert.ok(annualizedSharpeRatio(at, 0) !== undefined);
   });
 
-  it('reports zero volatility for a constant price and undefined for a single return', () => {
-    const flat = dailyCloseReturns(bars([['2024-01-02', 50], ['2024-01-03', 50], ['2024-01-04', 50]]));
+  it('annualizes the sample standard deviation with 252 trading days', () => {
+    const series = seriesReturns(MIN_RISK_OBSERVATIONS, (index) => (index % 2 === 0 ? 0.01 : -0.01));
+    const values = series.map((point) => point.value);
+
+    assertClose(annualizedVolatility(series), sampleStdDev(values) * Math.sqrt(TRADING_DAYS_PER_YEAR));
+  });
+
+  it('reports zero volatility for a constant series with enough observations', () => {
+    const flat = seriesReturns(MIN_RISK_OBSERVATIONS, () => 0);
 
     assert.equal(annualizedVolatility(flat), 0);
-    assert.equal(annualizedVolatility(returns([['2024-01-03', 0.01]])), undefined);
   });
 
   it('returns undefined Sharpe when volatility is zero', () => {
-    const flat = dailyCloseReturns(bars([['2024-01-02', 50], ['2024-01-03', 50], ['2024-01-04', 50]]));
+    const flat = seriesReturns(MIN_RISK_OBSERVATIONS, () => 0);
 
     assert.equal(annualizedSharpeRatio(flat, 0.04), undefined);
   });
 
   it('computes Sharpe from mean excess return over annualized volatility', () => {
-    const series = returns([['2024-01-03', 0.01], ['2024-01-04', 0.03]]);
+    const series = seriesReturns(MIN_RISK_OBSERVATIONS, (index) => (index % 2 === 0 ? 0.01 : 0.03));
+    const values = series.map((point) => point.value);
+    const expected =
+      ((sampleMean(values) - 0) / sampleStdDev(values)) * Math.sqrt(TRADING_DAYS_PER_YEAR);
 
-    // Risk-free 0: mean 0.02, sample sd sqrt(0.0002), scaled by sqrt(252).
-    assertClose(
-      annualizedSharpeRatio(series, 0),
-      (0.02 / Math.sqrt(0.0002)) * Math.sqrt(TRADING_DAYS_PER_YEAR),
-    );
+    assertClose(annualizedSharpeRatio(series, 0), expected);
   });
 
   it('lowers Sharpe as the explicit risk-free rate rises, and rejects a rate at or below -1', () => {
-    const series = returns([['2024-01-03', 0.01], ['2024-01-04', 0.03]]);
+    const series = seriesReturns(MIN_RISK_OBSERVATIONS, (index) => (index % 2 === 0 ? 0.01 : 0.03));
     const atZero = annualizedSharpeRatio(series, 0)!;
     const atFourPercent = annualizedSharpeRatio(series, 0.04)!;
 
     assert.ok(atFourPercent < atZero);
     assert.throws(() => annualizedSharpeRatio(series, -1), AnalyticsError);
+  });
+});
+
+describe('risk sample sufficiency', () => {
+  it('flags fewer than 60 observations as insufficient', () => {
+    const status = riskSampleStatus(MIN_RISK_OBSERVATIONS - 1);
+    assert.deepEqual(status, { observations: 59, sufficient: false, limited: false });
+  });
+
+  it('flags 60 to 251 observations as a limited sample', () => {
+    assert.deepEqual(riskSampleStatus(MIN_RISK_OBSERVATIONS), {
+      observations: 60,
+      sufficient: true,
+      limited: true,
+    });
+    assert.deepEqual(riskSampleStatus(LIMITED_SAMPLE_OBSERVATIONS - 1), {
+      observations: 251,
+      sufficient: true,
+      limited: true,
+    });
+  });
+
+  it('clears the limited flag at a full trading year', () => {
+    assert.deepEqual(riskSampleStatus(LIMITED_SAMPLE_OBSERVATIONS), {
+      observations: 252,
+      sufficient: true,
+      limited: false,
+    });
+  });
+});
+
+describe('return basis selection', () => {
+  it('leaves price-basis bars unchanged and moves the adjusted close into total-basis bars', () => {
+    const priced: PriceBar[] = [
+      { date: '2024-01-02', open: 10, high: 11, low: 9, close: 10, adjustedClose: 8 },
+      { date: '2024-01-03', open: 12, high: 13, low: 11, close: 12, adjustedClose: 9 },
+    ];
+
+    assert.equal(toReturnBasisBars(priced, 'price'), priced);
+    assert.deepEqual(
+      toReturnBasisBars(priced, 'total').map((entry) => entry.close),
+      [8, 9],
+    );
+  });
+
+  it('refuses a total basis when any bar lacks an adjusted close', () => {
+    const partial: PriceBar[] = [
+      { date: '2024-01-02', open: 10, high: 11, low: 9, close: 10, adjustedClose: 8 },
+      { date: '2024-01-03', open: 12, high: 13, low: 11, close: 12 },
+    ];
+
+    assert.throws(() => toReturnBasisBars(partial, 'total'), AnalyticsError);
+  });
+
+  it('chooses total return only when every series has adjusted-close coverage', () => {
+    assert.equal(resolveReturnBasis(['yahoo-adjusted-close', 'yahoo-adjusted-close']), 'total');
+    assert.equal(resolveReturnBasis(['yahoo-adjusted-close', 'unavailable']), 'price');
+    assert.equal(resolveReturnBasis(['demo', 'demo']), 'price');
+    assert.equal(resolveReturnBasis([]), 'price');
   });
 });
 
@@ -248,16 +353,28 @@ describe('simple moving averages', () => {
 });
 
 describe('beta and correlation', () => {
+  it('is unavailable below 60 overlapping returns and available at 60', () => {
+    const bench59 = seriesReturns(MIN_RISK_OBSERVATIONS - 1, (index) => 0.001 * ((index % 9) + 1));
+    const asset59 = bench59.map((point) => ({ date: point.date, value: point.value * 2 }));
+    assert.equal(beta(asset59, bench59), undefined);
+    assert.equal(correlation(asset59, bench59), undefined);
+
+    const bench60 = seriesReturns(MIN_RISK_OBSERVATIONS, (index) => 0.001 * ((index % 9) + 1));
+    const asset60 = bench60.map((point) => ({ date: point.date, value: point.value * 2 }));
+    assert.ok(beta(asset60, bench60) !== undefined);
+    assert.ok(correlation(asset60, bench60) !== undefined);
+  });
+
   it('measures beta and correlation of an asset that moves twice the benchmark', () => {
-    const benchmark = returns([['2024-01-03', 0.01], ['2024-01-04', 0.02], ['2024-01-05', 0.03]]);
-    const asset = returns([['2024-01-03', 0.02], ['2024-01-04', 0.04], ['2024-01-05', 0.06]]);
+    const benchmark = seriesReturns(MIN_RISK_OBSERVATIONS, (index) => 0.001 * ((index % 9) + 1));
+    const asset = benchmark.map((point) => ({ date: point.date, value: point.value * 2 }));
 
     assertClose(beta(asset, benchmark), 2);
     assertClose(correlation(asset, benchmark), 1);
     assertClose(correlation(benchmark, benchmark), 1);
   });
 
-  it('uses only overlapping dates, ignoring days one series does not have', () => {
+  it('inner-joins on date, dropping days one series does not have', () => {
     const benchmark = returns([['2024-01-04', 0.02], ['2024-01-05', 0.03]]);
     const asset = returns([
       ['2024-01-03', 5],
@@ -270,23 +387,35 @@ describe('beta and correlation', () => {
       { date: '2024-01-04', a: 0.04, b: 0.02 },
       { date: '2024-01-05', a: 0.06, b: 0.03 },
     ]);
+  });
+
+  it('uses only overlapping dates over a sufficient sample', () => {
+    const benchmark = [
+      ...seriesReturns(MIN_RISK_OBSERVATIONS, (index) => 0.001 * ((index % 9) + 1), '2024-02-01'),
+      { date: '2024-01-01', value: 9 },
+    ];
+    const asset = [
+      { date: '2024-05-01', value: -9 },
+      ...seriesReturns(MIN_RISK_OBSERVATIONS, (index) => 0.002 * ((index % 9) + 1), '2024-02-01'),
+    ];
+
     // The non-overlapping outliers are dropped, so this is still exactly 2×.
     assertClose(beta(asset, benchmark), 2);
     assertClose(correlation(asset, benchmark), 1);
   });
 
   it('measures -1 correlation for a perfectly inverse series', () => {
-    const benchmark = returns([['2024-01-03', 0.01], ['2024-01-04', 0.02], ['2024-01-05', 0.03]]);
-    const inverse = returns([['2024-01-03', -0.01], ['2024-01-04', -0.02], ['2024-01-05', -0.03]]);
+    const benchmark = seriesReturns(MIN_RISK_OBSERVATIONS, (index) => 0.001 * ((index % 9) + 1));
+    const inverse = benchmark.map((point) => ({ date: point.date, value: -point.value }));
 
     assertClose(correlation(inverse, benchmark), -1);
     assertClose(beta(inverse, benchmark), -1);
   });
 
   it('returns undefined for insufficient overlap or a flat series', () => {
-    const benchmark = returns([['2024-01-03', 0.01], ['2024-01-04', 0.02]]);
+    const benchmark = seriesReturns(MIN_RISK_OBSERVATIONS, (index) => 0.001 * ((index % 9) + 1));
     const oneOverlap = returns([['2024-01-04', 0.02], ['2024-01-08', 0.05]]);
-    const flat = returns([['2024-01-03', 0], ['2024-01-04', 0]]);
+    const flat = seriesReturns(MIN_RISK_OBSERVATIONS, () => 0);
 
     assert.equal(beta(oneOverlap, benchmark), undefined);
     assert.equal(correlation(oneOverlap, benchmark), undefined);
@@ -424,5 +553,202 @@ describe('concentration diagnostics', () => {
       { sector: 'Energy', weight: 0.4 },
     ]);
     assert.deepEqual(result.flags, []);
+  });
+});
+
+describe('Sortino ratio and downside deviation', () => {
+  it('is unavailable below 60 returns and available at exactly 60', () => {
+    const under = seriesReturns(MIN_RISK_OBSERVATIONS - 1, (index) => (index % 2 === 0 ? 0.02 : -0.01));
+    const at = seriesReturns(MIN_RISK_OBSERVATIONS, (index) => (index % 2 === 0 ? 0.02 : -0.01));
+
+    assert.equal(annualizedSortinoRatio(under, 0), undefined);
+    assert.equal(downsideDeviation(under, 0), undefined);
+    assert.ok(annualizedSortinoRatio(at, 0) !== undefined);
+    assert.ok(downsideDeviation(at, 0) !== undefined);
+  });
+
+  it('hand-calculates the downside deviation and the annualized Sortino ratio at a zero MAR', () => {
+    // 30 days of +2% and 30 days of −1% (alternating). With a 0% MAR only the −1% days are
+    // shortfalls: Σ min(0,r)² = 30 × 0.01² = 0.003, /60 = 0.00005, √ = 0.01/√2 daily downside.
+    const series = seriesReturns(MIN_RISK_OBSERVATIONS, (index) => (index % 2 === 0 ? 0.02 : -0.01));
+    const values = series.map((point) => point.value);
+    const expectedDownside = 0.01 / Math.SQRT2;
+
+    assertClose(downsideDeviation(series, 0), expectedDownside);
+    assertClose(downsideDeviation(series, 0), targetDownsideDeviation(values, 0));
+
+    // Mean daily return is (0.6 − 0.3)/60 = 0.005, so the daily Sortino is 0.005 / (0.01/√2) = √2/2.
+    const expectedSortino = (0.005 / expectedDownside) * Math.sqrt(TRADING_DAYS_PER_YEAR);
+    assertClose(annualizedSortinoRatio(series, 0), expectedSortino);
+    assertClose(expectedSortino, (Math.SQRT2 / 2) * Math.sqrt(TRADING_DAYS_PER_YEAR));
+  });
+
+  it('subtracts the same geometric daily risk-free rate as the MAR', () => {
+    const series = seriesReturns(MIN_RISK_OBSERVATIONS, (index) => (index % 2 === 0 ? 0.02 : -0.01));
+    const values = series.map((point) => point.value);
+    const dailyRiskFree = 1.04 ** (1 / TRADING_DAYS_PER_YEAR) - 1;
+    const expectedDownside = targetDownsideDeviation(values, dailyRiskFree);
+    const expectedSortino =
+      ((sampleMean(values) - dailyRiskFree) / expectedDownside) * Math.sqrt(TRADING_DAYS_PER_YEAR);
+
+    assertClose(downsideDeviation(series, 0.04), expectedDownside);
+    assertClose(annualizedSortinoRatio(series, 0.04), expectedSortino);
+  });
+
+  it('lowers the Sortino ratio as the risk-free rate rises and rejects a rate at or below -1', () => {
+    const series = seriesReturns(MIN_RISK_OBSERVATIONS, (index) => (index % 2 === 0 ? 0.02 : -0.01));
+
+    assert.ok(annualizedSortinoRatio(series, 0.04)! < annualizedSortinoRatio(series, 0)!);
+    assert.throws(() => annualizedSortinoRatio(series, -1), AnalyticsError);
+    assert.throws(() => downsideDeviation(series, -1), AnalyticsError);
+  });
+
+  it('returns undefined when nothing fell below the MAR, rather than infinity', () => {
+    const allGains = seriesReturns(MIN_RISK_OBSERVATIONS, () => 0.01);
+    const flat = seriesReturns(MIN_RISK_OBSERVATIONS, () => 0);
+
+    assert.equal(downsideDeviation(allGains, 0), 0);
+    assert.equal(annualizedSortinoRatio(allGains, 0), undefined);
+    assert.equal(annualizedSortinoRatio(flat, 0), undefined);
+  });
+});
+
+describe('historical value at risk', () => {
+  /** 57 days of +1% and three losing days of −10%, −8%, −6%: a controlled lower tail. */
+  const TAIL_SAMPLE = [...Array.from({ length: 57 }, () => 0.01), -0.1, -0.08, -0.06];
+
+  function tailSeries(): DatedValue[] {
+    return seriesReturns(TAIL_SAMPLE.length, (index) => TAIL_SAMPLE[index]);
+  }
+
+  it('reads the nearest-rank lower-tail quantile as a positive loss (hand calc)', () => {
+    // Sorted ascending the tail is [−0.10, −0.08, −0.06, 0.01 …]. At 95% the rank is
+    // ceil(0.05 × 60) = 3, the 3rd-worst return −6%, so the one-day VaR is +0.06.
+    assertClose(historicalValueAtRisk(tailSeries(), 0.95), 0.06);
+  });
+
+  it('does not imply a loss ceiling: a positive tail quantile yields a negative VaR', () => {
+    // At 90% the rank is ceil(0.10 × 60) = 6; only three days are losses, so the 6th-worst
+    // return is +1% and the VaR is −0.01, honestly a gain rather than clamped to zero.
+    assertClose(historicalValueAtRisk(tailSeries(), 0.9), -0.01);
+  });
+
+  it('pins a high confidence on a small sample to the single worst return', () => {
+    // rank = ceil(0.01 × 60) = 1 → the worst observed return, −10%.
+    assertClose(historicalValueAtRisk(tailSeries(), 0.99), 0.1);
+  });
+
+  it('is undefined below 60 returns', () => {
+    assert.equal(historicalValueAtRisk(seriesReturns(MIN_RISK_OBSERVATIONS - 1, () => -0.02), 0.95), undefined);
+  });
+
+  it('rejects a confidence that is not strictly between 0 and 1', () => {
+    const series = seriesReturns(MIN_RISK_OBSERVATIONS, () => -0.01);
+    for (const confidence of [0, 1, -0.5, 1.5, Number.NaN, Number.POSITIVE_INFINITY]) {
+      assert.throws(() => historicalValueAtRisk(series, confidence), AnalyticsError);
+    }
+  });
+});
+
+describe('Jensen alpha', () => {
+  it('is zero when the portfolio equals the benchmark', () => {
+    const benchmark = seriesReturns(MIN_RISK_OBSERVATIONS, (index) => 0.002 * ((index % 7) + 1));
+    // Identical returns → beta 1 and equal annualized returns → alpha 0 at any risk-free rate.
+    assertClose(jensenAlpha(benchmark, benchmark, 0.03), 0);
+  });
+
+  it('hand-calculates the annualized alpha of a 2× leveraged benchmark', () => {
+    // Portfolio = 2 × benchmark each day, so beta = 2 exactly. Benchmark alternates ±u, so its
+    // 60-day growth is (1−u²)^30 and the portfolio's is (1−4u²)^30. With Rf = 0 the CAPM term is
+    // 2 × Rm, and geometric annualization uses the 252/60 exponent.
+    const u = 0.02;
+    const benchmark = seriesReturns(MIN_RISK_OBSERVATIONS, (index) => (index % 2 === 0 ? u : -u));
+    const portfolio = benchmark.map((point) => ({ date: point.date, value: 2 * point.value }));
+
+    const exponent = TRADING_DAYS_PER_YEAR / MIN_RISK_OBSERVATIONS;
+    const annualizedBenchmark = (1 - u * u) ** (30 * exponent) - 1;
+    const annualizedPortfolio = (1 - 4 * u * u) ** (30 * exponent) - 1;
+    const expected = annualizedPortfolio - 2 * annualizedBenchmark;
+
+    assertClose(jensenAlpha(portfolio, benchmark, 0), expected);
+    // Leverage plus geometric compounding drags the annualized alpha slightly negative.
+    assert.ok((jensenAlpha(portfolio, benchmark, 0) as number) < 0);
+  });
+
+  it('is undefined when the overlap is too short or the benchmark is flat', () => {
+    const benchmark = seriesReturns(MIN_RISK_OBSERVATIONS, (index) => 0.001 * ((index % 9) + 1));
+    const shortPortfolio = seriesReturns(MIN_RISK_OBSERVATIONS - 1, (index) => 0.002 * ((index % 9) + 1));
+    const flat = seriesReturns(MIN_RISK_OBSERVATIONS, () => 0);
+
+    assert.equal(jensenAlpha(shortPortfolio, benchmark.slice(0, MIN_RISK_OBSERVATIONS - 1), 0.02), undefined);
+    assert.equal(jensenAlpha(benchmark, flat, 0.02), undefined);
+  });
+
+  it('rejects a risk-free rate at or below -1', () => {
+    const benchmark = seriesReturns(MIN_RISK_OBSERVATIONS, (index) => 0.001 * ((index % 9) + 1));
+    assert.throws(() => jensenAlpha(benchmark, benchmark, -1), AnalyticsError);
+  });
+});
+
+describe('inverse-volatility weights', () => {
+  it('weights a calmer series more than a wilder one (hand calc)', () => {
+    // AAA alternates ±2% and BBB alternates ±4%, so BBB's annualized volatility is exactly double
+    // AAA's; inverse-volatility weights are proportional to 1 and 1/2 → 2/3 and 1/3.
+    const calm = seriesReturns(MIN_RISK_OBSERVATIONS, (index) => (index % 2 === 0 ? 0.02 : -0.02));
+    const wild = seriesReturns(MIN_RISK_OBSERVATIONS, (index) => (index % 2 === 0 ? 0.04 : -0.04));
+    const allocation = inverseVolatilityWeights([
+      { symbol: 'AAA', returns: calm },
+      { symbol: 'BBB', returns: wild },
+    ]);
+
+    assert.equal(allocation.method, 'inverse-volatility');
+    assertClose(allocation.weights[0].volatility, annualizedVolatility(calm) as number);
+    assertClose(allocation.weights[1].volatility, annualizedVolatility(wild) as number);
+    assertClose(allocation.weights[0].weight, 2 / 3);
+    assertClose(allocation.weights[1].weight, 1 / 3);
+    assertClose(
+      allocation.weights.reduce((total, entry) => total + entry.weight, 0),
+      1,
+    );
+  });
+
+  it('gives a single series the whole weight', () => {
+    const only = seriesReturns(MIN_RISK_OBSERVATIONS, (index) => (index % 2 === 0 ? 0.02 : -0.02));
+    const allocation = inverseVolatilityWeights([{ symbol: 'AAA', returns: only }]);
+
+    assert.equal(allocation.weights.length, 1);
+    assert.equal(allocation.weights[0].weight, 1);
+  });
+
+  it('rejects a zero-volatility or too-short series rather than dividing by it', () => {
+    const moving = seriesReturns(MIN_RISK_OBSERVATIONS, (index) => (index % 2 === 0 ? 0.02 : -0.02));
+    const flat = seriesReturns(MIN_RISK_OBSERVATIONS, () => 0);
+    const tooShort = seriesReturns(MIN_RISK_OBSERVATIONS - 1, (index) => (index % 2 === 0 ? 0.02 : -0.02));
+
+    assert.throws(
+      () => inverseVolatilityWeights([{ symbol: 'AAA', returns: moving }, { symbol: 'BBB', returns: flat }]),
+      AnalyticsError,
+    );
+    assert.throws(() => inverseVolatilityWeights([{ symbol: 'AAA', returns: tooShort }]), AnalyticsError);
+  });
+
+  it('rejects fewer than one, more than ten, and duplicate series', () => {
+    const moving = seriesReturns(MIN_RISK_OBSERVATIONS, (index) => (index % 2 === 0 ? 0.02 : -0.02));
+
+    assert.throws(() => inverseVolatilityWeights([]), AnalyticsError);
+    assert.throws(
+      () =>
+        inverseVolatilityWeights(
+          Array.from({ length: INVERSE_VOLATILITY_MAX_SERIES + 1 }, (unused, index) => ({
+            symbol: `SYM${index}`,
+            returns: moving,
+          })),
+        ),
+      AnalyticsError,
+    );
+    assert.throws(
+      () => inverseVolatilityWeights([{ symbol: 'AAA', returns: moving }, { symbol: 'AAA', returns: moving }]),
+      AnalyticsError,
+    );
   });
 });

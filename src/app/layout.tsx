@@ -19,11 +19,11 @@ const uiMono = IBM_Plex_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: "InvestIQ — Personalized Investment Analytics Platform",
+    default: "InvestIQ — Investment Research & Portfolio Analytics",
     template: "%s — InvestIQ",
   },
   description:
-    "Personalized investment analytics for US stocks and ETFs: market overview, per-symbol analysis, comparison, portfolio construction, and recurring-investment backtests built on end-of-day data.",
+    "Evidence-first company financial analysis, valuation, portfolio construction, and risk analytics for US-listed equities.",
   applicationName: "InvestIQ",
   keywords: [
     "investment analytics",
@@ -42,7 +42,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${uiSans.variable} ${uiMono.variable}`}>
+    <html lang="en" className={`${uiSans.variable} ${uiMono.variable}`} data-scroll-behavior="smooth">
       <body><LanguageProvider>{children}</LanguageProvider></body>
     </html>
   );

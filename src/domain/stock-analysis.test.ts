@@ -1,7 +1,12 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'vitest';
 
-import { AnalyticsError, CALENDAR_DAYS_PER_YEAR, TRADING_DAYS_PER_YEAR } from '@/domain/analytics';
+import {
+  AnalyticsError,
+  CALENDAR_DAYS_PER_YEAR,
+  MIN_RISK_OBSERVATIONS,
+  TRADING_DAYS_PER_YEAR,
+} from '@/domain/analytics';
 import {
   MOVING_AVERAGE_WINDOWS,
   VOLUME_AVERAGE_WINDOW,
@@ -49,6 +54,16 @@ function marketData(prices: PriceBar[], overrides: Partial<MarketData> = {}): Ma
     tickerChanges: [],
     source: 'demo',
     fetchedAt: '2026-07-27T00:00:00.000Z',
+    provenance: {
+      priceProvider: 'demo',
+      priceBasis: 'split-adjusted',
+      fetchedAt: '2026-07-27T00:00:00.000Z',
+      dividendCoverage: 'demo',
+      totalReturnCoverage: 'demo',
+      splitCoverage: 'demo',
+      reorganizationCoverage: 'demo',
+      mode: 'demo',
+    },
     ...overrides,
   };
 }
@@ -83,17 +98,35 @@ function assertClose(actual: number | undefined, expected: number, tolerance = 1
   );
 }
 
-/** Asset up 20% then down 20%, against a benchmark up 10% then down 10% on the same days. */
-const DOUBLE_BETA_ASSET = bars([
-  ['2025-01-06', 100],
-  ['2025-01-07', 120],
-  ['2025-01-08', 96],
-]);
-const DOUBLE_BETA_BENCHMARK = bars([
-  ['2025-01-06', 100],
-  ['2025-01-07', 110],
-  ['2025-01-08', 99],
-]);
+/** `count + 1` closes producing `count` alternating ±magnitude daily returns from 100. */
+function alternatingCloses(magnitude: number, count: number = MIN_RISK_OBSERVATIONS): number[] {
+  const closes = [100];
+  for (let index = 0; index < count; index += 1) {
+    closes.push(closes[closes.length - 1] * (1 + (index % 2 === 0 ? magnitude : -magnitude)));
+  }
+  return closes;
+}
+
+function dailyReturnValues(closes: number[]): number[] {
+  const out: number[] = [];
+  for (let index = 1; index < closes.length; index += 1) out.push(closes[index] / closes[index - 1] - 1);
+  return out;
+}
+
+function sampleStdDev(values: number[]): number {
+  const mean = values.reduce((total, value) => total + value, 0) / values.length;
+  const variance = values.reduce((total, value) => total + (value - mean) ** 2, 0) / (values.length - 1);
+  return Math.sqrt(variance);
+}
+
+/**
+ * Asset moving ±20% daily against a benchmark moving ±10% on the same days, over the
+ * minimum 60-return sample the risk math requires. The asset return is exactly twice
+ * the benchmark return each day (beta 2, correlation 1), and both average zero.
+ */
+const DOUBLE_BETA_ASSET_CLOSES = alternatingCloses(0.2);
+const DOUBLE_BETA_ASSET = sequentialBars(DOUBLE_BETA_ASSET_CLOSES, '2025-01-06');
+const DOUBLE_BETA_BENCHMARK = sequentialBars(alternatingCloses(0.1), '2025-01-06');
 
 describe('buildStockAnalysis latest quote and history', () => {
   it('reports the last split-adjusted close, its date, and the covered history', () => {
@@ -224,7 +257,8 @@ describe('buildStockAnalysis risk metrics', () => {
       annualRiskFreeRate: 0,
     });
 
-    assertClose(view.volatility, Math.sqrt(0.08 * TRADING_DAYS_PER_YEAR));
+    const expected = sampleStdDev(dailyReturnValues(DOUBLE_BETA_ASSET_CLOSES)) * Math.sqrt(TRADING_DAYS_PER_YEAR);
+    assertClose(view.volatility, expected);
   });
 
   it('lowers the Sharpe ratio as the supplied risk-free rate rises', () => {
@@ -263,13 +297,7 @@ describe('buildStockAnalysis risk metrics', () => {
 
   it('leaves the Sharpe ratio undefined for flat prices instead of reporting zero risk-adjusted return', () => {
     const view = buildStockAnalysis({
-      marketData: marketData(
-        bars([
-          ['2025-01-02', 100],
-          ['2025-01-03', 100],
-          ['2025-01-06', 100],
-        ]),
-      ),
+      marketData: marketData(sequentialBars(Array.from({ length: MIN_RISK_OBSERVATIONS + 1 }, () => 100))),
       annualRiskFreeRate: 0.04,
     });
 
@@ -313,27 +341,26 @@ describe('buildStockAnalysis benchmark comparison', () => {
     });
 
     assert.equal(view.benchmark?.symbol, 'SPY');
-    assert.equal(view.benchmark?.overlappingDays, 2);
+    assert.equal(view.benchmark?.overlappingDays, MIN_RISK_OBSERVATIONS);
     assertClose(view.benchmark?.beta, 2);
     assertClose(view.benchmark?.correlation, 1);
   });
 
   it('uses only the overlapping days when the benchmark history is shorter', () => {
+    // The asset trades two return dates past the benchmark's history; only the 60
+    // shared dates feed beta and correlation.
     const view = buildStockAnalysis({
       marketData: marketData(
-        bars([
-          ['2025-01-02', 50],
-          ['2025-01-03', 80],
-          ['2025-01-06', 100],
-          ['2025-01-07', 120],
-          ['2025-01-08', 96],
-        ]),
+        sequentialBars(alternatingCloses(0.2, MIN_RISK_OBSERVATIONS + 2), '2025-02-01'),
       ),
-      benchmark: marketData(DOUBLE_BETA_BENCHMARK, { ticker: 'SPY' }),
+      benchmark: marketData(
+        sequentialBars(alternatingCloses(0.1, MIN_RISK_OBSERVATIONS), '2025-02-01'),
+        { ticker: 'SPY' },
+      ),
       annualRiskFreeRate: 0,
     });
 
-    assert.equal(view.benchmark?.overlappingDays, 2, 'only 01-07 and 01-08 are shared returns');
+    assert.equal(view.benchmark?.overlappingDays, MIN_RISK_OBSERVATIONS, 'only the shared dates count');
     assertClose(view.benchmark?.beta, 2, 1e-12);
     assertClose(view.benchmark?.correlation, 1, 1e-12);
   });
@@ -372,6 +399,67 @@ describe('buildStockAnalysis benchmark comparison', () => {
 
     assert.equal(view.benchmark, undefined);
     assert.ok(view.volatility !== undefined, 'single-symbol metrics still resolve');
+  });
+});
+
+/** Market data whose provider supplied a complete aligned adjusted-close axis. */
+function coveredMarketData(prices: PriceBar[], overrides: Partial<MarketData> = {}): MarketData {
+  return marketData(prices, {
+    source: 'yahoo',
+    provenance: {
+      priceProvider: 'yahoo',
+      priceBasis: 'split-adjusted',
+      lastCompletedSession: prices[prices.length - 1].date,
+      fetchedAt: '2026-07-27T00:00:00.000Z',
+      dividendCoverage: 'not-requested',
+      totalReturnCoverage: 'yahoo-adjusted-close',
+      splitCoverage: 'none-reported',
+      reorganizationCoverage: 'provider-reported-only',
+      mode: 'analysis',
+    },
+    ...overrides,
+  });
+}
+
+describe('buildStockAnalysis return basis', () => {
+  it('measures on total-return basis and separates price return from total return', () => {
+    // Flat price (0% price return) but a rising adjusted close: a dividend-driven total
+    // return of 100/90 − 1 that price return alone cannot see.
+    const count = MIN_RISK_OBSERVATIONS;
+    const prices = sequentialBars(Array.from({ length: count + 1 }, () => 100)).map((bar, index) => ({
+      ...bar,
+      adjustedClose: 90 + (10 * index) / count,
+    }));
+    const view = buildStockAnalysis({ marketData: coveredMarketData(prices), annualRiskFreeRate: 0 });
+
+    assert.equal(view.returnBasis, 'total');
+    assertClose(view.priceReturn, 0);
+    assertClose(view.totalReturn as number, 100 / 90 - 1);
+    assert.ok(view.volatility !== undefined && view.volatility > 0, 'total-return volatility is nonzero');
+    assert.equal(view.riskSample.observations, count);
+    assert.equal(view.riskSample.sufficient, true);
+    assert.equal(view.riskSample.limited, true);
+  });
+
+  it('falls back to price basis for both legs when the benchmark lacks coverage', () => {
+    const count = MIN_RISK_OBSERVATIONS;
+    const prices = sequentialBars(Array.from({ length: count + 1 }, () => 100)).map((bar, index) => ({
+      ...bar,
+      adjustedClose: 90 + (10 * index) / count,
+    }));
+    // The benchmark is demo data with no adjusted-close coverage.
+    const benchmark = marketData(sequentialBars(alternatingCloses(0.1, count)), { ticker: 'SPY' });
+    const view = buildStockAnalysis({
+      marketData: coveredMarketData(prices),
+      benchmark,
+      annualRiskFreeRate: 0,
+    });
+
+    // Mixed coverage → price basis for every figure, never a mixed table.
+    assert.equal(view.returnBasis, 'price');
+    assertClose(view.priceReturn, 0);
+    // The security's own total return is still exposed as a distinct metric.
+    assertClose(view.totalReturn as number, 100 / 90 - 1);
   });
 });
 

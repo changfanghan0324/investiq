@@ -17,6 +17,7 @@ import {
   maxCloseDrawdown,
   validatePriceSeries,
 } from '@/domain/analytics';
+import type { ReturnBasis } from '@/domain/analytics';
 import type { DateString, PriceBar } from '@/types/backtest';
 
 /**
@@ -45,7 +46,16 @@ export interface PriceWindowSummary {
   close: number;
   /** Close-to-close price return across the whole window; undefined with a single bar. */
   priceReturn?: number;
-  /** Annualized volatility of daily closes; undefined with fewer than three bars. */
+  /**
+   * Vendor-adjusted total return across the window (a dividend-and-split proxy, not
+   * audited dividend accounting). Present only when every bar in the window carries a
+   * valid adjusted close; undefined otherwise, so price and total are never conflated.
+   */
+  totalReturn?: number;
+  /**
+   * Annualized volatility of daily closes; undefined below `MIN_RISK_OBSERVATIONS`
+   * daily returns, so a statistically meaningless short-window figure is never shown.
+   */
   volatility?: number;
   /** Worst close-to-close decline inside the window, as a non-positive fraction. */
   maxDrawdown: number;
@@ -65,15 +75,34 @@ export function summarizePriceWindow(bars: PriceBar[]): PriceWindowSummary {
 
   const first = bars[0];
   const last = bars[bars.length - 1];
+  // The window carries a total-return proxy only when every bar has a valid adjusted close.
+  const covered = bars.every(
+    (bar) => bar.adjustedClose !== undefined && Number.isFinite(bar.adjustedClose) && bar.adjustedClose > 0,
+  );
   return {
     firstDate: first.date,
     lastDate: last.date,
     barCount: bars.length,
     close: last.close,
     priceReturn: bars.length < 2 ? undefined : last.close / first.close - 1,
+    totalReturn:
+      bars.length < 2 || !covered ? undefined : last.adjustedClose! / first.adjustedClose! - 1,
     volatility: bars.length < 2 ? undefined : annualizedVolatility(dailyCloseReturns(bars)),
     maxDrawdown: maxCloseDrawdown(bars).drawdown,
   };
+}
+
+/**
+ * Whether a window carries complete adjusted-close coverage (a total-return proxy is
+ * available). Used to resolve one shared basis across the symbols on the page.
+ */
+export function windowHasTotalReturn(bars: PriceBar[]): boolean {
+  return (
+    bars.length > 0 &&
+    bars.every(
+      (bar) => bar.adjustedClose !== undefined && Number.isFinite(bar.adjustedClose) && bar.adjustedClose > 0,
+    )
+  );
 }
 
 // --- Normalized comparison series -------------------------------------------
@@ -85,19 +114,28 @@ export interface NormalizedSeriesPoint {
 }
 
 /**
- * Cumulative price return for every symbol, rebased to 0 on the first trading day that
- * all of them share. Dates missing from any symbol are dropped, so a holiday or a shorter
- * listing history never pairs mismatched days on one axis.
+ * Cumulative return for every symbol, rebased to 0 on the first trading day that all of
+ * them share, on ONE `basis`. Dates missing from any symbol are dropped, so a holiday or
+ * a shorter listing history never pairs mismatched days on one axis. On the `total` basis
+ * every bar must carry an adjusted close (a bar without one is skipped rather than mixed
+ * with a raw close); the caller only selects `total` when every symbol is covered.
  */
 export function buildNormalizedSeries(
   series: Array<{ symbol: string; bars: PriceBar[] }>,
+  basis: ReturnBasis = 'price',
 ): NormalizedSeriesPoint[] {
   const usable = series
     .filter((entry) => entry.bars.length > 0)
     .map((entry) => ({
       symbol: entry.symbol,
-      closes: new Map(entry.bars.map((bar) => [bar.date, bar.close])),
-    }));
+      closes: new Map(
+        entry.bars.flatMap((bar) => {
+          const value = basis === 'total' ? bar.adjustedClose : bar.close;
+          return value === undefined ? [] : [[bar.date, value] as [DateString, number]];
+        }),
+      ),
+    }))
+    .filter((entry) => entry.closes.size > 0);
   if (usable.length === 0) return [];
 
   const sharedDates = [...usable[0].closes.keys()]

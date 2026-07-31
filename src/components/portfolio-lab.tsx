@@ -40,7 +40,7 @@ import {
   type KeyboardEvent,
 } from "react";
 import Link from "next/link";
-import { ChevronDown, Download, Info, Play, Plus, RefreshCw, Scale, TriangleAlert, X } from "lucide-react";
+import { Activity, ChevronDown, Download, Info, Play, Plus, RefreshCw, Scale, TriangleAlert, X } from "lucide-react";
 import { useReducedMotion } from "motion/react";
 import {
   CartesianGrid,
@@ -54,7 +54,7 @@ import {
 } from "recharts";
 
 import { AppShell, ShellDisclaimer } from "@/components/app-shell";
-import { HOLDING_CONCENTRATION_THRESHOLD, cumulativePriceReturns } from "@/domain/analytics";
+import { HOLDING_CONCENTRATION_THRESHOLD, cumulativePriceReturns, inverseVolatilityWeights } from "@/domain/analytics";
 import { isValidSymbol, normalizeSymbol } from "@/domain/market-overview";
 import {
   MAX_PORTFOLIO_HOLDINGS,
@@ -106,7 +106,7 @@ const EXAMPLE_YEARS = 5;
 const DEFAULT_INITIAL_CAPITAL = "10000";
 
 /** Default annual risk-free rate, in percent. Always shown and always editable. */
-const DEFAULT_RISK_FREE_PERCENT = "4.0";
+const DEFAULT_RISK_FREE_PERCENT = "0.0";
 
 /** Weights are entered in percent and must total exactly this before anything runs. */
 const WEIGHT_TOTAL_PERCENT = 100;
@@ -179,6 +179,8 @@ const DIAGNOSIS_KEYS: Record<PortfolioDiagnosisCode, TranslationKey> = {
   "common-window-shortened": "portfolioLab.diagWindowShortened",
   "sector-data-unavailable": "portfolioLab.diagSectorUnavailable",
   "price-return-only": "portfolioLab.diagPriceReturnOnly",
+  "total-return-basis": "portfolioLab.diagTotalReturnBasis",
+  "limited-sample": "portfolioLab.diagLimitedSample",
   "no-rebalancing": "portfolioLab.diagNoRebalancing",
   "not-investment-advice": "portfolioLab.diagNotAdvice",
 };
@@ -321,6 +323,20 @@ function equalWeightPercents(count: number): string[] {
     const share = Math.round(((index + 1) * tenths) / count) - Math.round((index * tenths) / count);
     return (share / 10).toFixed(1);
   });
+}
+
+/** Rounds fractional weights to visible 0.1 percentage-point units while preserving exactly 100%. */
+function allocationPercents(weights: number[]): string[] {
+  const rawUnits = weights.map((weight) => weight * 1000);
+  const units = rawUnits.map(Math.floor);
+  let remaining = 1000 - units.reduce((total, value) => total + value, 0);
+  const order = rawUnits
+    .map((value, index) => ({ index, remainder: value - units[index] }))
+    .sort((left, right) => right.remainder - left.remainder || left.index - right.index);
+  for (let index = 0; index < order.length && remaining > 0; index += 1, remaining -= 1) {
+    units[order[index].index] += 1;
+  }
+  return units.map((value) => (value / 10).toFixed(1));
 }
 
 /**
@@ -480,6 +496,7 @@ async function loadSymbol(
         from: startDate,
         to: endDate,
         requiredStart: startDate,
+        mode: "analysis",
       }),
     };
   } catch (error) {
@@ -752,6 +769,23 @@ export function PortfolioLab() {
     invalidateCurrentRun();
   }
 
+  /** Applies the transparent inverse-volatility rule to the measured shared-window returns. */
+  function applyRiskAdjustedWeights() {
+    if (!view) return;
+    try {
+      const allocation = inverseVolatilityWeights(
+        view.holdings.map((holding) => ({ symbol: holding.symbol, returns: holding.dailyReturns })),
+      );
+      const percents = allocationPercents(allocation.weights.map((entry) => entry.weight));
+      const bySymbol = new Map(allocation.weights.map((entry, index) => [entry.symbol, percents[index]]));
+      setSlots((prev) => prev.map((slot) => ({ ...slot, weightPercent: bySymbol.get(normalizeSymbol(slot.symbol)) ?? slot.weightPercent })));
+      setErrors([]);
+      invalidateCurrentRun();
+    } catch {
+      setErrors([{ field: "weights", messageKey: "portfolioLab.riskAdjustedUnavailable" }]);
+    }
+  }
+
   function updateField(field: keyof FormState, value: string) {
     setForm((prev) => ({ ...prev, [field]: value }));
     setErrors([]);
@@ -798,7 +832,7 @@ export function PortfolioLab() {
    * when SPY traded on every shared session: rebasing a partial series would start the benchmark
    * line on a different date than the portfolio line and quietly compare two windows.
    */
-  const benchmarkSeries = useMemo(() => {
+  const benchmarkSeries = (() => {
     const data = assembled?.benchmarkData;
     if (!view || !data || !view.benchmark?.coversCommonWindow) return undefined;
     const windowDates = new Set(view.window.dates);
@@ -811,9 +845,9 @@ export function PortfolioLab() {
       cumulative: point.value,
       value: view.allocatedCapital * (1 + point.value),
     }));
-  }, [assembled, view]);
+  })();
 
-  const chartData = useMemo(() => {
+  const chartData = (() => {
     if (!view) return [];
     const rows = new Map<DateString, Record<string, number | string>>(
       view.valueSeries.map((point) => [point.date, { date: point.date, portfolioValue: point.value }]),
@@ -830,7 +864,7 @@ export function PortfolioLab() {
       }
     }
     return [...rows.values()];
-  }, [benchmarkSeries, view]);
+  })();
 
   const loadingSymbol = run?.holdings.find((load) => load.status === "loading")?.symbol;
   const benchmarkLoading = run?.benchmark.status === "loading";
@@ -959,6 +993,10 @@ export function PortfolioLab() {
               <button type="button" className={styles.equalButton} onClick={applyEqualWeights}>
                 <Scale size={13} aria-hidden="true" />
                 <span>{t("portfolioLab.equalWeight")}</span>
+              </button>
+              <button type="button" className={styles.equalButton} onClick={applyRiskAdjustedWeights} disabled={!view}>
+                <Activity size={13} aria-hidden="true" />
+                <span>{t("portfolioLab.riskAdjustedWeight")}</span>
               </button>
             </div>
 
@@ -1176,11 +1214,12 @@ export function PortfolioLab() {
                 <li>{t("portfolioLab.basisFixedShares")}</li>
                 <li>{t("portfolioLab.basisNoRebalancing")}</li>
                 <li>{t("portfolioLab.basisSplitAdjusted")}</li>
-                <li>{t("portfolioLab.basisDividends")}</li>
+                <li>{t(view.returnBasis === "total" ? "portfolioLab.basisTotalReturn" : "portfolioLab.basisDividends")}</li>
                 <li>{t("portfolioLab.basisRiskFree", { rate: `${run.input.riskFreePercent}%` })}</li>
                 <li>
                   {t("portfolioLab.basisCalendar", { count: formatCount(view.window.sessions, locale) })}
                 </li>
+                <li>{t("portfolioLab.basisObservations", { count: formatCount(view.riskSample.observations, locale) })}</li>
                 <li>{t("portfolioLab.basisBeta", { symbol: BENCHMARK_SYMBOL })}</li>
                 <li>{t("portfolioLab.basisSector")}</li>
                 <li>{t("portfolioLab.basisNoAdvice")}</li>
@@ -1379,8 +1418,11 @@ export function PortfolioLab() {
                     <p>{t("portfolioLab.explainContribution")}</p>
                     <p>{t("portfolioLab.explainVolatilityLive")}</p>
                     <p>{t("portfolioLab.explainSharpeLive")}</p>
+                    <p>{t("portfolioLab.explainSortinoLive")}</p>
+                    <p>{t("portfolioLab.explainVarLive")}</p>
                     <p>{t("portfolioLab.explainDrawdownLive")}</p>
                     <p>{t("portfolioLab.explainBetaLive", { symbol: BENCHMARK_SYMBOL })}</p>
+                    <p>{t("portfolioLab.explainAlphaLive", { symbol: BENCHMARK_SYMBOL })}</p>
                     <p>{t("portfolioLab.explainHhiLive")}</p>
                   </div>
 
@@ -1618,7 +1660,7 @@ function WindowPanel({ view, locale, t }: { view: PortfolioLabViewModel; locale:
 // --- Headline ---------------------------------------------------------------
 
 /**
- * The seven figures that describe the whole portfolio. Every one is read straight from the view
+ * The decision-relevant figures that describe the whole portfolio. Every one is read straight from the view
  * model; a figure the window cannot support renders as an em dash with the reason beside it.
  */
 function HeadlineMetrics({
@@ -1664,6 +1706,17 @@ function HeadlineMetrics({
           t={t}
         />
         <MetricCard
+          label={t("portfolioLab.metricVendorTotalReturn")}
+          value={view.totalReturn === undefined ? undefined : formatSignedRate(view.totalReturn, locale)}
+          tone={view.totalReturn === undefined ? undefined : view.totalReturn < 0 ? "negative" : "positive"}
+          detail={
+            view.totalReturn === undefined
+              ? t("portfolioLab.metricVendorTotalReturnMissing")
+              : t("portfolioLab.metricVendorTotalReturnDetail")
+          }
+          t={t}
+        />
+        <MetricCard
           label={t("portfolioLab.metricCagr")}
           value={view.cagr === undefined ? undefined : formatSignedRate(view.cagr, locale)}
           tone={view.cagr === undefined ? undefined : view.cagr < 0 ? "negative" : "positive"}
@@ -1695,6 +1748,19 @@ function HeadlineMetrics({
           t={t}
         />
         <MetricCard
+          label={t("portfolioLab.metricSortino")}
+          value={view.sortinoRatio === undefined ? undefined : formatRatio(view.sortinoRatio, locale)}
+          detail={view.sortinoRatio === undefined ? t("portfolioLab.metricSortinoMissing") : t("portfolioLab.metricSortinoDetail", { rate: `${input.riskFreePercent}%` })}
+          t={t}
+        />
+        <MetricCard
+          label={t("portfolioLab.metricVar")}
+          value={view.historicalValueAtRisk.value === undefined ? undefined : formatRate(view.historicalValueAtRisk.value, locale)}
+          tone={view.historicalValueAtRisk.value !== undefined && view.historicalValueAtRisk.value > 0 ? "negative" : undefined}
+          detail={view.historicalValueAtRisk.value === undefined ? t("portfolioLab.metricVarMissing") : t("portfolioLab.metricVarDetail", { confidence: formatRate(view.historicalValueAtRisk.confidence, locale), count: formatCount(view.historicalValueAtRisk.sample, locale) })}
+          t={t}
+        />
+        <MetricCard
           label={t("portfolioLab.metricMaxDrawdown")}
           value={formatRate(drawdown.drawdown, locale)}
           tone={drawdown.drawdown < 0 ? "negative" : undefined}
@@ -1714,6 +1780,13 @@ function HeadlineMetrics({
                     count: formatCount(view.benchmark.overlappingSessions, locale),
                   })
           }
+          t={t}
+        />
+        <MetricCard
+          label={t("portfolioLab.metricAlpha", { symbol: BENCHMARK_SYMBOL })}
+          value={view.benchmark?.alpha === undefined ? undefined : formatSignedRate(view.benchmark.alpha, locale)}
+          tone={view.benchmark?.alpha === undefined ? undefined : view.benchmark.alpha < 0 ? "negative" : "positive"}
+          detail={view.benchmark?.alpha === undefined ? t("portfolioLab.metricAlphaMissing") : t("portfolioLab.metricAlphaDetail", { symbol: BENCHMARK_SYMBOL, count: formatCount(view.benchmark.overlappingSessions, locale) })}
           t={t}
         />
       </dl>
@@ -2537,6 +2610,11 @@ function buildCsv(view: PortfolioLabViewModel, input: PortfolioInput, t: Transla
     [t("portfolioLab.csvWindowEnd"), window.endDate],
     [t("portfolioLab.csvSessions"), String(window.sessions)],
     [t("portfolioLab.csvRiskFree"), `${input.riskFreePercent}%`],
+    [
+      t("portfolioLab.csvReturnBasis"),
+      t(view.returnBasis === "total" ? "portfolioLab.csvBasisTotal" : "portfolioLab.csvBasisPrice"),
+    ],
+    [t("portfolioLab.csvObservations"), String(view.riskSample.observations)],
     [t("portfolioLab.csvBenchmark"), benchmark ? benchmark.symbol : t("portfolioLab.csvNone")],
     [],
     [t("portfolioLab.csvTotals")],
@@ -2545,14 +2623,19 @@ function buildCsv(view: PortfolioLabViewModel, input: PortfolioInput, t: Transla
     [t("portfolioLab.csvFinalValue"), decimal(view.finalValue, 2)],
     [t("portfolioLab.csvTotalGain"), decimal(view.totalGain, 2)],
     [t("portfolioLab.csvTotalReturn"), decimal(view.totalPriceReturn, 6)],
+    [t("portfolioLab.csvVendorTotalReturn"), decimal(view.totalReturn, 6)],
     [t("portfolioLab.csvCagr"), decimal(view.cagr, 6)],
     [t("portfolioLab.csvVolatility"), decimal(view.volatility, 6)],
     [t("portfolioLab.csvSharpe"), decimal(view.sharpeRatio, 4)],
+    [t("portfolioLab.csvSortino"), decimal(view.sortinoRatio, 4)],
+    [t("portfolioLab.csvVar"), decimal(view.historicalValueAtRisk.value, 6)],
+    [t("portfolioLab.csvVarConfidence"), decimal(view.historicalValueAtRisk.confidence, 4)],
     [t("portfolioLab.csvMaxDrawdown"), decimal(view.maxDrawdown.drawdown, 6)],
     [t("portfolioLab.csvPeakDate"), view.maxDrawdown.peakDate ?? ""],
     [t("portfolioLab.csvTroughDate"), view.maxDrawdown.troughDate ?? ""],
     [t("portfolioLab.csvRecoveryDate"), view.maxDrawdown.recoveryDate ?? ""],
     [t("portfolioLab.csvBeta"), decimal(benchmark?.beta, 4)],
+    [t("portfolioLab.csvAlpha"), decimal(benchmark?.alpha, 6)],
     [t("portfolioLab.csvBenchmarkCorrelation"), decimal(benchmark?.correlation, 4)],
     [t("portfolioLab.csvBenchmarkSessions"), benchmark ? String(benchmark.overlappingSessions) : ""],
     [],
@@ -2568,6 +2651,7 @@ function buildCsv(view: PortfolioLabViewModel, input: PortfolioInput, t: Transla
       t("portfolioLab.csvHoldingFinalValue"),
       t("portfolioLab.csvFinalWeight"),
       t("portfolioLab.csvPriceReturn"),
+      t("portfolioLab.csvVendorTotalReturn"),
       t("portfolioLab.csvContributionDollars"),
       t("portfolioLab.csvContributionReturn"),
       t("portfolioLab.csvSessionsUsed"),
@@ -2589,6 +2673,7 @@ function buildCsv(view: PortfolioLabViewModel, input: PortfolioInput, t: Transla
       decimal(holding.finalValue, 2),
       decimal(holding.finalWeight, 6),
       decimal(holding.priceReturn, 6),
+      decimal(holding.totalReturn, 6),
       decimal(holding.contributionDollars, 2),
       decimal(holding.contributionToTotalReturn, 6),
       String(holding.usedSessions),

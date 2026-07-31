@@ -18,6 +18,91 @@ export const TRADING_DAYS_PER_YEAR = 252;
 /** Average calendar days per year, including the leap-year quarter day, used for CAGR. */
 export const CALENDAR_DAYS_PER_YEAR = 365.25;
 
+/**
+ * Minimum aligned daily returns before volatility, Sharpe, beta, or correlation are
+ * reported at all. Two returns are mathematically defined but statistically
+ * meaningless; roughly a quarter of a trading year is the floor below which these
+ * figures mislead more than they inform. Below it every one of these metrics is
+ * `undefined` (reported as unavailable), never zero.
+ */
+export const MIN_RISK_OBSERVATIONS = 60;
+
+/**
+ * Aligned daily returns below which a computed risk figure, while shown, carries a
+ * prominent limited-sample caveat. One trading year is the conventional reference
+ * length for annualized risk statistics.
+ */
+export const LIMITED_SAMPLE_OBSERVATIONS = 252;
+
+/**
+ * The observation count behind the risk figures and what it means for their
+ * trustworthiness. `sufficient` gates whether the figures are shown at all;
+ * `limited` flags a sample that is large enough to compute but short enough that the
+ * annualized figures should be read with caution.
+ */
+export interface RiskSampleStatus {
+  /** Aligned daily returns available to the risk math. */
+  observations: number;
+  /** True once `observations >= MIN_RISK_OBSERVATIONS`, so the figures are reported. */
+  sufficient: boolean;
+  /** True when sufficient but `observations < LIMITED_SAMPLE_OBSERVATIONS`. */
+  limited: boolean;
+}
+
+export function riskSampleStatus(observations: number): RiskSampleStatus {
+  const sufficient = observations >= MIN_RISK_OBSERVATIONS;
+  return {
+    observations,
+    sufficient,
+    limited: sufficient && observations < LIMITED_SAMPLE_OBSERVATIONS,
+  };
+}
+
+/**
+ * Which price series drives return, risk, and correlation math.
+ * `price`: split-adjusted close (dividends excluded). `total`: the vendor-adjusted
+ * close (a total-return proxy that folds dividends and splits back in). A comparison,
+ * table, beta, correlation, or portfolio is always measured on ONE basis; the two are
+ * never mixed.
+ */
+export type ReturnBasis = 'price' | 'total';
+
+/**
+ * Projects a bar series onto the chosen return basis by moving the selected close into
+ * the `close` leg so the shared close-based analytics operate on it unchanged. `price`
+ * returns the bars as-is. `total` requires every bar to carry a finite, positive
+ * `adjustedClose`; a gap throws rather than silently mixing an adjusted close with a
+ * raw close.
+ */
+export function toReturnBasisBars(bars: PriceBar[], basis: ReturnBasis): PriceBar[] {
+  if (basis === 'price') return bars;
+  return bars.map((bar) => {
+    if (
+      bar.adjustedClose === undefined ||
+      !Number.isFinite(bar.adjustedClose) ||
+      bar.adjustedClose <= 0
+    ) {
+      throw new AnalyticsError(
+        `Total-return basis requires an adjusted close on every bar; ${bar.date} has none.`,
+      );
+    }
+    return { ...bar, close: bar.adjustedClose };
+  });
+}
+
+/**
+ * Resolves the one return basis a multi-series view may use. Total return is chosen
+ * only when EVERY series has complete vendor-adjusted-close coverage; if any series
+ * lacks it, all series fall back to price return so no table, beta, correlation, or
+ * portfolio ever mixes the two bases.
+ */
+export function resolveReturnBasis(
+  coverages: Array<'yahoo-adjusted-close' | 'unavailable' | 'demo'>,
+): ReturnBasis {
+  if (coverages.length === 0) return 'price';
+  return coverages.every((coverage) => coverage === 'yahoo-adjusted-close') ? 'total' : 'price';
+}
+
 /** How far portfolio weights may sum away from 1 before the input is rejected. */
 export const WEIGHT_SUM_TOLERANCE = 1e-6;
 
@@ -190,9 +275,11 @@ export function compoundAnnualGrowthRate(bars: PriceBar[]): number | undefined {
 
 /**
  * Annualized sample standard deviation of daily returns, scaled by sqrt(252).
- * Returns undefined with fewer than two returns.
+ * Returns undefined below `MIN_RISK_OBSERVATIONS` aligned returns, so a statistically
+ * meaningless two-point estimate is never produced.
  */
 export function annualizedVolatility(returns: DatedValue[]): number | undefined {
+  if (returns.length < MIN_RISK_OBSERVATIONS) return undefined;
   const deviation = sampleStandardDeviation(returnValues(returns));
   if (deviation === undefined) return undefined;
   return deviation * Math.sqrt(TRADING_DAYS_PER_YEAR);
@@ -200,8 +287,13 @@ export function annualizedVolatility(returns: DatedValue[]): number | undefined 
 
 /**
  * Annualized Sharpe ratio of daily returns against an explicit annual risk-free rate,
- * which is de-annualized geometrically over 252 trading days.
- * Returns undefined when volatility is zero or there are fewer than two returns.
+ * which is de-annualized geometrically over 252 trading days. The sqrt(252)
+ * annualization assumes independent, identically distributed daily returns; serial
+ * correlation makes it only approximate (Andrew Lo, "The Statistics of Sharpe Ratios"),
+ * so it is never a definitive ranking.
+ *
+ * Returns undefined below `MIN_RISK_OBSERVATIONS` aligned returns or when volatility is
+ * zero.
  */
 export function annualizedSharpeRatio(
   returns: DatedValue[],
@@ -211,6 +303,7 @@ export function annualizedSharpeRatio(
     throw new AnalyticsError('The annual risk-free rate must be a finite number greater than -1.');
   }
 
+  if (returns.length < MIN_RISK_OBSERVATIONS) return undefined;
   const values = returnValues(returns);
   const deviation = sampleStandardDeviation(values);
   if (deviation === undefined || deviation === 0) return undefined;
@@ -218,6 +311,109 @@ export function annualizedSharpeRatio(
   const dailyRiskFree = (1 + annualRiskFreeRate) ** (1 / TRADING_DAYS_PER_YEAR) - 1;
   const meanExcessReturn = mean(values) - dailyRiskFree;
   return (meanExcessReturn / deviation) * Math.sqrt(TRADING_DAYS_PER_YEAR);
+}
+
+/**
+ * Daily target downside deviation of a return series against a minimum acceptable return (MAR)
+ * equal to the DAILY risk-free rate, de-annualized geometrically from the supplied annual rate
+ * exactly as `annualizedSharpeRatio` does its subtraction. Follows the Sortino & Satchell
+ * target-semideviation convention: each return's shortfall below the MAR, `min(0, r - MAR)`, is
+ * squared, summed over EVERY observation, divided by the full sample size N (not by the count of
+ * shortfall days), and square-rooted. Returns at or above the MAR contribute zero, so a day that
+ * beats the MAR lowers the downside deviation rather than raising it.
+ *
+ * The result is a DAILY decimal quantity; multiply by sqrt(252) to annualize it. Returns
+ * undefined below `MIN_RISK_OBSERVATIONS` observations, and exactly 0 when no observation fell
+ * below the MAR — in which case downside risk is undefined, not zero, for a ratio built on it.
+ */
+export function downsideDeviation(
+  returns: DatedValue[],
+  annualRiskFreeRate: number,
+): number | undefined {
+  if (!Number.isFinite(annualRiskFreeRate) || annualRiskFreeRate <= -1) {
+    throw new AnalyticsError('The annual risk-free rate must be a finite number greater than -1.');
+  }
+  if (returns.length < MIN_RISK_OBSERVATIONS) return undefined;
+
+  const dailyRiskFree = (1 + annualRiskFreeRate) ** (1 / TRADING_DAYS_PER_YEAR) - 1;
+  return targetDownsideDeviation(returnValues(returns), dailyRiskFree);
+}
+
+/**
+ * Annualized Sortino ratio: the Sharpe ratio's mean-excess-return numerator over the DAILY target
+ * downside deviation instead of the full standard deviation, scaled by sqrt(252).
+ *
+ * Conventions, stated exactly:
+ * - Minimum acceptable return (MAR): the daily risk-free rate `(1 + annualRiskFreeRate)^(1/252) - 1`,
+ *   the same de-annualized rate `annualizedSharpeRatio` subtracts. Excess return is measured
+ *   against this MAR, so a Sortino and a Sharpe on the same window share a numerator.
+ * - Downside deviation: `downsideDeviation` above — the root-mean-square shortfall below the MAR,
+ *   averaged over all N observations.
+ * - Annualization: the daily ratio times sqrt(252), matching `annualizedSharpeRatio`; it assumes
+ *   independent, identically distributed daily returns and is only approximate under serial
+ *   correlation.
+ *
+ * Returns undefined below `MIN_RISK_OBSERVATIONS` returns, and undefined (never Infinity) when the
+ * downside deviation is zero because no return fell below the MAR. Throws when the annual
+ * risk-free rate is not a finite number greater than -1.
+ */
+export function annualizedSortinoRatio(
+  returns: DatedValue[],
+  annualRiskFreeRate: number,
+): number | undefined {
+  if (!Number.isFinite(annualRiskFreeRate) || annualRiskFreeRate <= -1) {
+    throw new AnalyticsError('The annual risk-free rate must be a finite number greater than -1.');
+  }
+  if (returns.length < MIN_RISK_OBSERVATIONS) return undefined;
+
+  const values = returnValues(returns);
+  const dailyRiskFree = (1 + annualRiskFreeRate) ** (1 / TRADING_DAYS_PER_YEAR) - 1;
+  const deviation = targetDownsideDeviation(values, dailyRiskFree);
+  if (deviation === 0) return undefined;
+
+  const meanExcessReturn = mean(values) - dailyRiskFree;
+  return (meanExcessReturn / deviation) * Math.sqrt(TRADING_DAYS_PER_YEAR);
+}
+
+/**
+ * Historical (empirical) one-day Value at Risk from realized daily returns, at a caller-specified
+ * confidence — there is deliberately no default here, so a caller must state the confidence they
+ * mean rather than inherit a hidden 95%.
+ *
+ * Conventions, stated exactly:
+ * - Lower-tail quantile: the returns are sorted ascending and the loss is read off the
+ *   `1 - confidence` lower-tail quantile with the inverse-empirical-CDF (nearest-rank) rule,
+ *   `rank = ceil((1 - confidence) * n)`, taking the return at that 1-based rank. There is no
+ *   interpolation between order statistics, so the estimate is always one observed return. With a
+ *   high confidence and a small sample the rank pins to the single worst observation, which is a
+ *   limitation of the estimator, not a modelling choice.
+ * - Sign: the returned value is a POSITIVE loss as a decimal fraction. A VaR of 0.05 means the
+ *   portfolio lost 5% or more on `1 - confidence` of the observed days. When even the lower-tail
+ *   quantile is itself a gain the returned number is negative, which honestly reports "no loss at
+ *   this confidence" rather than being clamped to zero.
+ * - This is NOT a loss ceiling. `1 - confidence` of days breached this threshold historically, and
+ *   the losses on those days were by construction at least this large and often larger; VaR says
+ *   nothing about how much larger, nor about losses outside the sampled window.
+ *
+ * Returns undefined below `MIN_RISK_OBSERVATIONS` returns. Throws when the confidence is not a
+ * finite number strictly between 0 and 1.
+ */
+export function historicalValueAtRisk(returns: DatedValue[], confidence: number): number | undefined {
+  if (!Number.isFinite(confidence) || confidence <= 0 || confidence >= 1) {
+    throw new AnalyticsError('The VaR confidence must be a finite number strictly between 0 and 1.');
+  }
+  if (returns.length < MIN_RISK_OBSERVATIONS) return undefined;
+
+  const sorted = returnValues(returns).sort((left, right) => left - right);
+  const tailProbability = 1 - confidence;
+  // Decimal confidences such as 0.95 are not exact binary floats: (1 - 0.95) * 60 can resolve
+  // to 3.0000000000000027 and `ceil` would incorrectly select rank 4. The tolerance is far
+  // below a meaningful fraction of one observation and only restores exact integer boundaries.
+  const rawRank = tailProbability * sorted.length;
+  const rankTolerance = Number.EPSILON * Math.max(1, sorted.length) * 4;
+  const rank = Math.min(Math.max(Math.ceil(rawRank - rankTolerance), 1), sorted.length);
+  // Positive loss number: a negative quantile return becomes a positive VaR.
+  return -sorted[rank - 1];
 }
 
 /**
@@ -307,11 +503,11 @@ export function alignReturns(a: DatedValue[], b: DatedValue[]): AlignedReturn[] 
 
 /**
  * Beta of an asset against a benchmark, from overlapping dated returns only.
- * Returns undefined with fewer than two overlapping days or a flat benchmark.
+ * Returns undefined below `MIN_RISK_OBSERVATIONS` overlapping days or a flat benchmark.
  */
 export function beta(assetReturns: DatedValue[], benchmarkReturns: DatedValue[]): number | undefined {
   const aligned = alignReturns(assetReturns, benchmarkReturns);
-  if (aligned.length < 2) return undefined;
+  if (aligned.length < MIN_RISK_OBSERVATIONS) return undefined;
 
   const assetValues = aligned.map((point) => point.a);
   const benchmarkValues = aligned.map((point) => point.b);
@@ -324,11 +520,11 @@ export function beta(assetReturns: DatedValue[], benchmarkReturns: DatedValue[])
 /**
  * Pearson correlation of two return series, from overlapping dated returns only,
  * clamped to [-1, 1] against floating-point drift.
- * Returns undefined with fewer than two overlapping days or a flat series.
+ * Returns undefined below `MIN_RISK_OBSERVATIONS` overlapping days or a flat series.
  */
 export function correlation(a: DatedValue[], b: DatedValue[]): number | undefined {
   const aligned = alignReturns(a, b);
-  if (aligned.length < 2) return undefined;
+  if (aligned.length < MIN_RISK_OBSERVATIONS) return undefined;
 
   const aValues = aligned.map((point) => point.a);
   const bValues = aligned.map((point) => point.b);
@@ -338,6 +534,59 @@ export function correlation(a: DatedValue[], b: DatedValue[]): number | undefine
 
   const coefficient = sampleCovariance(aValues, bValues) / (aDeviation * bDeviation);
   return Math.min(1, Math.max(-1, coefficient));
+}
+
+/**
+ * Jensen-style annualized alpha of a portfolio against a benchmark: how much the portfolio's
+ * realized return beat, or trailed, the return CAPM expected for the beta it actually ran.
+ *
+ * Conventions, stated exactly:
+ * - Overlap: measured only on dates present in BOTH return series (`alignReturns`), so a session
+ *   one leg missed never pairs mismatched days.
+ * - Beta: the portfolio beta from `beta` on the same overlap — covariance over benchmark variance.
+ * - Annualization: geometric. Each leg's overlapping daily returns are compounded to a terminal
+ *   growth factor and annualized over 252 trading days, `growth^(252/n) - 1`. The risk-free rate is
+ *   used as the supplied ANNUAL rate directly (no de-annualization) because both returns are
+ *   already annual at this point.
+ * - Formula: `alpha = Rp - (Rf + beta * (Rm - Rf))`, with Rp and Rm the annualized geometric
+ *   portfolio and benchmark returns and Rf the annual risk-free rate.
+ *
+ * Limitations: a single-factor CAPM reading only; beta is estimated and unstable, not known;
+ * geometric annualization of a short window extrapolates a partial year; on a price-return basis
+ * dividends are excluded from both legs; and pairing a geometric return gap with a
+ * covariance-based beta is an approximation, not an exact identity.
+ *
+ * Returns undefined — never a fabricated alpha — when the overlap is below `MIN_RISK_OBSERVATIONS`,
+ * when beta is unavailable (a flat benchmark), or when either leg's compounded growth is
+ * non-positive so a geometric annualized return does not exist. Throws when the annual risk-free
+ * rate is not a finite number greater than -1.
+ */
+export function jensenAlpha(
+  portfolioReturns: DatedValue[],
+  benchmarkReturns: DatedValue[],
+  annualRiskFreeRate: number,
+): number | undefined {
+  if (!Number.isFinite(annualRiskFreeRate) || annualRiskFreeRate <= -1) {
+    throw new AnalyticsError('The annual risk-free rate must be a finite number greater than -1.');
+  }
+
+  const aligned = alignReturns(portfolioReturns, benchmarkReturns);
+  if (aligned.length < MIN_RISK_OBSERVATIONS) return undefined;
+
+  const portfolioBeta = beta(portfolioReturns, benchmarkReturns);
+  if (portfolioBeta === undefined) return undefined;
+
+  const portfolioGrowth = aligned.reduce((growth, point) => growth * (1 + point.a), 1);
+  const benchmarkGrowth = aligned.reduce((growth, point) => growth * (1 + point.b), 1);
+  if (portfolioGrowth <= 0 || benchmarkGrowth <= 0) return undefined;
+
+  const exponent = TRADING_DAYS_PER_YEAR / aligned.length;
+  const annualizedPortfolio = portfolioGrowth ** exponent - 1;
+  const annualizedBenchmark = benchmarkGrowth ** exponent - 1;
+  return (
+    annualizedPortfolio -
+    (annualRiskFreeRate + portfolioBeta * (annualizedBenchmark - annualRiskFreeRate))
+  );
 }
 
 // --- Portfolio --------------------------------------------------------------
@@ -442,6 +691,100 @@ export function analyzeConcentration(holdings: WeightedHolding[]): Concentration
   };
 }
 
+// --- Inverse-volatility allocation ------------------------------------------
+
+/** One return series named for its instrument, the input to inverse-volatility weighting. */
+export interface ReturnSeries {
+  symbol: string;
+  returns: DatedValue[];
+}
+
+/** One holding's inverse-volatility weight, alongside the volatility that produced it. */
+export interface InverseVolatilityWeight {
+  symbol: string;
+  /** Annualized volatility of this series; strictly positive, or the whole allocation is rejected. */
+  volatility: number;
+  /** Weight proportional to 1 / volatility, normalized so the set sums to 1. */
+  weight: number;
+}
+
+/**
+ * A long-only allocation weighted by inverse annualized volatility. This is a transparent
+ * risk-parity-style RULE, not an optimizer: it never reads returns' direction, correlations, or a
+ * covariance matrix, so it is deliberately NOT an efficient frontier, a minimum-variance
+ * portfolio, or an optimal portfolio, and it does not claim to be one.
+ */
+export interface InverseVolatilityAllocation {
+  /** Names the rule so a view never mislabels it as an optimization. */
+  method: 'inverse-volatility';
+  weights: InverseVolatilityWeight[];
+}
+
+/** Lower and upper bounds on the number of series inverse-volatility weighting accepts. */
+export const INVERSE_VOLATILITY_MIN_SERIES = 1;
+export const INVERSE_VOLATILITY_MAX_SERIES = 10;
+
+/**
+ * Deterministic long-only "risk-adjusted" weights that scale each holding by the reciprocal of its
+ * annualized volatility and normalize the set to sum to 1, so a historically calmer series carries
+ * more weight and a wilder one less. A single series receives the whole weight.
+ *
+ * Explicit rules:
+ * - Between `INVERSE_VOLATILITY_MIN_SERIES` and `INVERSE_VOLATILITY_MAX_SERIES` series, and every
+ *   symbol must be distinct.
+ * - Every series must have a defined, strictly positive annualized volatility. A series with too
+ *   few returns (volatility undefined) or one that never moved (volatility zero) is REJECTED with
+ *   an `AnalyticsError`, because dividing by an undefined or zero volatility would either fabricate
+ *   a weight or send it to infinity.
+ * - Weights are `(1 / volatility_i) / sum_j (1 / volatility_j)` and sum to 1 by construction.
+ *
+ * This intentionally implies no forecast and no optimality: it reweights toward historically
+ * calmer holdings, nothing more.
+ */
+export function inverseVolatilityWeights(series: ReturnSeries[]): InverseVolatilityAllocation {
+  if (series.length < INVERSE_VOLATILITY_MIN_SERIES || series.length > INVERSE_VOLATILITY_MAX_SERIES) {
+    throw new AnalyticsError(
+      `Inverse-volatility weighting needs between ${INVERSE_VOLATILITY_MIN_SERIES} and ` +
+        `${INVERSE_VOLATILITY_MAX_SERIES} return series; received ${series.length}.`,
+    );
+  }
+
+  const seen = new Set<string>();
+  const volatilities = series.map((entry) => {
+    if (seen.has(entry.symbol)) {
+      throw new AnalyticsError(`Return series ${entry.symbol} appears more than once.`);
+    }
+    seen.add(entry.symbol);
+
+    const volatility = annualizedVolatility(entry.returns);
+    if (volatility === undefined) {
+      throw new AnalyticsError(
+        `Return series ${entry.symbol} has fewer than ${MIN_RISK_OBSERVATIONS} returns, so its ` +
+          'annualized volatility is undefined and inverse-volatility weighting is rejected.',
+      );
+    }
+    if (volatility === 0) {
+      throw new AnalyticsError(
+        `Return series ${entry.symbol} never moved, so its inverse volatility is undefined; ` +
+          'inverse-volatility weighting rejects a zero-volatility series.',
+      );
+    }
+    return volatility;
+  });
+
+  const inverse = volatilities.map((volatility) => 1 / volatility);
+  const totalInverse = inverse.reduce((total, value) => total + value, 0);
+
+  return {
+    method: 'inverse-volatility',
+    weights: series.map((entry, index) => ({
+      symbol: entry.symbol,
+      volatility: volatilities[index],
+      weight: inverse[index] / totalInverse,
+    })),
+  };
+}
+
 // --- Internal helpers -------------------------------------------------------
 
 function validateReturnSeries(returns: DatedValue[], label?: string): void {
@@ -482,4 +825,17 @@ function sampleCovariance(a: number[], b: number[]): number {
   const meanB = mean(b);
   const sumOfProducts = a.reduce((total, value, index) => total + (value - meanA) * (b[index] - meanB), 0);
   return sumOfProducts / (a.length - 1);
+}
+
+/**
+ * Root-mean-square shortfall below a daily target, averaged over EVERY value (not only the
+ * shortfall days). Values at or above the target contribute zero. This is the Sortino & Satchell
+ * target semideviation and the denominator of the Sortino ratio.
+ */
+function targetDownsideDeviation(values: number[], dailyTarget: number): number {
+  const sumSquaredShortfall = values.reduce((total, value) => {
+    const shortfall = Math.min(0, value - dailyTarget);
+    return total + shortfall * shortfall;
+  }, 0);
+  return Math.sqrt(sumSquaredShortfall / values.length);
 }

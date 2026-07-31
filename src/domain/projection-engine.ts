@@ -29,7 +29,11 @@ export function buildProjectionReport(
   );
   if (samplePrices.length < 2) return undefined;
 
-  const annualReturns = completedAnnualReturns(samplePrices, lastHistoricalDate);
+  // Both the return sample and the dividend-yield sample are derived from one
+  // listing-aware set of complete calendar years, so a partial first listing
+  // year can never leak into one metric while being excluded from the other.
+  const eligibleYears = completeCalendarYears(samplePrices, lastHistoricalDate);
+  const annualReturns = annualReturnsFromEligibleYears(eligibleYears);
   if (annualReturns.length < 3) {
     return {
       sampleStartDate: samplePrices[0].date,
@@ -42,7 +46,7 @@ export function buildProjectionReport(
 
   const years = Math.max(daysBetween(samplePrices[0].date, samplePrices.at(-1)!.date) / 365.25, 1);
   const cagr = Math.pow(samplePrices.at(-1)!.close / samplePrices[0].close, 1 / years) - 1;
-  const dividendYield = medianAnnualDividendYield(samplePrices, marketData.dividends, lastHistoricalDate);
+  const dividendYield = medianAnnualDividendYield(eligibleYears, marketData.dividends);
   const definitions: ScenarioDefinition[] = [
     { id: 'conservative', label: 'Conservative', annualRate: percentile(annualReturns, 0.25) },
     { id: 'baseline', label: 'Baseline', annualRate: cagr },
@@ -92,11 +96,15 @@ function extendMarketData(
   while (cursor <= endDate) {
     if (isWeekday(cursor)) {
       close *= 1 + dailyRate;
+      // Bracket the high/low around both the open and close so the simulated bar
+      // satisfies the same economic OHLC invariant the domain boundary enforces,
+      // even when a conservative negative rate pushes the open above the close.
+      const openPrice = close / (1 + dailyRate / 2);
       projectedPrices.push({
         date: cursor,
-        open: close / (1 + dailyRate / 2),
-        high: close * (1 + intradayPremium),
-        low: close * (1 - intradayPremium * 0.8),
+        open: openPrice,
+        high: Math.max(openPrice, close) * (1 + intradayPremium),
+        low: Math.min(openPrice, close) * (1 - intradayPremium * 0.8),
         close,
         projected: true,
       });
@@ -152,37 +160,70 @@ function buildProjectedDividends(
   return events;
 }
 
-function completedAnnualReturns(prices: PriceBar[], lastDate: string): number[] {
+/** A prior calendar year whose observed sessions span the whole US trading year. */
+export interface EligibleYear {
+  year: number;
+  /** Sessions for the year, sorted ascending by date. */
+  bars: PriceBar[];
+}
+
+// A plausible complete US trading year has ~250-252 sessions. 220 is a
+// defensible floor that tolerates holiday-heavy or lightly gapped years while
+// still excluding a partial listing year. The calendar-boundary checks below do
+// the primary work; the session floor is a secondary guard.
+const MIN_SESSIONS_PER_COMPLETE_YEAR = 220;
+// A complete year's first session lands in early January and its last in late
+// December. US markets open on the first business day (~Jan 2) and the final
+// session is ~Dec 29-31, so these month-day boundaries admit every full year
+// while rejecting a mid-year first listing (or a sample that starts/ends mid-year).
+const YEAR_OPEN_BOUNDARY = '01-14';
+const YEAR_CLOSE_BOUNDARY = '12-18';
+
+/**
+ * Groups sample sessions into prior calendar years and keeps only those that
+ * demonstrate a complete US trading year. This is the single listing-aware
+ * eligibility gate; both the annual-return sample and the dividend-yield sample
+ * are derived from its result so they can never diverge.
+ */
+export function completeCalendarYears(prices: PriceBar[], lastDate: string): EligibleYear[] {
   const incompleteYear = Number(lastDate.slice(0, 4));
   const byYear = new Map<number, PriceBar[]>();
   for (const bar of prices) {
     const year = Number(bar.date.slice(0, 4));
+    // The year containing lastDate is still in progress and never eligible.
     if (year >= incompleteYear) continue;
     byYear.set(year, [...(byYear.get(year) ?? []), bar]);
   }
-  return [...byYear.values()]
-    .filter((bars) => bars.length >= 100)
-    .map((bars) => bars.at(-1)!.close / bars[0].close - 1)
+
+  const eligible: EligibleYear[] = [];
+  for (const [year, bars] of byYear) {
+    const sorted = [...bars].sort((a, b) => a.date.localeCompare(b.date));
+    if (isCompleteCalendarYear(sorted)) eligible.push({ year, bars: sorted });
+  }
+  return eligible.sort((a, b) => a.year - b.year);
+}
+
+function isCompleteCalendarYear(sortedBars: PriceBar[]): boolean {
+  if (sortedBars.length < MIN_SESSIONS_PER_COMPLETE_YEAR) return false;
+  const firstMonthDay = sortedBars[0].date.slice(5);
+  const lastMonthDay = sortedBars.at(-1)!.date.slice(5);
+  return firstMonthDay <= YEAR_OPEN_BOUNDARY && lastMonthDay >= YEAR_CLOSE_BOUNDARY;
+}
+
+function annualReturnsFromEligibleYears(years: EligibleYear[]): number[] {
+  return years
+    .map(({ bars }) => bars.at(-1)!.close / bars[0].close - 1)
     .sort((a, b) => a - b);
 }
 
-function medianAnnualDividendYield(
-  prices: PriceBar[],
-  dividends: DividendEvent[],
-  lastDate: string,
-): number {
-  const incompleteYear = Number(lastDate.slice(0, 4));
-  const yields: number[] = [];
-  const firstYear = Number(prices[0].date.slice(0, 4));
-  for (let year = firstYear; year < incompleteYear; year += 1) {
-    const yearPrices = prices.filter((bar) => bar.date.startsWith(`${year}-`));
-    if (yearPrices.length < 100) continue;
+function medianAnnualDividendYield(years: EligibleYear[], dividends: DividendEvent[]): number {
+  const yields = years.map(({ year, bars }) => {
     const dividendPerShare = dividends
       .filter((event) => event.payDate.startsWith(`${year}-`) && event.frequency > 0)
       .reduce((sum, event) => sum + event.splitAdjustedCashAmount, 0);
-    const averagePrice = yearPrices.reduce((sum, bar) => sum + bar.close, 0) / yearPrices.length;
-    yields.push(averagePrice > 0 ? dividendPerShare / averagePrice : 0);
-  }
+    const averagePrice = bars.reduce((sum, bar) => sum + bar.close, 0) / bars.length;
+    return averagePrice > 0 ? dividendPerShare / averagePrice : 0;
+  });
   return median(yields);
 }
 

@@ -72,7 +72,7 @@ const EXAMPLE_SYMBOLS = ["AAPL", "MSFT"];
 const EXAMPLE_YEARS = 5;
 
 /** Default annual risk-free rate, in percent. Always shown and always editable. */
-const DEFAULT_RISK_FREE_PERCENT = "4.0";
+const DEFAULT_RISK_FREE_PERCENT = "0.0";
 
 /** Accepted range for the typed annual risk-free rate, in percent. */
 const RISK_FREE_PERCENT_LIMIT = 25;
@@ -100,6 +100,8 @@ const CHART_TABS: Array<{ id: ChartTab; labelKey: TranslationKey }> = [
 /** Notes the domain narrative can raise, mapped to the prose the reader sees. */
 const NOTE_KEYS: Record<ComparisonNoteCode, TranslationKey> = {
   "price-return-only": "compare.notePriceReturnOnly",
+  "total-return-basis": "compare.noteTotalReturnBasis",
+  "limited-sample": "compare.noteLimitedSample",
   "not-investment-advice": "compare.noteNotAdvice",
   "common-window-shortened": "compare.noteWindowShortened",
   "benchmark-unavailable": "compare.noteBenchmarkUnavailable",
@@ -284,6 +286,7 @@ async function loadSymbol(
         from: startDate,
         to: endDate,
         requiredStart: startDate,
+        mode: "analysis",
       }),
     };
   } catch (error) {
@@ -835,11 +838,12 @@ export function StockComparison() {
               </h2>
               <ul>
                 <li>{t("compare.basisSplitAdjusted")}</li>
-                <li>{t("compare.basisDividends")}</li>
+                <li>{t(view.returnBasis === "total" ? "compare.basisTotalReturn" : "compare.basisDividends")}</li>
                 <li>{t("compare.basisRiskFree", { rate: `${run.input.riskFreePercent}%` })}</li>
                 <li>
                   {t("compare.basisCalendar", { count: formatCount(view.commonWindow.sessions, locale) })}
                 </li>
+                <li>{t("compare.basisObservations", { count: formatCount(view.riskSample.observations, locale) })}</li>
                 <li>{t("compare.basisBeta", { symbol: BENCHMARK_SYMBOL })}</li>
                 <li>{t("compare.basisNoAdvice")}</li>
               </ul>
@@ -1286,6 +1290,7 @@ function MetricsTable({
               <th scope="col">{t("result.ticker")}</th>
               <th scope="col">{t("compare.colCagr")}</th>
               <th scope="col">{t("compare.colTotalReturn")}</th>
+              <th scope="col">{t("compare.colVendorTotalReturn")}</th>
               <th scope="col">{t("metric.volatility")}</th>
               <th scope="col">{t("metric.sharpe")}</th>
               <th scope="col">{t("result.maxDrawdown")}</th>
@@ -1319,6 +1324,23 @@ function MetricsTable({
                   <MetricCell
                     text={formatSignedRate(security.totalPriceReturn, locale)}
                     tone={security.totalPriceReturn < 0 ? "negative" : "positive"}
+                    t={t}
+                  />
+                </td>
+                <td>
+                  <MetricCell
+                    text={
+                      security.totalReturn === undefined
+                        ? undefined
+                        : formatSignedRate(security.totalReturn, locale)
+                    }
+                    tone={
+                      security.totalReturn === undefined
+                        ? undefined
+                        : security.totalReturn < 0
+                          ? "negative"
+                          : "positive"
+                    }
                     t={t}
                   />
                 </td>
@@ -1667,9 +1689,13 @@ function buildCsv(view: StockComparisonViewModel, input: ComparisonInput, t: Tra
     [t("compare.csvWindowEnd"), view.commonWindow.endDate],
     [t("compare.csvSessions"), String(view.commonWindow.sessions)],
     [t("compare.csvRiskFree"), `${input.riskFreePercent}%`],
+    [
+      t("compare.csvReturnBasis"),
+      t(view.returnBasis === "total" ? "compare.csvBasisTotal" : "compare.csvBasisPrice"),
+    ],
+    [t("compare.csvObservations"), String(view.riskSample.observations)],
     [t("compare.csvBenchmark"), view.benchmark ? view.benchmark.symbol : t("compare.csvNone")],
     [t("compare.csvRequestedWindow"), `${input.startDate} / ${input.endDate}`],
-    [t("compare.csvBasis"), t("compare.csvBasisText")],
     [t("compare.csvEmptyCells"), t("compare.csvEmptyCellsText")],
     [],
     [t("compare.metrics")],
@@ -1683,6 +1709,7 @@ function buildCsv(view: StockComparisonViewModel, input: ComparisonInput, t: Tra
       t("compare.csvFirstClose"),
       t("compare.csvLastClose"),
       t("compare.csvTotalReturn"),
+      t("compare.csvVendorTotalReturn"),
       t("compare.csvCagr"),
       t("compare.csvVolatility"),
       t("compare.csvSharpe"),
@@ -1705,6 +1732,7 @@ function buildCsv(view: StockComparisonViewModel, input: ComparisonInput, t: Tra
       decimal(security.firstClose, 4),
       decimal(security.lastClose, 4),
       decimal(security.totalPriceReturn, 6),
+      decimal(security.totalReturn, 6),
       decimal(security.cagr, 6),
       decimal(security.volatility, 6),
       decimal(security.sharpeRatio, 4),

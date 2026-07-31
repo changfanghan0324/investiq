@@ -1,7 +1,7 @@
 "use client";
 
 // Purpose: The standalone methodology document. It states the shared data contract and the
-// calculation rules behind all five workspaces so the workspaces themselves stay uncluttered.
+// calculation rules behind the research platform so the workspaces themselves stay uncluttered.
 //
 // Honesty rules this file follows:
 // - It documents only rules the code actually implements. It computes nothing, shows no market
@@ -70,6 +70,28 @@ const SECTIONS: Section[] = [
     ],
   },
   {
+    id: "company-fundamentals",
+    title: "method.fundamentals.title",
+    summary: "method.fundamentals.summary",
+    clauses: [
+      { title: "method.fundamentals.sourceTitle", text: "method.fundamentals.sourceText", rule: "method.fundamentals.sourceRule" },
+      { title: "method.fundamentals.periodTitle", text: "method.fundamentals.periodText", rule: "method.fundamentals.periodRule" },
+      { title: "method.fundamentals.constructedTitle", text: "method.fundamentals.constructedText", rule: "method.fundamentals.constructedRule" },
+      { title: "method.fundamentals.coverageTitle", text: "method.fundamentals.coverageText" },
+    ],
+  },
+  {
+    id: "valuation",
+    title: "method.valuation.title",
+    summary: "method.valuation.summary",
+    clauses: [
+      { title: "method.valuation.fcffTitle", text: "method.valuation.fcffText", rule: "method.valuation.fcffRule" },
+      { title: "method.valuation.terminalTitle", text: "method.valuation.terminalText", rule: "method.valuation.terminalRule" },
+      { title: "method.valuation.rangeTitle", text: "method.valuation.rangeText", rule: "method.valuation.rangeRule" },
+      { title: "method.valuation.compsTitle", text: "method.valuation.compsText", rule: "method.valuation.compsRule" },
+    ],
+  },
+  {
     id: "stock-analysis",
     title: "method.stock.title",
     summary: "method.stock.summary",
@@ -113,6 +135,8 @@ const SECTIONS: Section[] = [
       { title: "method.portfolio.concentrationTitle", text: "method.portfolio.concentrationText", rule: "method.portfolio.concentrationRule" },
       { title: "method.portfolio.sectorTitle", text: "method.portfolio.sectorText" },
       { title: "method.portfolio.benchmarkTitle", text: "method.portfolio.benchmarkText" },
+      { title: "method.portfolio.downsideTitle", text: "method.portfolio.downsideText", rule: "method.portfolio.downsideRule" },
+      { title: "method.portfolio.inverseTitle", text: "method.portfolio.inverseText", rule: "method.portfolio.inverseRule" },
       { title: "method.portfolio.excludedTitle", text: "method.portfolio.excludedText", rule: "method.portfolio.excludedRule" },
     ],
   },
@@ -171,15 +195,24 @@ const FORMULAS: FormulaEntry[] = [
   { term: "method.formulas.calendarDaysTerm", formula: "method.formulas.calendarDaysFormula", note: "method.formulas.calendarDaysNote" },
   { term: "method.formulas.dailyReturnTerm", formula: "method.formulas.dailyReturnFormula", note: "method.formulas.dailyReturnNote" },
   { term: "method.formulas.priceReturnTerm", formula: "method.formulas.priceReturnFormula", note: "method.formulas.priceReturnNote" },
+  { term: "method.formulas.netGainRatioTerm", formula: "method.formulas.netGainRatioFormula", note: "method.formulas.netGainRatioNote" },
+  { term: "method.formulas.twrTerm", formula: "method.formulas.twrFormula", note: "method.formulas.twrNote" },
+  { term: "method.formulas.mwrrTerm", formula: "method.formulas.mwrrFormula", note: "method.formulas.mwrrNote" },
   { term: "method.formulas.cagrTerm", formula: "method.formulas.cagrFormula", note: "method.formulas.cagrNote" },
   { term: "method.formulas.volatilityTerm", formula: "method.formulas.volatilityFormula", note: "method.formulas.volatilityNote" },
   { term: "method.formulas.sharpeTerm", formula: "method.formulas.sharpeFormula", note: "method.formulas.sharpeNote" },
+  { term: "method.formulas.sortinoTerm", formula: "method.formulas.sortinoFormula", note: "method.formulas.sortinoNote" },
+  { term: "method.formulas.varTerm", formula: "method.formulas.varFormula", note: "method.formulas.varNote" },
+  { term: "method.formulas.alphaTerm", formula: "method.formulas.alphaFormula", note: "method.formulas.alphaNote" },
   { term: "method.formulas.riskFreeTerm", formula: "method.formulas.riskFreeFormula", note: "method.formulas.riskFreeNote" },
   { term: "method.formulas.drawdownTerm", formula: "method.formulas.drawdownFormula", note: "method.formulas.drawdownNote" },
   { term: "method.formulas.betaTerm", formula: "method.formulas.betaFormula", note: "method.formulas.betaNote" },
   { term: "method.formulas.correlationTerm", formula: "method.formulas.correlationFormula", note: "method.formulas.correlationNote" },
   { term: "method.formulas.hhiTerm", formula: "method.formulas.hhiFormula", note: "method.formulas.hhiNote" },
   { term: "method.formulas.effectiveTerm", formula: "method.formulas.effectiveFormula", note: "method.formulas.effectiveNote" },
+  { term: "method.formulas.fcffTerm", formula: "method.formulas.fcffFormula", note: "method.formulas.fcffNote" },
+  { term: "method.formulas.terminalTerm", formula: "method.formulas.terminalFormula", note: "method.formulas.terminalNote" },
+  { term: "method.formulas.equityBridgeTerm", formula: "method.formulas.equityBridgeFormula", note: "method.formulas.equityBridgeNote" },
 ];
 
 /** Two-digit section number, so the contents list and the headings line up in a monospace column. */

@@ -26,12 +26,18 @@ import {
   CALENDAR_DAYS_PER_YEAR,
   HOLDING_CONCENTRATION_THRESHOLD,
   annualizedSharpeRatio,
+  annualizedSortinoRatio,
   annualizedVolatility,
   beta as betaOf,
   compoundAnnualGrowthRate,
   correlation,
   cumulativePriceReturns,
+  historicalValueAtRisk,
+  jensenAlpha,
   maxCloseDrawdown,
+  resolveReturnBasis,
+  riskSampleStatus,
+  toReturnBasisBars,
   validatePriceSeries,
   validateWeights,
 } from '@/domain/analytics';
@@ -39,6 +45,8 @@ import type {
   ConcentrationFlag,
   DatedValue,
   MaxDrawdownResult,
+  ReturnBasis,
+  RiskSampleStatus,
   WeightedHolding,
 } from '@/domain/analytics';
 import {
@@ -65,6 +73,13 @@ export const MAX_PORTFOLIO_HOLDINGS = 10;
  * can separate them; anything larger means the allocation and the totals disagree.
  */
 export const ATTRIBUTION_CROSS_CHECK_TOLERANCE = 1e-9;
+
+/**
+ * The confidence the portfolio's historical one-day VaR is stated at. Fixed at 95% here, and
+ * passed EXPLICITLY into the pure `historicalValueAtRisk` helper so the default lives in the view
+ * layer, never hidden inside the math.
+ */
+export const PORTFOLIO_VAR_CONFIDENCE = 0.95;
 
 /** Upper bounds, exclusive, for each effective-holdings concentration band. */
 export const EFFECTIVE_HOLDINGS_BAND_LIMITS = { concentrated: 2, focused: 4 } as const;
@@ -110,7 +125,8 @@ export interface PortfolioLabHolding {
   /** Instrument type as the data source classified it, for example `CS` or `ETF`. */
   type: string;
   currency: string;
-  source: 'hybrid' | 'demo';
+  /** Honest provider attribution copied from the loaded data: `yahoo`, `hybrid`, or `demo`. */
+  source: 'yahoo' | 'hybrid' | 'demo';
   /** Bars the caller supplied, not bars used. */
   suppliedBars: number;
   suppliedFirstDate: DateString;
@@ -133,8 +149,10 @@ export interface PortfolioLabHolding {
   finalValue: number;
   /** Share of the final portfolio value this holding drifted to; not the target weight. */
   finalWeight: number;
-  /** Price return of this holding across the common window. */
+  /** Price return (split-adjusted close) of this holding across the common window. */
   priceReturn: number;
+  /** Vendor-adjusted total return across the window; present only with adjusted-close coverage. */
+  totalReturn?: number;
   /** Dollars this holding added to, or took from, the portfolio: `finalValue - initialAllocation`. */
   contributionDollars: number;
   /**
@@ -230,6 +248,12 @@ export interface PortfolioLabBenchmark {
   beta?: number;
   /** Correlation of the portfolio with the benchmark; undefined when either series never moved. */
   correlation?: number;
+  /**
+   * Jensen-style annualized alpha of the portfolio against the benchmark, on the overlapping
+   * sessions. Undefined whenever beta is unavailable, so alpha is never fabricated without the
+   * beta it is defined against.
+   */
+  alpha?: number;
 }
 
 /** Codes the view translates through `t()`; no user-visible prose is produced here. */
@@ -251,6 +275,8 @@ export type PortfolioDiagnosisCode =
   | 'common-window-shortened'
   | 'sector-data-unavailable'
   | 'price-return-only'
+  | 'total-return-basis'
+  | 'limited-sample'
   | 'no-rebalancing'
   | 'not-investment-advice';
 
@@ -293,6 +319,26 @@ export interface PortfolioRiskDiagnosis {
   educationalOnly: true;
 }
 
+/**
+ * Historical one-day Value at Risk of the portfolio's daily returns on `returnBasis`. A positive
+ * `value` is a one-day loss as a decimal fraction: 0.05 means the portfolio lost 5% or more on
+ * `1 - confidence` of the measured sessions. This is a historical threshold that was breached
+ * `1 - confidence` of the time, NOT a maximum loss — realized losses beyond it were larger.
+ * `value` is undefined below the minimum risk sample, and can be negative when even the lower-tail
+ * quantile was itself a gain. `confidence`, `method`, and `sample` are always present, so the view
+ * can state how the figure was produced even when the value is unavailable.
+ */
+export interface PortfolioValueAtRisk {
+  /** Confidence level the loss threshold is stated at, e.g. 0.95. */
+  confidence: number;
+  /** Positive one-day loss as a decimal fraction; undefined below the minimum risk sample. */
+  value?: number;
+  /** The estimator: sorted returns, nearest-rank lower-tail quantile, no interpolation. */
+  method: 'historical-nearest-rank';
+  /** Daily returns behind the estimate; identical to `riskSample.observations`. */
+  sample: number;
+}
+
 export interface PortfolioLabViewModel {
   /** Holdings in the order supplied, each measured on the common window. */
   holdings: PortfolioLabHolding[];
@@ -308,8 +354,14 @@ export interface PortfolioLabViewModel {
   finalValue: number;
   /** `finalValue - allocatedCapital`. */
   totalGain: number;
-  /** Price return across the whole common window. */
+  /** Price return (split-adjusted close) across the whole common window. */
   totalPriceReturn: number;
+  /**
+   * Vendor-adjusted total return of the portfolio across the window; present only when
+   * `returnBasis` is `total` (every holding has adjusted-close coverage). A proxy, not
+   * audited dividend accounting.
+   */
+  totalReturn?: number;
   /** Portfolio dollar value on every common session, from the fixed share counts. */
   valueSeries: DatedValue[];
   /** Cumulative portfolio price return rebased to 0 on the first common session. */
@@ -318,11 +370,25 @@ export interface PortfolioLabViewModel {
   dailyReturns: DatedValue[];
   /** Compound annual growth rate of portfolio value; undefined when no time elapsed. */
   cagr?: number;
-  /** Annualized volatility of the portfolio's daily returns; 0 for a portfolio that never moved. */
+  /** Annualized volatility of the portfolio's daily returns on `returnBasis`; undefined below the minimum sample. */
   volatility?: number;
-  /** Annualized Sharpe ratio over the common window; undefined when volatility is zero. */
+  /** Annualized Sharpe ratio over the common window; undefined when unavailable. */
   sharpeRatio?: number;
-  /** Worst close-to-close decline in portfolio value inside the common window. */
+  /**
+   * Annualized Sortino ratio over the common window, on the same MAR (the supplied risk-free rate)
+   * as the Sharpe ratio. Undefined below the minimum sample and undefined — never Infinity — when
+   * no session fell below the MAR so downside deviation is zero.
+   */
+  sortinoRatio?: number;
+  /**
+   * Historical one-day Value at Risk of the portfolio at `PORTFOLIO_VAR_CONFIDENCE`. The descriptor
+   * is always present; its `value` is undefined below the minimum sample, gated identically to
+   * `volatility`, `sharpeRatio`, and `sortinoRatio`.
+   */
+  historicalValueAtRisk: PortfolioValueAtRisk;
+  /** Observation count behind the risk figures and whether the sample is sufficient/limited. */
+  riskSample: RiskSampleStatus;
+  /** Worst close-to-close decline of the portfolio on `returnBasis` inside the common window. */
   maxDrawdown: MaxDrawdownResult;
   window: PortfolioWindow;
   /** Concentration of the initial target weights. */
@@ -337,8 +403,14 @@ export interface PortfolioLabViewModel {
   annualRiskFreeRate: number;
   /** Always false: share counts are fixed at the entry date and never adjusted. */
   rebalanced: false;
-  /** Always true: every figure here is a price return. */
-  excludesDividends: true;
+  /**
+   * The return basis for every daily/cumulative/risk figure. Dollar figures (values,
+   * allocations, attribution) stay on split-adjusted close regardless. `total` only when
+   * every holding (and the benchmark, if any) has complete adjusted-close coverage.
+   */
+  returnBasis: ReturnBasis;
+  /** True when `returnBasis` is `price`, so dividends are excluded from every figure. */
+  excludesDividends: boolean;
 }
 
 /**
@@ -357,6 +429,13 @@ export function buildPortfolioLab(request: PortfolioLabRequest): PortfolioLabVie
   validateInitialCapital(initialCapital);
 
   const supplied = normalizeHoldings(holdings);
+  // One basis for every risk figure: total return only when every holding and the
+  // benchmark all carry complete adjusted-close coverage. Dollar figures stay on close.
+  const returnBasis = resolveReturnBasis([
+    ...supplied.map((entry) => entry.marketData.provenance.totalReturnCoverage),
+    ...(benchmark ? [benchmark.provenance.totalReturnCoverage] : []),
+  ]);
+
   const commonDates = commonTradingDates(supplied.map((entry) => entry.marketData.prices));
   if (commonDates.length < MIN_COMMON_CLOSES) {
     throw new AnalyticsError(
@@ -369,23 +448,40 @@ export function buildPortfolioLab(request: PortfolioLabRequest): PortfolioLabVie
   const alignedBars = supplied.map((entry) =>
     entry.marketData.prices.filter((bar) => commonDateSet.has(bar.date)),
   );
+  const alignedBasisBars = alignedBars.map((bars) => toReturnBasisBars(bars, returnBasis));
 
   // One allocation, once, at the first common close. Shares are fixed from here on.
   const shares = supplied.map((entry, index) => (initialCapital * entry.weight) / alignedBars[index][0].close);
+  // The dollar sleeve deployed to each holding: shares × raw entry close (= initialCapital × weight).
+  const initialSleeves = supplied.map((entry, index) => shares[index] * alignedBars[index][0].close);
 
+  // Dollar value series on split-adjusted close: real buy-and-hold dollars.
   const valueSeries = commonDates.map((date, dateIndex) => ({
     date,
     value: alignedBars.reduce((total, bars, index) => total + shares[index] * bars[dateIndex].close, 0),
+  }));
+  // Return-basis value series drives every risk figure. Each holding's initial dollar sleeve
+  // is grown by its OWN normalized basis-close index (basisClose_t / basisClose_0), so the
+  // vendor's raw adjusted-close scale cannot distort the fixed target weights: multiplying any
+  // holding's adjusted-close axis by a positive constant leaves the index — and thus every
+  // portfolio result — unchanged. On the price basis this reduces exactly to shares × close,
+  // so the dollar path and the return path differ only when total return applies.
+  const basisValueSeries = commonDates.map((date, dateIndex) => ({
+    date,
+    value: alignedBasisBars.reduce(
+      (total, bars, index) => total + initialSleeves[index] * (bars[dateIndex].close / bars[0].close),
+      0,
+    ),
   }));
   const allocatedCapital = valueSeries[0].value;
   const finalValue = valueSeries[valueSeries.length - 1].value;
 
   const measured = supplied.map((entry, index) =>
-    measureHolding(entry, alignedBars[index], shares[index], allocatedCapital, finalValue),
+    measureHolding(entry, alignedBars[index], alignedBasisBars[index], shares[index], allocatedCapital, finalValue),
   );
 
-  const bars = valueBars(valueSeries);
-  const dailyReturns = valueSeriesReturns(valueSeries);
+  const bars = valueBars(basisValueSeries);
+  const dailyReturns = valueSeriesReturns(basisValueSeries);
   const volatility = annualizedVolatility(dailyReturns);
   const maxDrawdown = maxCloseDrawdown(bars);
   const totalPriceReturn = finalValue / allocatedCapital - 1;
@@ -394,7 +490,9 @@ export function buildPortfolioLab(request: PortfolioLabRequest): PortfolioLabVie
     measured.map((holding) => ({ symbol: holding.symbol, weight: holding.targetWeight })),
   );
   const window = describeWindow(measured, commonDates);
-  const benchmarkSummary = benchmark && measureBenchmark(benchmark, commonDates, valueSeries);
+  const benchmarkSummary =
+    benchmark && measureBenchmark(benchmark, commonDates, basisValueSeries, returnBasis, annualRiskFreeRate);
+  const riskSample = riskSampleStatus(dailyReturns.length);
 
   return {
     holdings: measured,
@@ -403,12 +501,25 @@ export function buildPortfolioLab(request: PortfolioLabRequest): PortfolioLabVie
     finalValue,
     totalGain: finalValue - allocatedCapital,
     totalPriceReturn,
+    totalReturn:
+      returnBasis === 'total'
+        ? basisValueSeries[basisValueSeries.length - 1].value / basisValueSeries[0].value - 1
+        : undefined,
     valueSeries,
     cumulativeReturns: cumulativePriceReturns(bars),
     dailyReturns,
     cagr: compoundAnnualGrowthRate(bars),
     volatility,
     sharpeRatio: annualizedSharpeRatio(dailyReturns, annualRiskFreeRate),
+    sortinoRatio: annualizedSortinoRatio(dailyReturns, annualRiskFreeRate),
+    historicalValueAtRisk: {
+      confidence: PORTFOLIO_VAR_CONFIDENCE,
+      // Explicit 95%: the pure helper carries no hidden default.
+      value: historicalValueAtRisk(dailyReturns, PORTFOLIO_VAR_CONFIDENCE),
+      method: 'historical-nearest-rank',
+      sample: dailyReturns.length,
+    },
+    riskSample,
     maxDrawdown,
     window,
     concentration,
@@ -423,10 +534,13 @@ export function buildPortfolioLab(request: PortfolioLabRequest): PortfolioLabVie
       volatility,
       window,
       benchmark: benchmarkSummary,
+      returnBasis,
+      riskSample,
     }),
     annualRiskFreeRate,
     rebalanced: false,
-    excludesDividends: true,
+    returnBasis,
+    excludesDividends: returnBasis === 'price',
   };
 }
 
@@ -492,8 +606,10 @@ export function diagnosePortfolioRisk(input: {
   volatility?: number;
   window: PortfolioWindow;
   benchmark?: PortfolioLabBenchmark;
+  returnBasis?: ReturnBasis;
+  riskSample?: RiskSampleStatus;
 }): PortfolioRiskDiagnosis {
-  const { concentration, maxDrawdown, volatility, window, benchmark } = input;
+  const { concentration, maxDrawdown, volatility, window, benchmark, returnBasis = 'price', riskSample } = input;
   const notes: PortfolioDiagnosisNote[] = [];
 
   const concentrationBand = concentration.band;
@@ -552,8 +668,21 @@ export function diagnosePortfolioRisk(input: {
       value: window.sessions,
     });
   }
+  if (riskSample?.limited) {
+    // Reported when the risk sample is sufficient to compute but shorter than a trading year.
+    notes.push({
+      code: 'limited-sample',
+      topic: 'limitation',
+      severity: 'caution',
+      value: riskSample.observations,
+    });
+  }
   notes.push({ code: 'sector-data-unavailable', topic: 'limitation', severity: 'info' });
-  notes.push({ code: 'price-return-only', topic: 'limitation', severity: 'info' });
+  notes.push({
+    code: returnBasis === 'total' ? 'total-return-basis' : 'price-return-only',
+    topic: 'limitation',
+    severity: 'info',
+  });
   notes.push({ code: 'no-rebalancing', topic: 'limitation', severity: 'info' });
   notes.push({ code: 'not-investment-advice', topic: 'limitation', severity: 'info' });
 
@@ -623,6 +752,7 @@ function normalizeHoldings(holdings: PortfolioLabHoldingInput[]): NormalizedHold
 function measureHolding(
   entry: NormalizedHolding,
   aligned: PriceBar[],
+  alignedBasis: PriceBar[],
   shares: number,
   allocatedCapital: number,
   portfolioFinalValue: number,
@@ -635,6 +765,14 @@ function measureHolding(
   const initialAllocation = shares * entryClose;
   const finalValue = shares * finalClose;
   const contributionDollars = finalValue - initialAllocation;
+  const first = aligned[0];
+  const last = aligned[aligned.length - 1];
+  const totalReturn =
+    marketData.provenance.totalReturnCoverage === 'yahoo-adjusted-close' &&
+    first.adjustedClose !== undefined &&
+    last.adjustedClose !== undefined
+      ? last.adjustedClose / first.adjustedClose - 1
+      : undefined;
 
   return {
     symbol,
@@ -656,9 +794,12 @@ function measureHolding(
     finalValue,
     finalWeight: finalValue / portfolioFinalValue,
     priceReturn: finalClose / entryClose - 1,
+    totalReturn,
     contributionDollars,
     contributionToTotalReturn: contributionDollars / allocatedCapital,
-    dailyReturns: dailyReturnsOf(aligned),
+    // Correlations are measured on the comparison's return basis, so a total-return
+    // comparison never correlates one holding's total returns against another's price returns.
+    dailyReturns: dailyReturnsOf(alignedBasis),
   };
 }
 
@@ -720,7 +861,9 @@ function crossCheckAttribution(
 function measureBenchmark(
   benchmark: MarketData,
   commonDates: DateString[],
-  valueSeries: DatedValue[],
+  basisValueSeries: DatedValue[],
+  basis: ReturnBasis,
+  annualRiskFreeRate: number,
 ): PortfolioLabBenchmark {
   const symbol = normalizeSymbol(benchmark.ticker);
   if (benchmark.prices.length === 0) {
@@ -732,9 +875,13 @@ function measureBenchmark(
   const overlappingDates = commonDates.filter((date) => benchmarkDates.has(date));
   const overlapping = new Set(overlappingDates);
 
-  const benchmarkBars = benchmark.prices.filter((bar) => overlapping.has(bar.date));
+  // Both legs on the same basis; `basis` is only 'total' when the benchmark also has coverage.
+  const benchmarkBars = toReturnBasisBars(
+    benchmark.prices.filter((bar) => overlapping.has(bar.date)),
+    basis,
+  );
   const benchmarkReturns = benchmarkBars.length < 2 ? [] : dailyReturnsOf(benchmarkBars);
-  const portfolioOnOverlap = valueSeries.filter((point) => overlapping.has(point.date));
+  const portfolioOnOverlap = basisValueSeries.filter((point) => overlapping.has(point.date));
   const portfolioReturns = portfolioOnOverlap.length < 2 ? [] : valueSeriesReturns(portfolioOnOverlap);
 
   return {
@@ -747,6 +894,8 @@ function measureBenchmark(
     coversCommonWindow: overlappingDates.length === commonDates.length,
     beta: betaOf(portfolioReturns, benchmarkReturns),
     correlation: correlation(portfolioReturns, benchmarkReturns),
+    // Same overlap and basis as beta; jensenAlpha returns undefined whenever beta is unavailable.
+    alpha: jensenAlpha(portfolioReturns, benchmarkReturns, annualRiskFreeRate),
   };
 }
 

@@ -1,83 +1,122 @@
 # InvestIQ product specification
 
-## Purpose
+## Product position
 
-InvestIQ is an educational investment analytics platform for US-listed stocks and ETFs. It
-turns end-of-day market data into readable risk and return analysis — performance, volatility,
-drawdown, correlation, concentration, and recurring-investment backtests — and explains how
-every number is produced. It is research software: no order routing, no investment or tax
-advice, no guarantee that market data or broker fee schedules are complete or current.
+InvestIQ is an educational **Investment Research & Portfolio Analytics Platform** for US-listed
+companies and ETFs. It helps finance students, aspiring research analysts, asset-management interns,
+and self-directed investors turn source data into a documented investment view.
 
-## Workspaces
+The primary question is not “how much money will I have?” It is:
 
-Five primary workspaces plus standalone documentation.
+> What do reported fundamentals, explicit valuation assumptions, and portfolio risk say about this
+> investment case—and which conclusions remain uncertain?
 
-| Route | Workspace | Scope |
-| --- | --- | --- |
-| `/` | Market Overview | Index benchmarks and a personal watchlist: return, volatility, drawdown |
-| `/stock` | Stock Analysis | One symbol: price history, rolling volatility, risk metrics, corporate actions |
-| `/compare` | Stock Comparison | 2–5 symbols on one aligned calendar: total return, risk table, correlation |
-| `/portfolio` | Portfolio Lab | Buy-and-hold weights totalling 100%: performance, concentration, attribution |
-| `/dca` | DCA Backtest | Recurring contributions with dividends, fees, taxes, drawdown, PDF report |
-| `/methodology` | How it works | Documentation of the calculation rules; not part of primary navigation |
+Historical DCA and growth calculators are supporting tools. They must never dominate the research
+home or be presented as the platform's investment conclusion.
 
-`/methodology` is deliberately outside `primaryRoutes` in `src/config/navigation.ts`.
+## Personas and jobs to be done
 
-## Foundation migration status
+1. **Aspiring investment analyst / finance student (primary).** Needs a portfolio-quality research
+   process, visible formulas, and source receipts without institutional terminals.
+2. **Early-career portfolio analyst (secondary).** Needs aligned multi-asset risk metrics,
+   attribution, benchmark context, and reproducible exports.
+3. **International beginner (accessibility persona).** Needs plain-language English or Simplified
+   Chinese explanations and the ability to open details only when ready.
 
-Only **DCA Backtest** is fully functional. The other four routes are honest layout previews:
-they present structure, labels, and intent, and every data region states that it is not yet
-connected to market data. Previews must never display invented, illustrative, or placeholder
-numeric values.
+## Information architecture
 
-## Localization
+Primary navigation contains exactly four destinations: Research, Compare, Portfolio, Tools.
 
-- English and Simplified Chinese only. No Spanish, no Japanese, no other locales.
-- All copy comes from the catalogs in `src/i18n/language.tsx`. The `zh-CN` catalog is typed
-  against the English catalog, so both stay in sync by construction.
+- `/` — ticker-first Research launcher; recent browser-local work; no overloaded market dashboard.
+- `/company/[ticker]` — Company Summary, capped at five decision-relevant outputs.
+- `/company/[ticker]/financials` — detailed annual filing analysis and source receipts.
+- `/company/[ticker]/valuation` — DCF, sensitivities, scenario range, and user-sourced comparables.
+- `/company/[ticker]/memo` — one-page evidence-linked memo and print/PDF workflow.
+- `/compare` — two to five securities on one common return calendar.
+- `/portfolio` — one to ten holdings, user/equal/inverse-volatility weights and portfolio risk.
+- `/tools` — secondary market and calculator tools.
+- `/tools/dca` — historical recurring-investment backtest; no future estimates.
+- `/market`, `/methodology` — contextual destinations outside primary navigation.
 
-## Font scale
+## Functional acceptance criteria
 
-Four levels — `25`, `50`, `75`, `100` — with `25` as the default. The selection is persisted per
-browser and applied as a root multiplier; all layouts must remain usable at `100`.
+### Company Summary
 
-## Visual concepts
+- Loads a valid US ticker through a server-owned SEC adapter.
+- Shows revenue, operating margin, constructed FCF, dated price-risk context, and a deterministic
+  historical interpretation—no more than five first-level outputs.
+- Every annual fact retains taxonomy, concept, filing date, accession, period, and filing URL.
+- Missing data remains unavailable; the UI never converts missing data to zero.
 
-`design/investiq/market-overview-concept.png`, `design/investiq/stock-analysis-concept.png`,
-`design/investiq/stock-comparison-concept.png`, `design/investiq/portfolio-lab-concept.png`,
-`design/investiq/dca-backtest-concept.png`, `design/investiq/mobile-dca-concept.png`.
+### Financial Analysis
 
-## Calculation and data files under change control
+- Shows up to five latest-reported annual periods for growth, profitability, cash generation, and
+  supported health metrics.
+- Revenue/net income/EPS/FCF show CAGR only when positive endpoints and a valid span support it.
+- Margin change is shown in percentage points, not CAGR.
+- Unsupported gross margin, ROIC, debt/liquidity, efficiency, sector, and financial-industry metrics
+  carry explicit coverage gates.
 
-The `## Calculation contract` section of `README.md` is a product contract. The files that
-implement it cannot change behavior without regression tests:
+### Valuation
 
-- Engines: `src/domain/backtest-engine.ts`, `src/domain/schedule.ts`, `src/domain/fees.ts`,
-  `src/domain/portfolio-aggregate.ts`, `src/domain/projection-engine.ts`
-- Report assembly: `src/services/create-portfolio-report.ts`, `src/services/create-report.ts`
-- Market data: `src/server/market-data.ts`
-- Fixed data: `src/constants/broker-presets.ts`, `src/data/demo-market-data.ts`
+- Five-year unlevered FCFF DCF with editable revenue growth, operating margin, cash tax, D&A, CapEx,
+  ΔNWC, WACC, terminal growth, and net debt.
+- Displays bear/base/bull range before base implied price, two 5×5 sensitivity tables, full forecast,
+  terminal bridge, and EV→equity bridge.
+- Current price comparison is separate and includes a quote date.
+- Comparable method applies user-researched P/E, EV/Revenue, or EV/EBITDA ranges; InvestIQ does not
+  invent peers or medians.
+- Never uses “fair value,” “price target,” “prediction,” “guarantee,” or buy/sell language.
 
-Existing suites: `src/domain/backtest-engine.test.ts`, `src/domain/fees.test.ts`,
-`src/services/create-portfolio-report.test.ts`, `src/server/market-data.test.ts`.
+### Portfolio Analytics
 
-## Accessibility requirements
+- One to ten distinct, long-only holdings; weights must visibly total exactly 100%.
+- User-defined and equal weights are available before a run. Inverse-volatility weights become
+  available only after every holding has sufficient, non-zero measured volatility.
+- Outputs return, CAGR, annualized volatility, Sharpe, Sortino, beta, Jensen-style alpha, maximum
+  drawdown, historical one-day VaR, correlation, holding attribution, weight drift, and concentration.
+- Common-date alignment, return basis, sample size, benchmark overlap, and unavailable metrics are
+  visible. Sector exposure is withheld until a trusted sector source exists.
 
-- Full keyboard operation with visible focus and a skip-to-content link.
-- Landmarks and navigation regions labelled; every control has an accessible name from the
-  translation catalog, including icon-only controls.
-- Charts and data regions expose text equivalents or explicit empty-state descriptions.
-- Colour is never the only signal; motion respects `prefers-reduced-motion`.
+### Investment Memo
 
-## Mobile requirements
+- One-page record containing company overview, financial evidence, thesis, catalysts, risks,
+  valuation range, conclusion, and filing receipt.
+- Reported facts, model assumptions, and user-authored interpretation remain visually distinct.
+- Saves notes and the last valuation snapshot only in the browser; no account or analytics tracking.
+- Print stylesheet supports browser Save as PDF without sending memo contents to another service.
 
-- Usable from 320px width upward, single-column with no horizontal scrolling.
-- Compact bottom navigation for the five primary routes on small screens.
-- Touch targets at least 44px; wide tables scroll within their own container.
+## Data and model governance
 
-## Workflow and ownership
+- SEC annual facts are latest-reported/restatement-aware and grouped by economic period, not filing
+  fiscal-year metadata. Annual flow periods are 350–380 days; direct and constructed metrics have
+  explicit unit and component contracts.
+- Company fundamentals are display-only. Historical market analysis never mixes latest filing data
+  backward into price history.
+- Analytics use one return basis per view: vendor adjusted-close total-return proxy only when every
+  leg has complete coverage; otherwise price return for every leg.
+- Volatility, Sharpe, Sortino, VaR, beta, alpha, and correlation require at least 60 aligned daily
+  returns. Under 252 is disclosed as a limited sample.
+- Future DCA estimates are disabled. An unreachable experimental engine is not a product feature.
+- All calculations are deterministic, preserve internal precision, and return unavailable instead
+  of an invented zero.
 
-1. **Codex** owns product acceptance and review, and defines the scope of each change.
-2. **Claude Opus 5** implements the code within that scope.
-3. **Codex** verifies the result against this specification.
-4. **The user** approves all product decisions.
+## Experience requirements
+
+- English and Simplified Chinese only; language selector shows 🇺🇸 and 🇨🇳.
+- Text-size choices 25/50/75/100 with 25 as default; layouts remain usable at 100.
+- Professional low-saturation dark interface: thin borders, restrained blue/teal status color,
+  limited radius, mono numerics, no glassmorphism or neon gradients.
+- Keyboard operation, visible focus, labelled landmarks, text equivalents for charts, reduced-motion
+  support, and table-local horizontal scrolling.
+- Mobile layouts work from 320 px; company tabs and primary navigation remain reachable.
+
+## Delivery standard
+
+- Public GitHub repository and Vercel deployment.
+- Passing typecheck, lint, deterministic unit tests, production build, and browser acceptance checks.
+- README, methodology, known limitations, data-source configuration, equity research sample, project
+  report, three-minute demo script, and one-page summary PDF.
+- Codex owns product acceptance, math review, test execution, final integration, GitHub, and delivery.
+  Claude Opus 4.8 High is used as a coding/review partner where available; its output is never merged
+  without independent Codex tests and review.

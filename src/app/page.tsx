@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
-import { MarketOverview } from "@/components/market-overview";
+import { ResearchHome } from "@/components/research-home";
 
 export const metadata: Metadata = {
-  title: "Market Overview",
-  description: "End-of-day US index benchmarks, watchlist, and market risk in one view.",
+  title: "Investment Research",
+  description: "Build an evidence-backed view of a US-listed company, its valuation assumptions, and portfolio risk.",
 };
 
-export default function MarketOverviewRoute() {
-  return <MarketOverview />;
+export default function ResearchRoute() {
+  return <ResearchHome />;
 }

@@ -1,6 +1,15 @@
 // Purpose: Pure backtest engine; all money, dividend, fee, and drawdown rules live here.
 
-import { calculateOrderFee, floorShares, roundMoney, sharesForCash } from '@/domain/fees';
+import {
+  aggregateFeeComponents,
+  floorShares,
+  quoteOrderFee,
+  roundCalcMoney,
+  sharePrincipal,
+  sharesForCash,
+} from '@/domain/fees';
+import { isValidOhlcBar } from '@/domain/ohlc';
+import { externalCashFlows, moneyWeightedReturn, timeWeightedReturn } from '@/domain/performance';
 import { buildExecutionSchedule, nextAvailableTradingDate } from '@/domain/schedule';
 import type {
   BacktestInput,
@@ -8,13 +17,18 @@ import type {
   DateString,
   DividendEvent,
   DrawdownResult,
+  FeeComponent,
+  LiquidationEstimate,
   MarketData,
   PortfolioPoint,
   Transaction,
 } from '@/types/backtest';
 import { daysBetween } from '@/utils/date';
 
-const CROSS_CHECK_TOLERANCE = 0.03;
+// Tightened from three cents to the internal calculation-money precision. Share
+// principal, residual cash, and tax now round at six decimals, so the return
+// decomposition and the ending-balance identity reconcile far below one cent.
+const CROSS_CHECK_TOLERANCE = 1e-6;
 
 export class BacktestError extends Error {
   constructor(message: string) {
@@ -50,6 +64,10 @@ export function runBacktest(input: BacktestInput, marketData: MarketData): Backt
   let totalContributions = 0;
   let purchaseCost = 0;
   let totalFees = 0;
+  // Buy-side fees only (contribution buys and dividend reinvestments). Tracked
+  // apart from totalFees so the liquidation tax basis can add acquisition fees
+  // without pulling in the sell fee, which belongs to the amount realized.
+  let acquisitionFees = 0;
   let grossDividends = 0;
   let dividendTax = 0;
   let units = 0;
@@ -60,6 +78,9 @@ export function runBacktest(input: BacktestInput, marketData: MarketData): Backt
   const dividendEntitlements = new Map<string, number>();
   const transactions: Transaction[] = [];
   const portfolio: PortfolioPoint[] = [];
+  // Every order's per-component fee lines, summed by kind at the end so the audit
+  // and PDF can explain the total fees (commission, SEC, TAF, CAT, …).
+  const feeComponentLedger: FeeComponent[] = [];
 
   for (const bar of prices) {
     for (const dividend of dividendTimeline.exDates.get(bar.date) ?? []) {
@@ -76,11 +97,13 @@ export function runBacktest(input: BacktestInput, marketData: MarketData): Backt
       grossDividends += gross;
       dividendTax += tax;
 
-      const order = sharesForCash(dividendCash, bar.high, input.fees.dividendReinvestment);
+      const order = sharesForCash(dividendCash, bar.high, input.fees, 'dividend-reinvestment');
       dividendCash = Math.max(0, dividendCash - order.cost - order.fee);
       shares += order.shares;
       purchaseCost += order.cost;
       totalFees += order.fee;
+      acquisitionFees += order.fee;
+      feeComponentLedger.push(...order.components);
       dividendCount += 1;
 
       transactions.push({
@@ -92,6 +115,7 @@ export function runBacktest(input: BacktestInput, marketData: MarketData): Backt
         fee: order.fee,
         tax,
         note: dividend.projected ? 'Simulated dividend reinvestment' : 'Ordinary cash dividend reinvested on payment date',
+        feeComponents: order.components,
       });
     }
 
@@ -110,11 +134,13 @@ export function runBacktest(input: BacktestInput, marketData: MarketData): Backt
         contributionCash += externalFlow;
         totalContributions += externalFlow;
 
-        const order = sharesForCash(contributionCash, bar.high, input.fees.buy);
+        const order = sharesForCash(contributionCash, bar.high, input.fees, 'contribution-cash');
         contributionCash = Math.max(0, contributionCash - order.cost - order.fee);
         shares += order.shares;
         purchaseCost += order.cost;
         totalFees += order.fee;
+        acquisitionFees += order.fee;
+        feeComponentLedger.push(...order.components);
         contributionCount += 1;
 
         transactions.push({
@@ -126,17 +152,27 @@ export function runBacktest(input: BacktestInput, marketData: MarketData): Backt
           fee: order.fee,
           tax: 0,
           note: bar.projected ? 'Purchased at simulated daily high' : 'Purchased at trading-day high',
+          feeComponents: order.components,
         });
       } else {
         const orderShares = floorShares(input.investment.value);
-        const orderValue = roundMoney(orderShares * bar.high);
-        const fee = calculateOrderFee(input.fees.buy, orderShares, orderValue);
+        const orderValue = sharePrincipal(orderShares, bar.high);
+        const breakdown = quoteOrderFee(input.fees, {
+          purpose: 'contribution-shares',
+          side: 'buy',
+          shares: orderShares,
+          tradeValue: orderValue,
+          price: bar.high,
+        });
+        const fee = breakdown.total;
         const externalFlow = orderValue + fee;
         externalFlowToday += externalFlow;
         totalContributions += externalFlow;
         shares += orderShares;
         purchaseCost += orderValue;
         totalFees += fee;
+        acquisitionFees += fee;
+        feeComponentLedger.push(...breakdown.components);
         contributionCount += 1;
 
         transactions.push({
@@ -148,6 +184,7 @@ export function runBacktest(input: BacktestInput, marketData: MarketData): Backt
           fee,
           tax: 0,
           note: bar.projected ? 'Fixed shares purchased at simulated daily high' : 'Fixed shares purchased at trading-day high',
+          feeComponents: breakdown.components,
         });
       }
     }
@@ -177,16 +214,45 @@ export function runBacktest(input: BacktestInput, marketData: MarketData): Backt
   let finalShares = shares;
   let sellFee = 0;
   let capitalGainsTax = 0;
+  let liquidation: LiquidationEstimate | undefined;
 
   if (input.liquidateAtEnd && shares > 0) {
-    sellFee = calculateOrderFee(input.fees.sell, shares, marketValueBeforeSale);
-    const taxableGain = Math.max(0, marketValueBeforeSale - purchaseCost);
-    capitalGainsTax = input.taxMode === 'after-tax'
-      ? taxableGain * (input.capitalGainsTaxRate / 100)
+    const sellBreakdown = quoteOrderFee(input.fees, {
+      purpose: 'liquidation',
+      side: 'sell',
+      shares,
+      tradeValue: marketValueBeforeSale,
+      price: lastBar.close,
+    });
+    sellFee = sellBreakdown.total;
+    feeComponentLedger.push(...sellBreakdown.components);
+    // IRS Pub. 550: automatic-investment basis includes purchase price plus
+    // allocated commission, and the amount realized on sale is gross proceeds
+    // minus sale expenses. IRS Topic 409 / Schedule D compute the gain or loss as
+    // amount realized minus basis; a loss is a real negative here. This flat-rate
+    // estimate applies the user rate to the resulting gain; it is not lot-level
+    // tax accounting.
+    const adjustedTaxBasis = roundCalcMoney(purchaseCost + acquisitionFees);
+    const netAmountRealized = roundCalcMoney(marketValueBeforeSale - sellFee);
+    const realizedGainLoss = roundCalcMoney(netAmountRealized - adjustedTaxBasis);
+    const taxableGain = Math.max(0, realizedGainLoss);
+    // A holding run inside a Portfolio report defers its capital-gain tax so gains
+    // and losses net across the whole portfolio before one flat-rate tax is applied.
+    capitalGainsTax = input.taxMode === 'after-tax' && !input.deferCapitalGainsTax
+      ? roundCalcMoney(taxableGain * (input.capitalGainsTaxRate / 100))
       : 0;
     finalCash += marketValueBeforeSale - sellFee - capitalGainsTax;
     finalShares = 0;
     totalFees += sellFee;
+    liquidation = {
+      adjustedTaxBasis,
+      netAmountRealized,
+      realizedGainLoss,
+      taxableGain,
+      sellFee,
+      capitalGainsTax,
+      feeComponents: sellBreakdown.components,
+    };
     transactions.push({
       date: lastBar.date,
       type: 'liquidation',
@@ -196,6 +262,7 @@ export function runBacktest(input: BacktestInput, marketData: MarketData): Backt
       fee: sellFee,
       tax: capitalGainsTax,
       note: lastBar.projected ? 'All shares sold at simulated close' : 'All shares sold at end-date close',
+      feeComponents: sellBreakdown.components,
     });
   }
 
@@ -209,6 +276,32 @@ export function runBacktest(input: BacktestInput, marketData: MarketData): Backt
   if (Math.abs(crossCheckDifference) > CROSS_CHECK_TOLERANCE) {
     throw new BacktestError('The return audit cross-check failed, so calculation stopped before displaying unreliable values.');
   }
+
+  // End-of-period valuation policy: mark the terminal portfolio point to the
+  // after-fee/after-tax ending value. This makes an end sell fee and liquidation tax
+  // internal portfolio economics reflected in BOTH the flow-neutral TWR and the
+  // flow-neutral drawdown — exactly as they enter the MWRR terminal value — without ever
+  // becoming an external cash flow. When liquidation is off, finalAmount already equals
+  // the point's mark-to-close value, so this is a no-op. A terminal liquidation cost can
+  // therefore create the final drawdown observation (documented in the README/methodology).
+  const terminalPoint = portfolio[portfolio.length - 1];
+  terminalPoint.value = finalAmount;
+  terminalPoint.cash = finalCash;
+  terminalPoint.shares = finalShares;
+  if (units > 0) {
+    const terminalUnitValue = finalAmount / units;
+    if (!Number.isFinite(terminalUnitValue) || terminalUnitValue <= 0) {
+      unitValueLockedAtZero = true;
+    }
+    terminalPoint.unitValue = unitValueLockedAtZero ? 0 : terminalUnitValue;
+  }
+
+  // Performance measures, separated by construction. TWR is cash-flow-neutral (from the
+  // flow-neutral unit-value series). MWRR is the investor experience: dated external
+  // contributions as negative flows and the after-fee/after-tax ending value as the
+  // terminal positive flow. Reinvested dividends are internal to both, never a flow.
+  const twr = timeWeightedReturn(portfolio);
+  const mwrr = moneyWeightedReturn(externalCashFlows(portfolio, finalAmount, lastBar.date));
 
   return {
     ticker: input.ticker,
@@ -228,7 +321,9 @@ export function runBacktest(input: BacktestInput, marketData: MarketData): Backt
     capitalGainsTax,
     totalFees,
     totalProfit: totalProfitByBalance,
-    totalReturnPercent: totalContributions > 0 ? (totalProfitByBalance / totalContributions) * 100 : 0,
+    netGainRatioPercent: totalContributions > 0 ? (totalProfitByBalance / totalContributions) * 100 : 0,
+    twr,
+    mwrr,
     durationDays: daysBetween(prices[0].date, lastBar.date),
     contributionCount,
     dividendCount,
@@ -243,6 +338,9 @@ export function runBacktest(input: BacktestInput, marketData: MarketData): Backt
     ).length,
     crossCheckDifference,
     projected: prices.some((bar) => bar.projected),
+    acquisitionFees,
+    feeComponents: aggregateFeeComponents(feeComponentLedger),
+    liquidation,
   };
 
   function getPreFlowUnitValue(preFlowValue: number): number {
@@ -287,7 +385,7 @@ function validateInput(input: BacktestInput, marketData: MarketData) {
     throw new BacktestError('This security contains an unsupported corporate action. Calculation stopped to avoid an unreliable result.');
   }
 
-  if (marketData.prices.some((bar) => ![bar.open, bar.high, bar.low, bar.close].every(Number.isFinite))) {
+  if (marketData.prices.some((bar) => !isValidOhlcBar(bar))) {
     throw new BacktestError('The market-price history is incomplete and cannot be calculated reliably.');
   }
 }
@@ -299,9 +397,15 @@ function prepareDividendTimeline(
 ) {
   const exDates = new Map<DateString, DividendEvent[]>();
   const payDates = new Map<DateString, DividendEvent[]>();
+  const firstTradingDate = tradingDates[0];
 
   for (const event of dividends) {
     if (event.exDate > input.endDate || event.payDate < input.startDate) continue;
+    // A portfolio built by this backtest holds nothing before its first actual
+    // trading session. An ex-date that falls before that session cannot be rolled
+    // forward and granted to shares bought later, so drop it entirely instead of
+    // mapping entitlement onto the first session's post-contribution holdings.
+    if (firstTradingDate === undefined || event.exDate < firstTradingDate) continue;
     const exExecution = nextAvailableTradingDate(tradingDates, event.exDate);
     const payExecution = nextAvailableTradingDate(tradingDates, event.payDate);
     if (exExecution) pushMap(exDates, exExecution, event);

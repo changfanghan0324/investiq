@@ -48,13 +48,17 @@ import {
 import { exportPortfolioPdf } from "@/services/pdf-export";
 import type {
   BacktestResult,
+  FeeComponentKind,
+  FeeConfig,
   FeeRule,
   IntervalUnit,
+  MoneyWeightedReturn,
   PortfolioAggregateResult,
   PortfolioInput,
   PortfolioPositionInput,
   PortfolioReport,
   ProjectionScenarioId,
+  TimeWeightedReturn,
 } from "@/types/backtest";
 import { addYearsClamped, todayDateString } from "@/utils/date";
 import { formatCurrency, formatPercent } from "@/utils/format";
@@ -297,6 +301,7 @@ export function DcaBacktestDashboard() {
                   className={styles.input}
                   type="date"
                   min="1990-01-01"
+                  max={todayDateString()}
                   value={input.startDate}
                   aria-invalid={Boolean(fieldErrors.startDate)}
                   aria-describedby={fieldErrors.startDate ? "start-date-error" : undefined}
@@ -310,6 +315,7 @@ export function DcaBacktestDashboard() {
                   className={styles.input}
                   type="date"
                   min="1990-01-01"
+                  max={todayDateString()}
                   value={input.endDate}
                   aria-invalid={Boolean(fieldErrors.endDate)}
                   aria-describedby={fieldErrors.endDate ? "end-date-error" : undefined}
@@ -425,7 +431,7 @@ export function DcaBacktestDashboard() {
               </Field>
             ) : null}
             <button type="button" className={styles.feeDisclosure} onClick={() => setAdvancedFees((value) => !value)}>
-              <span><Info size={13} /> {advancedFees ? t("broker.hideFees") : t("broker.reviewFees")}</span>
+              <span><Info size={13} /> {advancedFees ? t("broker.hideFees") : input.fees.kind === "custom" ? t("broker.reviewFees") : t("broker.reviewScenario")}</span>
               <ChevronDown size={14} className={advancedFees ? styles.chevronOpen : undefined} />
             </button>
             <AnimatePresence initial={false}>
@@ -436,13 +442,20 @@ export function DcaBacktestDashboard() {
                   animate={{ opacity: 1, height: "auto" }}
                   exit={{ opacity: 0, height: 0 }}
                 >
-                  <FeeEditor title={t("broker.buyOrder")} ruleKey="buy" value={input.fees.buy} errors={fieldErrors} onChange={(buy) => updateInput((current) => ({ ...current, fees: { ...current.fees, buy } }))} />
-                  <FeeEditor title={t("broker.sellOrder")} ruleKey="sell" value={input.fees.sell} errors={fieldErrors} onChange={(sell) => updateInput((current) => ({ ...current, fees: { ...current.fees, sell } }))} />
-                  <FeeEditor title={t("broker.dividendReinvestment")} ruleKey="dividendReinvestment" value={input.fees.dividendReinvestment} errors={fieldErrors} onChange={(dividendReinvestment) => updateInput((current) => ({ ...current, fees: { ...current.fees, dividendReinvestment } }))} />
+                  {input.fees.kind === "custom" ? (
+                    <>
+                      <FeeEditor title={t("broker.buyOrder")} ruleKey="buy" value={input.fees.buy} errors={fieldErrors} onChange={(buy) => updateInput((current) => ({ ...current, fees: { ...current.fees, buy } }))} />
+                      <FeeEditor title={t("broker.sellOrder")} ruleKey="sell" value={input.fees.sell} errors={fieldErrors} onChange={(sell) => updateInput((current) => ({ ...current, fees: { ...current.fees, sell } }))} />
+                      <FeeEditor title={t("broker.dividendReinvestment")} ruleKey="dividendReinvestment" value={input.fees.dividendReinvestment} errors={fieldErrors} onChange={(dividendReinvestment) => updateInput((current) => ({ ...current, fees: { ...current.fees, dividendReinvestment } }))} />
+                      <p className={styles.brokerNote}>{t("broker.customNoHidden")}</p>
+                    </>
+                  ) : (
+                    <BrokerScenarioDisclosure fees={input.fees} />
+                  )}
                 </motion.div>
               ) : null}
             </AnimatePresence>
-            <p className={styles.brokerNote}>{localizedBrokerNote(input.fees.brokerId, input.fees.notes, t)} {t("broker.checked", { date: input.fees.effectiveDate })}</p>
+            <p className={styles.brokerNote}>{localizedBrokerNote(input.fees.brokerId, input.fees.notes, t)} {t("broker.checked", { date: input.fees.checkedDate })}</p>
 
             {error ? (
               <motion.div className={styles.errorBanner} initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} role="alert">
@@ -897,8 +910,9 @@ function ResultsWorkspace({
 
       <div className={styles.metricGrid}>
         <Metric label={t("result.finalValue")} value={result.finalAmount} formatter={formatCurrency} />
-        <Metric label={t("result.totalReturn")} value={result.totalReturnPercent} formatter={formatPercent} tone={positive ? "positive" : "negative"} />
         <Metric label={t("result.netContributions")} value={result.totalContributions} formatter={formatCurrency} />
+        <Metric label={t("result.netGainLoss")} value={result.totalProfit} formatter={formatCurrency} tone={positive ? "positive" : "negative"} />
+        <Metric label={t("result.netGainRatio")} value={result.netGainRatioPercent} formatter={formatPercent} tone={positive ? "positive" : "negative"} />
         <Metric label={t("result.maxDrawdown")} value={result.maxDrawdown.percent} formatter={formatPercent} tone="negative" />
       </div>
 
@@ -918,7 +932,7 @@ function ResultsWorkspace({
               <div className={styles.attributionRow} key={holding.ticker}>
                 <div><TickerBadge ticker={holding.ticker} /><span><strong>{holding.ticker}</strong><small>{holding.result.companyName}</small></span></div>
                 <strong>{compactCurrency(holding.result.finalAmount)}</strong>
-                <strong className={holding.result.totalReturnPercent >= 0 ? styles.positive : styles.negative}>{formatPercent(holding.result.totalReturnPercent)}</strong>
+                <strong className={holding.result.netGainRatioPercent >= 0 ? styles.positive : styles.negative}>{formatPercent(holding.result.netGainRatioPercent)}</strong>
                 <div className={styles.allocationCell}><span>{allocation.toFixed(1)}%</span><i><b style={{ width: `${Math.min(100, allocation)}%` }} /></i></div>
               </div>
             );
@@ -931,15 +945,18 @@ function ResultsWorkspace({
             <div className={styles.transactionHeader}>
               <span>{t("result.date")}</span><span>{t("result.ticker")}</span><span>{t("result.action")}</span><span>{t("holding.shares")}</span><span>{t("result.price")}</span>
             </div>
-            {transactions.map((transaction, index) => (
-              <div className={styles.transactionRow} key={`${transaction.date}-${transaction.ticker}-${transaction.type}-${index}`}>
-                <span>{transaction.date}</span>
-                <strong>{transaction.ticker ?? "—"}</strong>
-                <span>{transaction.type === "contribution-buy" ? t("result.buy") : transaction.type === "dividend-reinvestment" ? t("result.dividendReinvest") : t("result.liquidate")}</span>
-                <span>{transaction.shares.toFixed(3)}</span>
-                <span>{formatCurrency(transaction.price)}</span>
-              </div>
-            ))}
+            {transactions.map((transaction, index) => {
+              const isAdjustment = transaction.type === "portfolio-tax-adjustment";
+              return (
+                <div className={styles.transactionRow} key={`${transaction.date}-${transaction.ticker}-${transaction.type}-${index}`}>
+                  <span>{transaction.date}</span>
+                  <strong>{transaction.ticker ?? "—"}</strong>
+                  <span>{transactionActionLabel(transaction.type, t)}</span>
+                  <span>{isAdjustment ? "—" : transaction.shares.toFixed(3)}</span>
+                  <span>{isAdjustment ? "—" : formatCurrency(transaction.price)}</span>
+                </div>
+              );
+            })}
           </div>
           <button type="button" className={styles.tableAction} onClick={onToggleTransactions}>
             {showAllTransactions ? t("result.showRecent") : t("result.viewAll")} <ArrowRight size={14} />
@@ -969,9 +986,23 @@ function InsightsRail({
       <RailSection title={t("audit.execution")}>
         <AuditRow label={t("audit.purchasePrice")} value={t("audit.dailyHigh")} />
         <AuditRow label={t("audit.nonTrading")} value={t("audit.nextSession")} />
-        <AuditRow label={t("audit.ohlc")} value={t("audit.splitAdjusted")} />
+        <AuditRow label={t("audit.priceBasis")} value={t("audit.priceExcludesDividends")} />
         <AuditRow label={t("audit.dividends")} value={t("audit.payDate")} />
+        <AuditRow label={t("audit.dividendCoverage")} value={coverageLabel(report.provenance.dividendCoverage, t)} verified={report.provenance.dividendCoverage === "cross-checked"} />
+        <AuditRow label={t("audit.splitCoverage")} value={coverageLabel(report.provenance.splitCoverage, t)} verified={report.provenance.splitCoverage === "cross-checked"} />
+        {report.provenance.lastCompletedSession ? (
+          <AuditRow label={t("audit.lastSession")} value={report.provenance.lastCompletedSession} />
+        ) : null}
         <AuditRow label={t("audit.dataSource")} value={report.source === "demo" ? t("audit.syntheticDemo") : t("audit.liveSource")} verified={report.source !== "demo"} />
+        {report.source !== "demo" ? <p className={styles.railFootnote}>{t("audit.coverageLimitation")}</p> : null}
+      </RailSection>
+
+      <RailSection title={t("audit.performanceMeasures")}>
+        <AuditRow label={t("result.netGainRatio")} value={formatPercent(result.netGainRatioPercent)} tone={result.totalProfit >= 0 ? "positive" : "negative"} />
+        <AuditRow label={t("result.twrPeriod")} value={formatPercent(result.twr.cumulative * 100)} tone={result.twr.cumulative >= 0 ? "positive" : "negative"} />
+        <AuditRow label={t("result.twrAnnualized")} value={twrAnnualizedLabel(result.twr, t)} />
+        <AuditRow label={t("result.mwrr")} value={mwrrLabel(result.mwrr, t)} />
+        <p className={styles.railFootnote}>{t("audit.measuresNote")}</p>
       </RailSection>
 
       <RailSection title={t("audit.returnBreakdown")}>
@@ -979,8 +1010,29 @@ function InsightsRail({
         <AuditRow label={t("audit.dividendReturn")} value={formatPercent(result.grossDividends / contributionBase * 100)} tone="positive" />
         <AuditRow label={t("audit.fees")} value={formatPercent(-result.totalFees / contributionBase * 100)} tone="negative" />
         <AuditRow label={t("audit.taxes")} value={formatPercent(-(result.dividendTax + result.capitalGainsTax) / contributionBase * 100)} tone="negative" />
-        <AuditRow label={t("result.totalReturn")} value={formatPercent(result.totalReturnPercent)} tone={result.totalProfit >= 0 ? "positive" : "negative"} strong />
+        <AuditRow label={t("result.netGainRatio")} value={formatPercent(result.netGainRatioPercent)} tone={result.totalProfit >= 0 ? "positive" : "negative"} strong />
       </RailSection>
+
+      {result.feeComponents.length > 0 ? (
+        <RailSection title={t("audit.feeBreakdown")}>
+          {result.feeComponents.map((line) => (
+            <AuditRow key={line.kind} label={feeComponentLabel(line.kind, t)} value={formatCurrency(line.amount)} tone="negative" />
+          ))}
+          <AuditRow label={t("audit.fees")} value={formatCurrency(result.totalFees)} tone="negative" strong />
+          <p className={styles.railFootnote}>{t("audit.feeBreakdownFootnote")}</p>
+        </RailSection>
+      ) : null}
+
+      {result.liquidation ? (
+        <RailSection title={t("audit.liquidationBasis")}>
+          <AuditRow label={t("audit.adjustedBasis")} value={formatCurrency(result.liquidation.adjustedTaxBasis)} />
+          <AuditRow label={t("audit.netRealized")} value={formatCurrency(result.liquidation.netAmountRealized)} />
+          <AuditRow label={t("audit.realizedGainLoss")} value={formatCurrency(result.liquidation.realizedGainLoss)} tone={result.liquidation.realizedGainLoss >= 0 ? "positive" : "negative"} />
+          <AuditRow label={t("audit.taxableGain")} value={formatCurrency(result.liquidation.taxableGain)} />
+          <AuditRow label={t("audit.capitalGainsTax")} value={formatCurrency(result.liquidation.capitalGainsTax)} tone="negative" />
+          <p className={styles.railFootnote}>{t("audit.liquidationBasisFootnote")}</p>
+        </RailSection>
+      ) : null}
 
       <RailSection title={t("audit.risk")}>
         <div className={styles.riskValue}><span>{t("result.maxDrawdown")}</span><strong>{formatPercent(result.maxDrawdown.percent)}</strong></div>
@@ -1193,6 +1245,32 @@ function FeeEditor({
   );
 }
 
+function BrokerScenarioDisclosure({ fees }: { fees: FeeConfig }) {
+  const { t } = useLanguage();
+  return (
+    <div className={styles.scenarioDisclosure}>
+      <p>{t("broker.readOnlyScenario")}</p>
+      <p>{t("broker.scenarioGrain")}</p>
+      <dl className={styles.scenarioMeta}>
+        <div><dt>{t("broker.effective")}</dt><dd>{fees.effectiveDate}</dd></div>
+        <div><dt>{t("broker.checkedLabel")}</dt><dd>{fees.checkedDate}</dd></div>
+      </dl>
+      {fees.sources.length > 0 ? (
+        <div className={styles.scenarioSources}>
+          <span>{t("broker.sources")}</span>
+          <ul>
+            {fees.sources.map((source) => (
+              <li key={source.url}>
+                <a href={source.url} target="_blank" rel="noreferrer noopener">{source.label}</a>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function Field({
   label,
   htmlFor,
@@ -1363,6 +1441,8 @@ function validatePortfolio(input: PortfolioInput, t: Translate): { summary?: str
   }
   if (!isValidDateString(input.endDate)) {
     fields.endDate = t("validation.endDate");
+  } else if (input.endDate > todayDateString()) {
+    fields.endDate = t("validation.futureDisabled");
   }
   if (!fields.startDate && !fields.endDate && input.startDate > input.endDate) {
     fields.startDate = t("validation.startBeforeEnd");
@@ -1450,6 +1530,53 @@ function labelScenario(mode: Exclude<ResultMode, "historical">, t: Translate) {
   if (mode === "conservative") return t("result.conservative");
   if (mode === "optimistic") return t("result.optimistic");
   return t("result.baseline");
+}
+
+function transactionActionLabel(type: string, t: Translate) {
+  if (type === "contribution-buy") return t("result.buy");
+  if (type === "dividend-reinvestment") return t("result.dividendReinvest");
+  if (type === "portfolio-tax-adjustment") return t("result.portfolioTax");
+  return t("result.liquidate");
+}
+
+function twrAnnualizedLabel(twr: TimeWeightedReturn, t: Translate): string {
+  if (!twr.annualizationEligible || twr.annualized === undefined) {
+    return t("result.notAnnualizedUnderYear");
+  }
+  return formatPercent(twr.annualized * 100);
+}
+
+function mwrrLabel(mwrr: MoneyWeightedReturn, t: Translate): string {
+  if (mwrr.status === "available" && mwrr.annualizedRate !== undefined) {
+    return formatPercent(mwrr.annualizedRate * 100);
+  }
+  if (mwrr.status === "no-external-flows") return t("result.mwrrNoFlows");
+  if (mwrr.status === "not-converged") return t("result.mwrrNotConverged");
+  return t("result.mwrrNoSolution");
+}
+
+const feeComponentKeys: Record<FeeComponentKind, TranslationKey> = {
+  commission: "fee.component.commission",
+  platform: "fee.component.platform",
+  settlement: "fee.component.settlement",
+  "sec-31": "fee.component.sec31",
+  "finra-taf": "fee.component.finraTaf",
+  cat: "fee.component.cat",
+  custom: "fee.component.custom",
+};
+
+function feeComponentLabel(kind: FeeComponentKind, t: Translate) {
+  return t(feeComponentKeys[kind]);
+}
+
+function coverageLabel(
+  coverage: "cross-checked" | "not-requested" | "none-reported" | "demo",
+  t: Translate,
+) {
+  if (coverage === "cross-checked") return t("audit.coverageChecked");
+  if (coverage === "none-reported") return t("audit.coverageNoneReported");
+  if (coverage === "demo") return t("audit.syntheticDemo");
+  return t("audit.coverageNotRequested");
 }
 
 function formatLocalizedDuration(days: number, t: Translate) {

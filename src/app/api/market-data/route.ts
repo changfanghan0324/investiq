@@ -1,31 +1,29 @@
 import {
-  getClientIdentifier,
+  MAX_MARKET_DATA_RESPONSE_BYTES,
+  boundedJsonResponse,
   jsonResponse,
   readJsonBody,
   routeErrorResponse,
-  withinRateLimit,
 } from '@/server/errors';
-import {
-  isMarketDataConfigured,
-  loadMarketData,
-  validateMarketDataOptions,
-} from '@/server/market-data';
+import { enforceRateLimit } from '@/server/rate-limit';
+import { loadMarketData, validateMarketDataOptions } from '@/server/market-data';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request): Promise<Response> {
-  if (!withinRateLimit('market-data', getClientIdentifier(request), 60)) {
-    return jsonResponse({ message: 'Too many requests.' }, 429);
-  }
-  if (!isMarketDataConfigured()) {
-    console.error('Market-data request rejected: MASSIVE_API_KEY is not configured.');
-    return jsonResponse({ message: 'Market data is temporarily unavailable.' }, 503);
+  const limit = await enforceRateLimit('market-data', request);
+  if (!limit.ok) {
+    return jsonResponse({ message: limit.message }, limit.status);
   }
 
+  // Provider configuration is enforced per purpose inside loadMarketData: DCA
+  // requires Massive, price-only analysis does not. Validation of the request
+  // (including its mode) therefore happens first.
   try {
     const options = validateMarketDataOptions(await readJsonBody(request));
-    return jsonResponse(await loadMarketData(options));
+    const data = await loadMarketData(options);
+    return boundedJsonResponse(data, MAX_MARKET_DATA_RESPONSE_BYTES);
   } catch (error) {
     return routeErrorResponse(
       error,

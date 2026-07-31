@@ -28,9 +28,12 @@ import {
   cumulativePriceReturns,
   dailyCloseReturns,
   maxCloseDrawdown,
+  resolveReturnBasis,
+  riskSampleStatus,
+  toReturnBasisBars,
   validatePriceSeries,
 } from '@/domain/analytics';
-import type { DatedValue, MaxDrawdownResult } from '@/domain/analytics';
+import type { DatedValue, MaxDrawdownResult, ReturnBasis, RiskSampleStatus } from '@/domain/analytics';
 import type { DateString, MarketData, PriceBar } from '@/types/backtest';
 import { daysBetween } from '@/utils/date';
 
@@ -55,7 +58,8 @@ export interface SuppliedSeries {
   /** Instrument type as the data source classified it, for example `CS` or `ETF`. */
   type: string;
   currency: string;
-  source: 'hybrid' | 'demo';
+  /** Honest provider attribution copied from the loaded data: `yahoo`, `hybrid`, or `demo`. */
+  source: 'yahoo' | 'hybrid' | 'demo';
   /** Bars the caller supplied, not bars used. */
   suppliedBars: number;
   suppliedFirstDate: DateString;
@@ -70,12 +74,14 @@ export interface ComparedSecurity extends SuppliedSeries {
   firstClose: number;
   /** Close on the last common date. */
   lastClose: number;
-  /** Cumulative price return rebased to 0 on the first common date. */
+  /** Cumulative return rebased to 0 on the first common date, on the comparison's `returnBasis`. */
   cumulativeReturns: DatedValue[];
-  /** Close-to-close returns between consecutive common dates; n sessions yield n-1 points. */
+  /** Close-to-close returns between consecutive common dates on `returnBasis`; n sessions yield n-1 points. */
   dailyReturns: DatedValue[];
-  /** Price return across the whole common window. */
+  /** Price return (split-adjusted close) across the whole common window; always available. */
   totalPriceReturn: number;
+  /** Vendor-adjusted total return across the common window; present only with adjusted-close coverage. */
+  totalReturn?: number;
   /** Compound annual growth rate over the common window; undefined when no time elapsed. */
   cagr?: number;
   /** Annualized volatility of the aligned daily returns; 0 for a series that never moved. */
@@ -132,6 +138,8 @@ export interface CorrelationMatrix {
 /** Codes the view translates through `t()`; no user-visible prose is produced here. */
 export type ComparisonNoteCode =
   | 'price-return-only'
+  | 'total-return-basis'
+  | 'limited-sample'
   | 'not-investment-advice'
   | 'common-window-shortened'
   | 'benchmark-unavailable'
@@ -174,8 +182,16 @@ export interface StockComparisonViewModel {
   narrative: ComparisonNarrative;
   /** Echoed so the view can state which risk-free rate the Sharpe ratios used. */
   annualRiskFreeRate: number;
-  /** Always true: every figure here is a price return. */
-  excludesDividends: true;
+  /**
+   * The single basis every risk figure and the correlation matrix use: `total` only
+   * when every compared security (and the benchmark, if any) has complete adjusted-close
+   * coverage; otherwise `price` so nothing mixes bases.
+   */
+  returnBasis: ReturnBasis;
+  /** Observation count of the common window and whether the risk sample is sufficient/limited. */
+  riskSample: RiskSampleStatus;
+  /** True when `returnBasis` is `price`, so dividends are excluded from every figure. */
+  excludesDividends: boolean;
 }
 
 export interface StockComparisonRequest {
@@ -200,6 +216,13 @@ export function buildStockComparison(request: StockComparisonRequest): StockComp
   validateRiskFreeRate(annualRiskFreeRate);
 
   const supplied = normalizeSecurities(securities);
+  // One basis for the whole comparison: total return only when every security and the
+  // benchmark all have complete adjusted-close coverage.
+  const returnBasis = resolveReturnBasis([
+    ...supplied.map((entry) => entry.data.provenance.totalReturnCoverage),
+    ...(benchmark ? [benchmark.provenance.totalReturnCoverage] : []),
+  ]);
+
   const commonDates = commonTradingDates(supplied.map((entry) => entry.data.prices));
   if (commonDates.length < MIN_COMMON_CLOSES) {
     throw new AnalyticsError(
@@ -211,13 +234,14 @@ export function buildStockComparison(request: StockComparisonRequest): StockComp
   const commonDateSet = new Set(commonDates);
   const alignedBars = supplied.map((entry) => entry.data.prices.filter((bar) => commonDateSet.has(bar.date)));
 
-  const benchmarkContext = benchmark && buildBenchmarkContext(benchmark, commonDates);
+  const benchmarkContext = benchmark && buildBenchmarkContext(benchmark, commonDates, returnBasis);
 
   const compared = supplied.map((entry, index) =>
-    measureSecurity(entry, alignedBars[index], annualRiskFreeRate, benchmarkContext),
+    measureSecurity(entry, alignedBars[index], annualRiskFreeRate, returnBasis, benchmarkContext),
   );
   const commonWindow = describeCommonWindow(compared, commonDates);
   const benchmarkSummary = benchmarkContext?.summary;
+  const riskSample = riskSampleStatus(Math.max(0, commonWindow.sessions - 1));
 
   return {
     securities: compared,
@@ -226,9 +250,11 @@ export function buildStockComparison(request: StockComparisonRequest): StockComp
       compared.map((security) => ({ symbol: security.symbol, returns: security.dailyReturns })),
     ),
     benchmark: benchmarkSummary,
-    narrative: describeComparison(compared, commonWindow, benchmarkSummary),
+    narrative: describeComparison(compared, commonWindow, benchmarkSummary, returnBasis, riskSample),
     annualRiskFreeRate,
-    excludesDividends: true,
+    returnBasis,
+    riskSample,
+    excludesDividends: returnBasis === 'price',
   };
 }
 
@@ -289,11 +315,17 @@ export function describeComparison(
   securities: ComparedSecurity[],
   commonWindow: CommonWindow,
   benchmark?: ComparisonBenchmark,
+  returnBasis: ReturnBasis = 'price',
+  riskSample?: RiskSampleStatus,
 ): ComparisonNarrative {
   const highestCagr = findExtreme(securities, (security) => security.cagr, 'highest');
   const lowestVolatility = findExtreme(securities, (security) => security.volatility, 'lowest');
 
-  const notes: ComparisonNoteCode[] = ['price-return-only', 'not-investment-advice'];
+  const notes: ComparisonNoteCode[] = [
+    returnBasis === 'total' ? 'total-return-basis' : 'price-return-only',
+    'not-investment-advice',
+  ];
+  if (riskSample?.limited) notes.push('limited-sample');
   if (securities.some((security) => security.suppliedBars > commonWindow.sessions)) {
     notes.push('common-window-shortened');
   }
@@ -363,6 +395,7 @@ function measureSecurity(
   entry: NormalizedSecurity,
   aligned: PriceBar[],
   annualRiskFreeRate: number,
+  basis: ReturnBasis,
   benchmarkContext?: BenchmarkContext,
 ): ComparedSecurity {
   const { symbol, data } = entry;
@@ -370,7 +403,14 @@ function measureSecurity(
   const suppliedLast = data.prices[data.prices.length - 1];
   const first = aligned[0];
   const last = aligned[aligned.length - 1];
-  const dailyReturns = dailyCloseReturns(aligned);
+  const basisBars = toReturnBasisBars(aligned, basis);
+  const dailyReturns = dailyCloseReturns(basisBars);
+  const totalReturn =
+    data.provenance.totalReturnCoverage === 'yahoo-adjusted-close' &&
+    first.adjustedClose !== undefined &&
+    last.adjustedClose !== undefined
+      ? last.adjustedClose / first.adjustedClose - 1
+      : undefined;
 
   return {
     symbol,
@@ -384,29 +424,34 @@ function measureSecurity(
     sessions: aligned.length,
     firstClose: first.close,
     lastClose: last.close,
-    cumulativeReturns: cumulativePriceReturns(aligned),
+    cumulativeReturns: cumulativePriceReturns(basisBars),
     dailyReturns,
     totalPriceReturn: last.close / first.close - 1,
-    cagr: compoundAnnualGrowthRate(aligned),
+    totalReturn,
+    cagr: compoundAnnualGrowthRate(basisBars),
     volatility: annualizedVolatility(dailyReturns),
     sharpeRatio: annualizedSharpeRatio(dailyReturns, annualRiskFreeRate),
-    maxDrawdown: maxCloseDrawdown(aligned),
-    beta: benchmarkContext && measureBeta(aligned, benchmarkContext),
+    maxDrawdown: maxCloseDrawdown(basisBars),
+    beta: benchmarkContext && measureBeta(basisBars, benchmarkContext),
   };
 }
 
 /**
  * Beta from the common dates the benchmark also traded. Both legs are rebuilt on that same date
- * set, so a session the benchmark missed never leaves the security's return spanning two days
- * against the benchmark's one.
+ * set and the same return basis, so a session the benchmark missed never leaves the security's
+ * return spanning two days against the benchmark's one, and the bases never mix.
  */
-function measureBeta(aligned: PriceBar[], benchmarkContext: BenchmarkContext): number | undefined {
-  const overlapping = aligned.filter((bar) => benchmarkContext.dates.has(bar.date));
+function measureBeta(basisBars: PriceBar[], benchmarkContext: BenchmarkContext): number | undefined {
+  const overlapping = basisBars.filter((bar) => benchmarkContext.dates.has(bar.date));
   if (overlapping.length < 2) return undefined;
   return beta(dailyCloseReturns(overlapping), benchmarkContext.returns);
 }
 
-function buildBenchmarkContext(benchmark: MarketData, commonDates: DateString[]): BenchmarkContext {
+function buildBenchmarkContext(
+  benchmark: MarketData,
+  commonDates: DateString[],
+  basis: ReturnBasis,
+): BenchmarkContext {
   const symbol = benchmark.ticker.trim().toUpperCase();
   if (benchmark.prices.length === 0) {
     throw new AnalyticsError(`Benchmark ${symbol} has no price history to compare against.`);
@@ -416,7 +461,10 @@ function buildBenchmarkContext(benchmark: MarketData, commonDates: DateString[])
   const benchmarkDates = new Set(benchmark.prices.map((bar) => bar.date));
   const overlappingDates = commonDates.filter((date) => benchmarkDates.has(date));
   const overlappingSet = new Set(overlappingDates);
-  const overlappingBars = benchmark.prices.filter((bar) => overlappingSet.has(bar.date));
+  const overlappingBars = toReturnBasisBars(
+    benchmark.prices.filter((bar) => overlappingSet.has(bar.date)),
+    basis,
+  );
 
   return {
     summary: {

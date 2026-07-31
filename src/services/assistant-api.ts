@@ -2,9 +2,11 @@
 
 import type {
   BacktestResult,
+  MoneyWeightedReturn,
   PortfolioAggregateResult,
   PortfolioReport,
   ProjectionScenarioId,
+  TimeWeightedReturn,
 } from '@/types/backtest';
 
 export interface AssistantMessage {
@@ -97,10 +99,47 @@ export function buildAssistantSummary(
       liquidateAtEnd: report.input.liquidateAtEnd,
       capitalGainsTaxRate: report.input.capitalGainsTaxRate,
       broker: report.input.fees.brokerName,
+      brokerFeeModel:
+        report.input.fees.kind === 'custom'
+          ? 'custom user-entered fees; no hidden regulatory charges'
+          : 'dated, source-backed fee scenario applying the current schedule to every modeled order (not reconstructed history); one order treated as one execution',
+      brokerFeeEffectiveDate: report.input.fees.effectiveDate,
+      brokerFeeCheckedDate: report.input.fees.checkedDate,
       purchasePriceRule: 'split-adjusted daily high',
+      dividendReinvestmentRule: 'payment-date reinvestment at that day\'s split-adjusted high',
       fractionalSharePrecision: 3,
     },
     dataSource: report.source,
+    dataQuality: {
+      priceProvider: report.provenance.priceProvider,
+      priceBasis: 'split-adjusted OHLC; dividends excluded from prices',
+      lastCompletedSession: report.provenance.lastCompletedSession,
+      fetchedAt: report.provenance.fetchedAt,
+      dividendCoverage: report.provenance.dividendCoverage,
+      splitCoverage: report.provenance.splitCoverage,
+      reorganizationCoverage: report.provenance.reorganizationCoverage,
+      limitation:
+        'An action absent from both data providers cannot be detected; not official, real-time, or licensed institutional data.',
+    },
+  };
+}
+
+function twrPayload(twr: TimeWeightedReturn) {
+  return {
+    cumulativePercent: twr.cumulative * 100,
+    annualizedPercent: twr.annualizationEligible && twr.annualized !== undefined ? twr.annualized * 100 : null,
+    annualizationEligible: twr.annualizationEligible,
+    durationDays: twr.durationDays,
+    note: 'Cash-flow-neutral time-weighted return; dividends, dividend tax, and fees are inside it. Annualized only after one calendar year.',
+  };
+}
+
+function mwrrPayload(mwrr: MoneyWeightedReturn) {
+  return {
+    status: mwrr.status,
+    annualizedPercent:
+      mwrr.status === 'available' && mwrr.annualizedRate !== undefined ? mwrr.annualizedRate * 100 : null,
+    note: 'Investor-experience money-weighted return (annualized XIRR) from dated contributions and the after-fee/after-tax terminal value.',
   };
 }
 
@@ -110,12 +149,29 @@ function aggregateSummary(result: PortfolioAggregateResult) {
     endingValue: result.finalAmount,
     contributions: result.totalContributions,
     totalProfit: result.totalProfit,
-    totalReturnPercent: result.totalReturnPercent,
+    netGainOnContributionsPercent: result.netGainRatioPercent,
+    netGainOnContributionsNote:
+      'A simple dollar-efficiency ratio (net gain ÷ contributions), not a performance return and not annualized. Use TWR and MWRR for performance.',
+    timeWeightedReturn: twrPayload(result.twr),
+    moneyWeightedReturn: mwrrPayload(result.mwrr),
     priceReturn: result.priceReturn,
     grossDividends: result.grossDividends,
     dividendTax: result.dividendTax,
     capitalGainsTax: result.capitalGainsTax,
+    capitalGainsTaxNote:
+      'Capital-gain tax nets gains and losses across holdings (IRS Topic 409) and is applied once at the portfolio level; per-holding figures defer it.',
+    acquisitionFees: result.acquisitionFees,
+    liquidationEstimate: result.liquidation
+      ? {
+          adjustedTaxBasis: result.liquidation.adjustedTaxBasis,
+          netAmountRealized: result.liquidation.netAmountRealized,
+          realizedGainLoss: result.liquidation.realizedGainLoss,
+          taxableGain: result.liquidation.taxableGain,
+          note: 'Simplified flat-rate estimate; portfolio gains and losses are netted before the single tax. Not lot-level tax accounting.',
+        }
+      : undefined,
     fees: result.totalFees,
+    feeComponents: result.feeComponents,
     maxDrawdownPercent: result.maxDrawdown.percent,
     maxDrawdownPeakDate: result.maxDrawdown.peakDate,
     maxDrawdownTroughDate: result.maxDrawdown.troughDate,
@@ -130,7 +186,9 @@ function holdingSummary(ticker: string, result: BacktestResult) {
     endingValue: result.finalAmount,
     contributions: result.totalContributions,
     totalProfit: result.totalProfit,
-    totalReturnPercent: result.totalReturnPercent,
+    netGainOnContributionsPercent: result.netGainRatioPercent,
+    timeWeightedReturn: twrPayload(result.twr),
+    moneyWeightedReturn: mwrrPayload(result.mwrr),
     finalShares: result.finalShares,
     priceReturn: result.priceReturn,
     grossDividends: result.grossDividends,

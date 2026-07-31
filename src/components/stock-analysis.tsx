@@ -64,7 +64,7 @@ const EXAMPLE_TICKER = "AAPL";
 const EXAMPLE_YEARS = 5;
 
 /** Default annual risk-free rate, in percent. Always shown and always editable. */
-const DEFAULT_RISK_FREE_PERCENT = "4.0";
+const DEFAULT_RISK_FREE_PERCENT = "0.0";
 
 /** Accepted range for the typed annual risk-free rate, in percent. */
 const RISK_FREE_PERCENT_LIMIT = 25;
@@ -246,6 +246,7 @@ async function loadSymbol(
         from: startDate,
         to: endDate,
         requiredStart: startDate,
+        mode: "analysis",
       }),
     };
   } catch (error) {
@@ -461,6 +462,10 @@ export function StockAnalysis() {
   const errorFor = (field: FieldKey) => errors.find((error) => error.field === field);
 
   const view = result?.view;
+  // Analysis mode never requests dividend history, so an empty dividend list is
+  // "not loaded", not a verified zero. Presenting it as "0 dividends paid" would be
+  // a false factual claim, so the count and list switch to an explicit not-loaded state.
+  const dividendsNotLoaded = result?.marketData.provenance.dividendCoverage === "not-requested";
 
   const priceData = useMemo(() => {
     if (!result) return [];
@@ -838,7 +843,15 @@ export function StockAnalysis() {
                   <dl className={styles.countRows}>
                     <div>
                       <dt>{t("stock.dividendCount")}</dt>
-                      <dd className={styles.mono}>{formatCount(view.dividendCount, locale)}</dd>
+                      <dd className={styles.mono}>
+                        {dividendsNotLoaded ? (
+                          <span className={styles.notAvailable}>
+                            —<span className={styles.visuallyHidden}>{t("stock.notAvailable")}</span>
+                          </span>
+                        ) : (
+                          formatCount(view.dividendCount, locale)
+                        )}
+                      </dd>
                     </div>
                     <div>
                       <dt>{t("stock.splitCount")}</dt>
@@ -846,13 +859,17 @@ export function StockAnalysis() {
                     </div>
                   </dl>
 
-                  <p className={styles.actionNote}>{t("stock.dividendsNotReinvested")}</p>
+                  {dividendsNotLoaded ? null : (
+                    <p className={styles.actionNote}>{t("stock.dividendsNotReinvested")}</p>
+                  )}
                   <p className={styles.actionNote}>{t("stock.splitsAdjusted")}</p>
 
                   <div className={styles.eventLists}>
                     <div>
                       <h3>{t("stock.recentDividends")}</h3>
-                      {events.dividends.length > 0 ? (
+                      {dividendsNotLoaded ? (
+                        <p className={styles.emptyState}>{t("stock.dividendsNotLoaded")}</p>
+                      ) : events.dividends.length > 0 ? (
                         <>
                           <ul className={styles.eventList}>
                             {events.dividends.map((event) => (
@@ -919,6 +936,21 @@ export function StockAnalysis() {
 
                   <dl className={styles.metricRows}>
                     <MetricRow
+                      label={t("stock.priceReturnLabel")}
+                      value={formatSignedRate(view.priceReturn, locale)}
+                      tone={view.priceReturn < 0 ? "negative" : "positive"}
+                      t={t}
+                    />
+                    {view.totalReturn !== undefined ? (
+                      <MetricRow
+                        label={t("stock.totalReturnLabel")}
+                        value={formatSignedRate(view.totalReturn, locale)}
+                        tone={view.totalReturn < 0 ? "negative" : "positive"}
+                        detail={t("stock.totalReturnDetail")}
+                        t={t}
+                      />
+                    ) : null}
+                    <MetricRow
                       label={t("stock.annualizedPriceReturn")}
                       value={view.cagr === undefined ? undefined : formatSignedRate(view.cagr, locale)}
                       tone={view.cagr === undefined ? undefined : view.cagr < 0 ? "negative" : "positive"}
@@ -962,6 +994,16 @@ export function StockAnalysis() {
                     />
                   </dl>
 
+                  <p className={styles.footnote}>
+                    {t(view.returnBasis === "total" ? "stock.basisTotal" : "stock.basisPrice")}
+                  </p>
+                  <p className={styles.footnote}>
+                    {!view.riskSample.sufficient
+                      ? t("stock.riskSampleInsufficient", { count: view.riskSample.observations })
+                      : view.riskSample.limited
+                        ? t("stock.riskSampleLimited", { count: view.riskSample.observations })
+                        : t("stock.riskSampleOk", { count: view.riskSample.observations })}
+                  </p>
                   <p className={styles.footnote}>{t("stock.dashMeaning")}</p>
                   <p className={styles.footnote}>
                     {t("stock.fetchedAt", { time: formatTimestamp(new Date(result.marketData.fetchedAt), locale) })}

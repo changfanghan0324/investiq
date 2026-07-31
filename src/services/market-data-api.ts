@@ -1,6 +1,6 @@
 // Purpose: Loads validated market data from the same-origin Next.js API without exposing vendor credentials.
 
-import type { DateString, MarketData } from '@/types/backtest';
+import type { DateString, MarketData, MarketDataMode } from '@/types/backtest';
 
 export class MarketDataError extends Error {
   constructor(message: string) {
@@ -14,11 +14,14 @@ export async function loadMarketData(options: {
   from: DateString;
   to: DateString;
   requiredStart: DateString;
+  mode: MarketDataMode;
 }): Promise<MarketData> {
   const controller = new AbortController();
-  // The server may deliberately back off when a free provider rate limit is
-  // reached. Keep the browser request alive long enough for that safe retry.
-  const timeout = setTimeout(() => controller.abort(), 150_000);
+  // The server issues its provider calls sequentially, each with a 30s timeout
+  // (chart, then — for DCA — dividends and any split verification). It no longer
+  // retries on a provider rate limit. A 60s ceiling comfortably covers that
+  // worst-case path while still failing fast on a genuinely stuck request.
+  const timeout = setTimeout(() => controller.abort(), 60_000);
 
   try {
     const response = await fetch('/api/market-data', {
@@ -75,6 +78,20 @@ function isMarketData(value: unknown): value is MarketData {
     candidate.prices.length > 0 &&
     Array.isArray(candidate.dividends) &&
     Array.isArray(candidate.splits) &&
-    Array.isArray(candidate.tickerChanges)
+    Array.isArray(candidate.tickerChanges) &&
+    isProvenance(candidate.provenance)
+  );
+}
+
+function isProvenance(value: unknown): value is MarketData['provenance'] {
+  if (!value || typeof value !== 'object') return false;
+  const candidate = value as Partial<MarketData['provenance']>;
+  return (
+    typeof candidate.priceProvider === 'string' &&
+    typeof candidate.priceBasis === 'string' &&
+    typeof candidate.fetchedAt === 'string' &&
+    typeof candidate.dividendCoverage === 'string' &&
+    typeof candidate.totalReturnCoverage === 'string' &&
+    typeof candidate.splitCoverage === 'string'
   );
 }
