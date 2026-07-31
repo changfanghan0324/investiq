@@ -186,7 +186,7 @@ describe('evaluateRateLimit — production', () => {
       }),
     );
     assert.deepEqual(outcome, { ok: true });
-    assert.equal(seenRuleId, 'investiq-market-data');
+    assert.equal(seenRuleId, 'investiq-provider-backed-api');
   });
 });
 

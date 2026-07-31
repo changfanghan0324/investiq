@@ -767,13 +767,13 @@ Create one Firewall custom rule in the Vercel dashboard (Project → **Firewall*
 | Setting | Value |
 | --- | --- |
 | Rule name | `investiq-provider-backed-api` |
-| Condition | Rate Limit API ID matches regex `^investiq-(assistant\|market-data\|fundamentals)$` |
+| Condition | Rate Limit API ID equals `investiq-provider-backed-api` |
 | Rate limit | 60 requests per 60 seconds, fixed window |
 | Key | Client IP |
 | Exceeded action | Rate limit (429) |
 
-The three stable SDK IDs are defined in `src/server/rate-limit.ts` (`RATE_LIMIT_RULE_IDS`) and all
-match the single edge rule. This shared bucket is intentionally coarser than the route-specific
+The shared stable SDK ID is defined in `src/server/rate-limit.ts` (`RATE_LIMIT_RULE_IDS`) and all
+three routes call the same edge rule. This shared bucket is intentionally coarser than the route-specific
 non-production fallback budgets; it fits the Vercel plan while preserving a real cross-instance
 production boundary. If the rule or condition is missing, the SDK returns an error and production
 **fails closed** with a neutral `503` rather than allowing unmetered traffic. The default per-IP

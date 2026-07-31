@@ -13,8 +13,8 @@
 // production and does not, on its own, protect a real deployment.
 //
 // External setup required before production traffic is trusted (see README):
-//   1. Publish one WAF rule whose Rate Limit API ID condition matches every
-//      stable ID below: ^investiq-(assistant|market-data|fundamentals)$.
+//   1. Publish one WAF rule whose Rate Limit API ID is exactly the shared
+//      stable ID below: investiq-provider-backed-api.
 //      The production rule is one shared 60-request / 60-second per-IP bucket,
 //      a free-plan-compatible edge abuse boundary rather than three independent
 //      route quotas.
@@ -43,9 +43,9 @@ export interface RateLimitOutcome {
  * unmetered traffic.
  */
 export const RATE_LIMIT_RULE_IDS: Record<RateLimitKind, string> = {
-  assistant: 'investiq-assistant',
-  'market-data': 'investiq-market-data',
-  fundamentals: 'investiq-fundamentals',
+  assistant: 'investiq-provider-backed-api',
+  'market-data': 'investiq-provider-backed-api',
+  fundamentals: 'investiq-provider-backed-api',
 };
 
 /** Route-specific budgets for the non-production in-process fallback only. */
