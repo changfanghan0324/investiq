@@ -190,9 +190,11 @@ These hold across Market Context, Company price-risk context, Stock Comparison, 
 - Annual eligibility: 10-K, 10-K/A, or 20-F with `fp=FY`; flow facts must span 350–380 days.
 - Facts are grouped by the economic period they describe. The displayed fiscal year comes from the
   period end. The latest filed/restated observation wins; alias precedence is explicit and tested.
-- Revenue, net income, operating income, diluted EPS, operating cash flow, capital expenditure, and
-  share counts are direct standardized facts. Operating margin and FCF are constructed only from
-  components sharing the same annual period.
+- Revenue, net income, operating income, diluted EPS, operating cash flow, capital expenditure,
+  D&A, current debt, noncurrent debt, cash equivalents, and share counts are direct standardized
+  facts. Operating margin, FCF, EBITDA, total debt, and net debt are constructed only from components
+  sharing the same annual period or balance-sheet date. Missing current or noncurrent debt makes net
+  debt unavailable; an absent line is never treated as zero.
 - Missing facts stay unavailable. Sector/GICS, gross margin, ROIC, balance-sheet ratios, turnover,
   and cash conversion are not guessed. SEC SIC 6000–6999 activates a financial-issuer capability
   gate for manufacturing-style metrics.
@@ -204,6 +206,11 @@ These hold across Market Context, Company price-risk context, Stock Comparison, 
   automatic tax benefit because the model does not track NOLs or deferred tax assets.
 - Terminal value uses Gordon growth at the end of the final forecast year; `WACC > terminal growth`
   is a hard gate. EV bridges to equity through explicit net debt and diluted shares.
+- Blank net debt is rejected rather than coerced to zero. SEC-sourced net debt is prefilled only when
+  current debt, noncurrent debt, and cash align; otherwise the user must supply and own the assumption.
+  Diluted weighted-average shares are required—period-end shares are not substituted.
+- Historical starter values use medians only with sufficient aligned annual coverage. Comparable
+  EV/EBITDA uses SEC-derived EBITDA, never a D&A forecast assumption mixed into a historical metric.
 - No internal rounding. Market price never enters DCF math; the dated market comparison is separate.
 - Bear/base/bull ranges and WACC×g plus growth×margin grids rerun the complete model. They are
   assumption scenarios, never called fair value, price targets, predictions, or guarantees.
