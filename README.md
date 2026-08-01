@@ -1,5 +1,7 @@
 # InvestIQ — Investment Research & Portfolio Analytics
 
+[![CI](https://github.com/changfanghan0324/investiq/actions/workflows/ci.yml/badge.svg)](https://github.com/changfanghan0324/investiq/actions/workflows/ci.yml)
+
 InvestIQ is an evidence-first research platform for finance students, aspiring equity-research
 analysts, asset-management interns, and self-directed investors studying US-listed companies and
 ETFs. Its primary workflow is **company fundamentals → scenario valuation → portfolio risk →
