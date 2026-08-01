@@ -84,8 +84,8 @@ Constraints enforced in `src/domain/risk-context.ts` and locked by `src/domain/r
 
 ## Architecture
 
-The current MVP intentionally remains one Next.js deployment. A Python/FastAPI/PostgreSQL service is
-deferred until cross-user persistence or analytics workloads justify its operating cost.
+The application remains one Next.js deployment with a server-only Neon Postgres persistence
+foundation. Python/FastAPI is deferred until optimization or ETL workloads justify a second service.
 
 ```text
 Browser UI (research, company, comparison, portfolio, tools)
@@ -98,6 +98,8 @@ Browser UI (research, company, comparison, portfolio, tools)
   ├─ browser-local valuation/memo notes; PDF/print and CSV generation
   ├─ same-origin POST /api/assistant
   │    └─ Google Gemini: compact, report-grounded explanation
+  ├─ server-only Drizzle adapter → Neon pooled PostgreSQL
+  │    └─ identities, portfolios, immutable analysis/valuation receipts, peers, memos, audit log
   └─ GET /api/health → readiness only, never key values
 ```
 
@@ -113,8 +115,12 @@ Browser UI (research, company, comparison, portfolio, tools)
   and request timeouts, and return neutral 5xx messages (`src/server/errors.ts`,
   `src/server/rate-limit.ts`). Provider responses and the serialized route response are also byte-bounded.
 - `/api/health` reports an overall `ready`, `degraded`, or `unavailable` alongside separate
-  `priceAnalysis`, `dca`, and `assistant` readiness, and nothing else. A missing Massive key degrades
-  `dca` alone; price analysis stays ready, so it never forces an overall `503`.
+  `priceAnalysis`, `dca`, `assistant`, and `database` readiness, and nothing else. A missing Massive
+  key degrades `dca` alone; price analysis stays ready, so it never forces an overall `503`.
+- The database migration contract lives in `drizzle/`. Snapshot, source, and audit rows are
+  append-only at the database layer; cross-owner snapshot, memo, peer, and portfolio writes are
+  rejected by PostgreSQL triggers. No authenticated cloud-save UI is enabled until Auth.js has a
+  real provider configuration.
 
 ### Sequential loading
 
@@ -457,6 +463,7 @@ estimates and can never be merged with historical backtests or described as pred
 - npm
 - A Massive API key for live market data
 - A Google Gemini API key if the AI report explainer is required
+- A Neon database only when testing persistence or migrations
 
 ### Install and configure
 
@@ -471,6 +478,8 @@ cp .env.example .env.local
 
 | Variable | Required | Purpose |
 | --- | --- | --- |
+| `DATABASE_URL` | Persistence | Neon pooled connection used only by server-side application queries. Vercel's Neon integration supplies it. |
+| `DATABASE_URL_UNPOOLED` | Migrations | Neon direct connection. `npm run db:migrate` fails closed when it is absent. |
 | `MASSIVE_API_KEY` | Yes, for live data | Ordinary dividend history and corporate-action (split) verification. |
 | `GEMINI_API_KEY` | Optional | The report-grounded AI explainer. Calculations, charts, CSV, and PDF export all work without it. |
 | `MARKET_DATA_PUBLIC_DISPLAY_LICENSE_CONFIRMED` | Production, for live data | Server-only acknowledgement that written public-display **and** derived-analytics rights are held for **every** source. Without it, public production serves demo only. The flag grants no rights (see [Production licensing gate](#production-licensing-gate)). |
@@ -498,7 +507,15 @@ npm run test       # vitest run
 npm run build      # production Next.js build
 npm run dev        # development server
 npm run start      # serve a completed production build
+npm run db:generate # generate a reviewed migration from src/db/schema.ts
+npm run db:check    # validate Drizzle's migration journal
+npm run db:migrate # apply committed migrations; requires DATABASE_URL_UNPOOLED
 ```
+
+Application queries use the pooled URL; migrations use the direct URL. Never run a raw migration
+file by hand or edit Drizzle's journal. The custom governance migrations contain triggers that are
+tracked by the migration journal even though Drizzle's schema diff does not introspect trigger
+bodies. Apply every migration through `npm run db:migrate` exactly once per database/branch.
 
 Test suites, all deterministic and network-free:
 
@@ -515,6 +532,7 @@ Test suites, all deterministic and network-free:
 | `src/domain/stock-comparison.test.ts` | Two-to-five alignment, risk table, correlation matrix, neutral narrative, CSV contents. |
 | `src/server/market-data.test.ts` | Supported split classification and fail-closed reorganization detection, with no network. |
 | `src/services/create-portfolio-report.test.ts` | Sequential holding load and aggregate report assembly. |
+| `src/server/database-health.test.ts` | Database configuration, success, failure, and timeout health states without a network. |
 
 Before release, also verify manually: live-data success and failure states, all chart modes,
 desktop and mobile layouts from 320px, reduced-motion behavior, both languages at every text size,
@@ -627,6 +645,8 @@ exists in both languages, and it is deliberately kept out of the primary navigat
 | `vitest.config.ts` | Vitest runtime and matching source alias. |
 | `eslint.config.mjs` | Next.js Core Web Vitals and TypeScript lint configuration. |
 | `vercel.json` | Pins the Vercel framework preset to Next.js. |
+| `drizzle.config.ts` / `drizzle.migrate.config.ts` | Schema generation config and fail-closed direct-connection migration config. |
+| `drizzle/` | Ordered SQL migrations, Drizzle snapshots, and append-only/ownership governance triggers. |
 | `next-env.d.ts` | Next.js-generated type declarations; do not edit manually. |
 | `design/investiq/*.png` | Current reference visual concepts, one per workspace plus mobile DCA. |
 | `design/stock-lens-web-concept.png`, `design/stock-lens-web-concept-v2.png` | **Legacy design references.** Visual direction from Stock Lens, the single-workspace DCA tool InvestIQ grew out of. Retained for design history only; they do not describe the current product. |
@@ -690,6 +710,8 @@ exists in both languages, and it is deliberately kept out of the primary navigat
 | `src/server/assistant.ts` | Server-only Gemini integration, report-bound guardrails, payload limits, provider error translation. |
 | `src/server/errors.ts` | Incremental request/response byte limits, size-bounded JSON responses, and safe public/server error separation. |
 | `src/server/rate-limit.ts` | Per-client/per-region abuse rate limiting via Vercel WAF (`@vercel/firewall`) with production fail-closed semantics and a non-production in-process fallback. This is not a deployment-wide provider-call quota limiter — that durable shared limiter is still absent and is required before licensed public live mode. |
+| `src/server/db.ts`, `src/db/schema.ts` | Server-only Neon/Drizzle adapter and the typed 16-table persistence schema. |
+| `src/server/database-health.ts` | Deduplicated, timeout-bounded Neon readiness check with no credential disclosure. |
 | `src/services/market-data-api.ts` | Browser client for the same-origin market-data endpoint, with response validation and timeouts. |
 | `src/services/assistant-api.ts` | Builds the compact report summary and calls the same-origin assistant endpoint. |
 | `src/services/create-report.ts` | Coordinates live/demo loading, historical boundaries, and optional holding-level simulations. |
