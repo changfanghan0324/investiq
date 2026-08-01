@@ -220,6 +220,18 @@ const METRIC_LABEL_KEYS: Record<FundamentalsMetricKey, TranslationKey> = {
   freeCashFlow: "company.metricFreeCashFlow",
   ebitda: "company.metricEbitda",
   netDebt: "company.metricNetDebt",
+  grossProfit: "company.metricGrossProfit",
+  costOfRevenue: "company.metricCostOfRevenue",
+  incomeTaxExpense: "company.metricIncomeTaxExpense",
+  pretaxIncome: "company.metricPretaxIncome",
+  totalAssets: "company.metricTotalAssets",
+  currentAssets: "company.metricCurrentAssets",
+  currentLiabilities: "company.metricCurrentLiabilities",
+  stockholdersEquity: "company.metricStockholdersEquity",
+  inventoryNet: "company.metricInventoryNet",
+  accountsReceivableNetCurrent: "company.metricAccountsReceivable",
+  accountsPayableCurrent: "company.metricAccountsPayable",
+  interestExpense: "company.metricInterestExpense",
 };
 function labelMetric(value: FundamentalsMetricKey, t: Translate) { return t(METRIC_LABEL_KEYS[value]); }
 function basisLabel(value: FundamentalsMetricKey, t: Translate) {

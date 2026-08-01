@@ -190,14 +190,19 @@ These hold across Market Context, Company price-risk context, Stock Comparison, 
 - Annual eligibility: 10-K, 10-K/A, or 20-F with `fp=FY`; flow facts must span 350–380 days.
 - Facts are grouped by the economic period they describe. The displayed fiscal year comes from the
   period end. The latest filed/restated observation wins; alias precedence is explicit and tested.
-- Revenue, net income, operating income, diluted EPS, operating cash flow, capital expenditure,
-  D&A, current debt, noncurrent debt, cash equivalents, and share counts are direct standardized
-  facts. Operating margin, FCF, EBITDA, total debt, and net debt are constructed only from components
-  sharing the same annual period or balance-sheet date. Missing current or noncurrent debt makes net
-  debt unavailable; an absent line is never treated as zero.
-- Missing facts stay unavailable. Sector/GICS, gross margin, ROIC, balance-sheet ratios, turnover,
-  and cash conversion are not guessed. SEC SIC 6000–6999 activates a financial-issuer capability
-  gate for manufacturing-style metrics.
+- Revenue, income, cash-flow, debt, assets, equity, liquidity, inventory, receivable, payable, tax,
+  interest, and share-count inputs are direct standardized facts. Operating margin, FCF, EBITDA,
+  total debt, net debt, and fourteen financial ratios are constructed only from components sharing
+  the same annual period or balance-sheet date. Missing current or noncurrent debt makes net debt
+  unavailable; an absent line is never treated as zero.
+- ROE, ROA, ROIC, asset turnover, inventory turnover, receivables turnover, and cash conversion use
+  consecutive year-end average balances. Gross/net margin, leverage, liquidity, interest coverage,
+  and net-debt/EBITDA enforce positive-denominator and coverage gates. Quick ratio requires an
+  explicit inventory fact and cash conversion requires every DIO/DSO/DPO leg. Missing inputs stay
+  unavailable rather than being zero-filled.
+- SEC SIC 6000–6999 activates a financial-issuer gate for revenue-margin, conventional debt,
+  liquidity, interest-coverage, and manufacturing-style efficiency ratios. A missing SIC also
+  withholds issuer-sensitive ratios. Every available ratio retains all component filing receipts.
 - This latest-reported view is display-only and is never fed into a historical backtest.
 
 ### Valuation contract

@@ -161,6 +161,18 @@ export type FundamentalsMetricKey =
   | 'longTermDebtNoncurrent'
   | 'totalDebt'
   | 'cashAndEquivalents'
+  | 'grossProfit'
+  | 'costOfRevenue'
+  | 'incomeTaxExpense'
+  | 'pretaxIncome'
+  | 'totalAssets'
+  | 'currentAssets'
+  | 'currentLiabilities'
+  | 'stockholdersEquity'
+  | 'inventoryNet'
+  | 'accountsReceivableNetCurrent'
+  | 'accountsPayableCurrent'
+  | 'interestExpense'
   | 'dilutedShares'
   | 'sharesOutstanding'
   | 'operatingMargin'
@@ -306,6 +318,115 @@ const DIRECT_METRICS: DirectMetricSpec[] = [
     basis: 'Cash and cash equivalents; restricted cash and short-term investments excluded',
     nonNegative: true,
     aliases: [{ taxonomy: 'us-gaap', concept: 'CashAndCashEquivalentsAtCarryingValue' }],
+  },
+  {
+    key: 'grossProfit',
+    kind: 'duration',
+    unit: 'USD',
+    basis: 'Gross profit',
+    aliases: [{ taxonomy: 'us-gaap', concept: 'GrossProfit' }],
+  },
+  {
+    key: 'costOfRevenue',
+    kind: 'duration',
+    unit: 'USD',
+    basis: 'Cost of revenue (positive expense)',
+    nonNegative: true,
+    aliases: [
+      { taxonomy: 'us-gaap', concept: 'CostOfGoodsAndServicesSold' },
+      { taxonomy: 'us-gaap', concept: 'CostOfRevenue' },
+      { taxonomy: 'us-gaap', concept: 'CostOfGoodsSold' },
+    ],
+  },
+  {
+    key: 'incomeTaxExpense',
+    kind: 'duration',
+    unit: 'USD',
+    basis: 'Income tax expense (benefit)',
+    aliases: [{ taxonomy: 'us-gaap', concept: 'IncomeTaxExpenseBenefit' }],
+  },
+  {
+    key: 'pretaxIncome',
+    kind: 'duration',
+    unit: 'USD',
+    basis: 'Income from continuing operations before income taxes',
+    aliases: [
+      { taxonomy: 'us-gaap', concept: 'IncomeLossFromContinuingOperationsBeforeIncomeTaxesExtraordinaryItemsNoncontrollingInterest' },
+      { taxonomy: 'us-gaap', concept: 'IncomeLossFromContinuingOperationsBeforeIncomeTaxesMinorityInterestAndIncomeLossFromEquityMethodInvestments' },
+    ],
+  },
+  {
+    key: 'totalAssets',
+    kind: 'instant',
+    unit: 'USD',
+    basis: 'Total assets',
+    nonNegative: true,
+    aliases: [{ taxonomy: 'us-gaap', concept: 'Assets' }],
+  },
+  {
+    key: 'currentAssets',
+    kind: 'instant',
+    unit: 'USD',
+    basis: 'Current assets',
+    nonNegative: true,
+    aliases: [{ taxonomy: 'us-gaap', concept: 'AssetsCurrent' }],
+  },
+  {
+    key: 'currentLiabilities',
+    kind: 'instant',
+    unit: 'USD',
+    basis: 'Current liabilities',
+    nonNegative: true,
+    aliases: [{ taxonomy: 'us-gaap', concept: 'LiabilitiesCurrent' }],
+  },
+  {
+    key: 'stockholdersEquity',
+    kind: 'instant',
+    unit: 'USD',
+    basis: 'Stockholders equity attributable to the parent',
+    aliases: [{ taxonomy: 'us-gaap', concept: 'StockholdersEquity' }],
+  },
+  {
+    key: 'inventoryNet',
+    kind: 'instant',
+    unit: 'USD',
+    basis: 'Net inventory',
+    nonNegative: true,
+    aliases: [{ taxonomy: 'us-gaap', concept: 'InventoryNet' }],
+  },
+  {
+    key: 'accountsReceivableNetCurrent',
+    kind: 'instant',
+    unit: 'USD',
+    basis: 'Current net accounts receivable',
+    nonNegative: true,
+    aliases: [
+      { taxonomy: 'us-gaap', concept: 'AccountsReceivableNetCurrent' },
+      { taxonomy: 'us-gaap', concept: 'ReceivablesNetCurrent' },
+    ],
+  },
+  {
+    key: 'accountsPayableCurrent',
+    kind: 'instant',
+    unit: 'USD',
+    basis: 'Current accounts payable',
+    nonNegative: true,
+    aliases: [
+      { taxonomy: 'us-gaap', concept: 'AccountsPayableCurrent' },
+      { taxonomy: 'us-gaap', concept: 'AccountsPayableTradeCurrent' },
+    ],
+  },
+  {
+    key: 'interestExpense',
+    kind: 'duration',
+    unit: 'USD',
+    basis: 'Interest expense',
+    nonNegative: true,
+    aliases: [
+      { taxonomy: 'us-gaap', concept: 'InterestExpense' },
+      { taxonomy: 'us-gaap', concept: 'InterestExpenseDebt' },
+      { taxonomy: 'us-gaap', concept: 'InterestAndDebtExpense' },
+    ],
   },
   {
     key: 'dilutedShares',

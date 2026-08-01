@@ -44,9 +44,6 @@ const MAX_CACHE_ENTRIES = 200;
 // optional class separator. Stricter than an open string; SEC class shares use `-`.
 const TICKER_PATTERN = /^[A-Z0-9][A-Z0-9.-]{0,11}$/;
 
-const DEFAULT_USER_AGENT =
-  'InvestIQ/1.0 (https://github.com/changfanghan0324/investiq; educational research)';
-
 /** Injectable dependencies so the whole layer is testable without a live network. */
 export interface SecClientOptions {
   fetchImpl?: typeof fetch;
@@ -250,9 +247,13 @@ function parseSic(value: unknown): number | undefined {
 }
 
 function resolveDeps(options: SecClientOptions): ResolvedSecDeps {
+  const userAgent = options.userAgent?.trim() || process.env.SEC_USER_AGENT?.trim();
+  if (!userAgent) {
+    throw publicError(503, 'The SEC contact configuration is unavailable.');
+  }
   return {
     fetchImpl: options.fetchImpl ?? ((input, init) => fetch(input, init)),
-    userAgent: options.userAgent ?? (process.env.SEC_USER_AGENT?.trim() || DEFAULT_USER_AGENT),
+    userAgent,
     gate: options.gate ?? defaultGate,
     now: options.now ?? (() => Date.now()),
   };

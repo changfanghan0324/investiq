@@ -120,6 +120,27 @@ describe('concept alias precedence', () => {
     assert.equal(da.observations[0].value, 80);
     assert.equal(da.observations[0].receipts[0].concept, 'DepreciationAndAmortization');
   });
+
+  it('selects conservative statement-input aliases for ratio construction', () => {
+    const facts = companyFacts({
+      'us-gaap': {
+        Revenues: { units: { USD: [annual(2024, 1_000)] } },
+        CostOfGoodsAndServicesSold: { units: { USD: [annual(2024, 600)] } },
+        CostOfRevenue: { units: { USD: [annual(2024, 999)] } },
+        Assets: { units: { USD: [instant(2024, 2_000)] } },
+        StockholdersEquity: { units: { USD: [instant(2024, 800)] } },
+        AccountsReceivableNetCurrent: { units: { USD: [instant(2024, 125)] } },
+        ReceivablesNetCurrent: { units: { USD: [instant(2024, 999)] } },
+      },
+    });
+    const output = buildFundamentals(facts, identity());
+    assert.equal(series(output, 'costOfRevenue').observations[0].value, 600);
+    assert.equal(series(output, 'costOfRevenue').observations[0].receipts[0].concept, 'CostOfGoodsAndServicesSold');
+    assert.equal(series(output, 'totalAssets').observations[0].value, 2_000);
+    assert.equal(series(output, 'stockholdersEquity').observations[0].value, 800);
+    assert.equal(series(output, 'accountsReceivableNetCurrent').observations[0].value, 125);
+    assert.equal(series(output, 'accountsReceivableNetCurrent').observations[0].receipts[0].concept, 'AccountsReceivableNetCurrent');
+  });
 });
 
 describe('annual duration and form filters', () => {

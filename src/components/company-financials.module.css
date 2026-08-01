@@ -7,7 +7,7 @@
 .groupHeader { min-height: 56px; display: flex; align-items: center; gap: 11px; padding: 9px 13px; border-bottom: 1px solid #2a2e39; }
 .groupHeader > span { width: 27px; height: 27px; display: grid; place-items: center; border: 1px solid #3b465e; border-radius: 3px; color: #7598e7; font-family: var(--font-geist-mono), monospace; font-size: 10px; }
 .groupHeader h2, .audit h2 { color: #dfe3eb; font-size: calc(12px * var(--ui-font-scale, 1)); font-weight: 500; }
-.groupHeader p, .audit > p { margin-top: 3px; color: #737a86; font-size: calc(9px * var(--ui-font-scale, 1)); line-height: 1.4; }
+.groupHeader p, .auditHeader p { margin-top: 3px; color: #737a86; font-size: calc(9px * var(--ui-font-scale, 1)); line-height: 1.4; }
 .metricGrid, .metricGridCompact { display: grid; grid-template-columns: repeat(4, 1fr); }
 .metric { min-height: 164px; padding: 14px; border-right: 1px solid #292e39; }
 .metric:last-child { border-right: 0; }
@@ -31,7 +31,12 @@
 .coverageGate strong { color: #d8dce4; font-size: calc(12px * var(--ui-font-scale, 1)); font-weight: 500; }
 .coverageGate p { max-width: 470px; color: #808793; font-size: calc(9px * var(--ui-font-scale, 1)); line-height: 1.5; }
 .coverageGate ul { display: flex; flex-wrap: wrap; justify-content: center; gap: 7px 18px; margin-top: 5px; color: #6f7682; font-size: calc(8px * var(--ui-font-scale, 1)); list-style-position: inside; }
+.methodNote { display: flex; align-items: flex-start; gap: 7px; padding: 10px 12px; border-top: 1px solid #292e39; color: #777f8c; font-size: calc(8px * var(--ui-font-scale, 1)); line-height: 1.45; }
+.methodNote svg { flex: 0 0 auto; color: #9b7b48; }
 .audit { padding: 14px; }
+.auditHeader { display: flex; align-items: center; justify-content: space-between; gap: 16px; cursor: pointer; list-style: none; }
+.auditHeader::-webkit-details-marker { display: none; }
+.auditHeader > span { flex: 0 0 auto; color: #75a0ff; font-size: calc(8px * var(--ui-font-scale, 1)); }
 .auditRows { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; margin-top: 12px; }
 .audit details { border: 1px solid #292e39; border-radius: 2px; background: #0f131b; }
 .audit summary { min-height: 38px; display: grid; grid-template-columns: 1fr 70px 88px; align-items: center; gap: 8px; padding: 7px 10px; color: #9ca3ae; font-size: calc(8px * var(--ui-font-scale, 1)); cursor: pointer; }
