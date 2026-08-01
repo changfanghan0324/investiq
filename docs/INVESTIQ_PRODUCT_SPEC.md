@@ -88,6 +88,8 @@ Primary navigation contains exactly four destinations: Research, Compare, Portfo
 - Saves notes and the last valuation snapshot only in the browser; no account or analytics tracking.
 - A dedicated print stylesheet supports CJK-safe browser Save as PDF without sending report contents
   to another service; Chromium print output is visually and text-extraction tested in both languages.
+  Print typography stays at the stable report baseline across the four screen text-size preferences;
+  PDF-reader zoom remains available without repaginating the research artifact.
 
 ## Data and model governance
 

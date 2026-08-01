@@ -57,6 +57,9 @@ Reference visual concepts for each workspace live in `design/investiq/`.
   fallback.
 - **Text size:** four levels — `25`, `50`, `75`, `100` — with `25` as the default. The level is applied
   as a root multiplier (`1`, `1.15`, `1.3`, `1.45`) and every layout stays usable at `100`.
+- Browser-print research reports and memos use the stable default type scale so A4 pagination does
+  not change with a temporary screen-reading preference. Readers can use their PDF viewer's zoom or
+  accessibility controls without changing the report's page structure.
 - Language and text size persist per browser in `localStorage` under the `investiq-` key namespace
   (`investiq-language`, `investiq-font-scale`, `investiq-market-watchlist`,
   `investiq-dca-portfolio-name`). No account, no server-side profile, no analytics.

@@ -74,7 +74,7 @@
 }
 
 @media print {
-  :global(html) { background: #fff !important; }
+  :global(html) { background: #fff !important; --ui-font-scale: 1 !important; }
   :global(body) { background: transparent !important; }
   @page {
     size: A4;
@@ -91,6 +91,7 @@
   .cover p, .cover dt, .cover dd, .section header small, .sectionIntro, .noteGrid p, .limitations, .disclaimer p, .sources span, .sources code { color: #374151; }
   .section { padding: 8mm 0; border-color: #d1d5db; }
   .section > header, .noteGrid section, .scenarios, .bridge, .tableWrap, .sources li, .limitations li, .disclaimer { break-inside: avoid; }
+  .section > header { break-after: avoid; }
   .pageBreak { break-before: page; }
   .noteGrid section { min-height: 28mm; }
   .noteGrid section, .scenarios div, .bridge, .missing { border-color: #cbd5e1; background: #fff; }
