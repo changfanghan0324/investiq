@@ -90,6 +90,7 @@
   .cover h2, .section h2, .noteGrid h3, .scenarios strong, .sources strong { color: #111827; }
   .cover p, .cover dt, .cover dd, .section header small, .sectionIntro, .noteGrid p, .limitations, .disclaimer p, .sources span, .sources code { color: #374151; }
   .section { padding: 8mm 0; border-color: #d1d5db; }
+  .section:last-of-type { padding-top: 5mm; padding-bottom: 2mm; break-inside: avoid; }
   .section > header, .noteGrid section, .scenarios, .bridge, .tableWrap, .sources li, .limitations li, .disclaimer { break-inside: avoid; }
   .section > header { break-after: avoid; }
   .pageBreak { break-before: page; }
@@ -101,6 +102,7 @@
   .tableWrap th, .tableWrap td, .tableWrap tbody th { border-color: #d1d5db; color: #111827; background: #fff; }
   .sources li { border-color: #d1d5db; }
   .sources a { color: #1d4ed8; }
-  .disclaimer { border-color: #94a3b8; background: #fff; }
+  .disclaimer { margin-top: 6px; padding: 6px 10px; border-color: #94a3b8; background: #fff; }
+  .disclaimer p { line-height: 1.45; }
   .reportFooter { display: none; }
 }
