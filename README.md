@@ -21,6 +21,7 @@ deterministic domain functions covered by Vitest; official annual company facts 
 price-risk context uses end-of-day market data through server-only adapters.
 
 - **Product specification:** [docs/INVESTIQ_PRODUCT_SPEC.md](docs/INVESTIQ_PRODUCT_SPEC.md)
+- **Institutional analytics roadmap:** [docs/INSTITUTIONAL_ANALYTICS_ROADMAP.md](docs/INSTITUTIONAL_ANALYTICS_ROADMAP.md)
 - **Working agreement:** [CLAUDE.md](CLAUDE.md)
 - **In-app methodology:** `/methodology`
 
