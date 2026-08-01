@@ -92,7 +92,8 @@ them. This is a deliberate data-quality feature, not an incomplete zero.
 - Company overview, financial evidence, thesis, catalysts, risks, valuation range, interpretation,
   and SEC receipt on one page.
 - Notes and the last DCF snapshot persist only in browser storage.
-- Print stylesheet supports browser Save as PDF without sending research contents elsewhere.
+- A dedicated bilingual A4 report route supports browser Save as PDF without sending research
+  contents elsewhere, with filing receipts, DCF assumptions, limitations, and page counters.
 
 ## Important defects found through cross-review
 
@@ -148,7 +149,8 @@ them. This is a deliberate data-quality feature, not an incomplete zero.
 4. Comparable multiples require the user to research a defensible peer set and source its range.
 5. Portfolio alpha is a historical single-factor approximation; VaR is sample-dependent and not a
    loss ceiling; inverse-volatility weighting ignores correlations and expected return.
-6. Browser print is the memo PDF workflow; a CJK-embedded downloadable PDF can be added later.
+6. Browser print is intentionally used for the full report because it preserves Simplified-Chinese
+   glyph coverage and line breaking without shipping a large embedded CJK font.
 7. Python/FastAPI/PostgreSQL remain deferred until cross-user storage or heavier analytics justify a
    separate service.
 

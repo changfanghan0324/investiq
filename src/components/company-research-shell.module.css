@@ -12,3 +12,4 @@
 .content { padding: 18px clamp(14px, 2vw, 24px); }
 .footer { margin: 0 20px; padding-top: 14px; border-top: 1px solid #20242e; color: #666c78; font-size: calc(10px * var(--ui-font-scale, 1)); text-align: center; }
 @media (max-width: 640px) { .identity { align-items: flex-start; flex-wrap: wrap; } .meta { width: 100%; margin-left: 57px; gap: 12px; flex-direction: column; } .tabs { gap: 21px; } .content { padding: 12px; } }
+@media print { .identity, .tabs, .footer { display: none; } .page { min-height: 0; padding: 0; background: #fff; } .content { padding: 0; } }

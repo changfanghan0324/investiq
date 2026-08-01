@@ -37,6 +37,7 @@ detail routes only after a ticker is selected.
 | `/company/[ticker]/financials` | Financial Analysis | Five-year growth, profitability, cash generation, coverage gates, and filing-level source receipts. |
 | `/company/[ticker]/valuation` | Valuation | Five-year unlevered FCFF DCF, bear/base/bull range, two 5×5 sensitivities, EV→equity bridge, and a user-sourced comparable-multiple method. |
 | `/company/[ticker]/memo` | Investment Memo | One-page evidence record separating reported facts, model assumptions, thesis, catalysts, risks, and interpretation; printable to PDF. |
+| `/company/[ticker]/report` | Equity Research Report | Bilingual, print-ready A4 report with five-year SEC evidence, ratio diagnostics, DCF assumptions and scenarios, filing register, limitations, and page numbers. |
 | `/compare` | Stock Comparison | Two to five symbols aligned to common trading dates: cumulative return, risk table, correlation matrix, neutral narrative, and CSV. |
 | `/portfolio` | Portfolio Lab | One to ten long-only holdings: return, volatility, Sharpe, Sortino, beta, alpha, historical VaR, drawdown, attribution, concentration, correlation, equal/user/inverse-volatility weights. |
 | `/tools` | Research Tools | Secondary calculators and market context. |
@@ -687,7 +688,7 @@ exists in both languages, and it is deliberately kept out of the primary navigat
 | `src/app/layout.tsx` | Root HTML layout, fonts, metadata, language provider, and global stylesheet. |
 | `src/app/globals.css` | Global reset, color foundation, font-scale variables, and reduced-motion behavior. |
 | `src/app/page.tsx` | Research home route (`/`). |
-| `src/app/company/[ticker]/` | Company summary plus nested financials, valuation, and memo routes. |
+| `src/app/company/[ticker]/` | Company summary plus nested financials, valuation, memo, and full-report routes. |
 | `src/app/stock/page.tsx` | Legacy redirect to `/company/AAPL`. |
 | `src/app/market/page.tsx` | Market Overview route (`/market`). |
 | `src/app/compare/page.tsx` | Stock Comparison route (`/compare`). |
@@ -744,6 +745,8 @@ exists in both languages, and it is deliberately kept out of the primary navigat
 | `src/services/market-data-api.ts` | Browser client for the same-origin market-data endpoint, with response validation and timeouts. |
 | `src/services/assistant-api.ts` | Builds the compact report summary and calls the same-origin assistant endpoint. |
 | `src/services/create-report.ts` | Coordinates live/demo loading, historical boundaries, and optional holding-level simulations. |
+| `src/services/create-equity-report.ts` | Pure, clock-injected equity-report assembler that keeps SEC facts, DCF assumptions, and analyst notes structurally separate. |
+| `src/components/equity-report.tsx` | English/Simplified-Chinese on-screen and browser-print Equity Research Report. |
 | `src/services/create-portfolio-report.ts` | Runs every holding sequentially and constructs aggregate historical and scenario reports. |
 | `src/services/pdf-export.ts` | Generates and downloads the multi-page DCA PDF in the browser. |
 | `src/data/demo-market-data.ts` | Deterministic, explicitly labelled synthetic series for product exploration. |

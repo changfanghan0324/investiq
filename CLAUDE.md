@@ -44,7 +44,7 @@ regression tests:
 
 - `src/domain/backtest-engine.ts`, `src/domain/schedule.ts`, `src/domain/fees.ts`,
   `src/domain/portfolio-aggregate.ts`, `src/domain/projection-engine.ts`
-- `src/services/create-portfolio-report.ts`, `src/services/create-report.ts`
+- `src/services/create-portfolio-report.ts`, `src/services/create-report.ts`, `src/services/create-equity-report.ts`
 - `src/server/market-data.ts`
 - `src/constants/broker-presets.ts`, `src/data/demo-market-data.ts`
 

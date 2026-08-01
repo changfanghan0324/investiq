@@ -35,7 +35,8 @@ historical rule, not an optimizer or recommendation.
 ## 2:15–2:45 — Investment Memo
 
 Return to AAPL and open Investment Memo. Show the saved DCF range, financial evidence, source receipt,
-and separate thesis/catalyst/risk fields. Save notes, then use Print / Save PDF. Emphasize that facts,
+and separate thesis/catalyst/risk fields. Save notes, open Full report / PDF, and show the five-year
+evidence table, ratio diagnostics, DCF assumptions, filing register, and bilingual PDF export. Emphasize that facts,
 assumptions, and interpretation are visibly distinct.
 
 ## 2:45–3:00 — Engineering close
