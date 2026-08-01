@@ -12,7 +12,8 @@
 // - Buy-and-hold only: capital is deployed once at the first shared close, share counts are
 //   fractional and then fixed, and nothing is rebalanced. The page says so in the basis panel, in
 //   the execution summary, in the diagnosis notes, and inside the CSV header.
-// - Only closing prices are read, so every return is a price return with dividends excluded.
+// - Only end-of-day close fields are read. Price-only execution values stay separate from the
+//   vendor adjusted-close total-return proxy used for performance when coverage is complete.
 // - Weights must total exactly 100%. A total above or below that blocks the run instead of being
 //   silently rescaled, and the running total is visible at all times.
 // - Holdings load strictly one at a time, in row order. SPY is requested afterwards and only when
@@ -54,7 +55,8 @@ import {
 } from "recharts";
 
 import { AppShell, ShellDisclaimer } from "@/components/app-shell";
-import { HOLDING_CONCENTRATION_THRESHOLD, cumulativePriceReturns, globalMinimumVarianceWeights, inverseVolatilityWeights } from "@/domain/analytics";
+import { AnalyticsError, HOLDING_CONCENTRATION_THRESHOLD, cumulativePriceReturns, globalMinimumVarianceWeights, inverseVolatilityWeights, toReturnBasisBars } from "@/domain/analytics";
+import { computeEfficientFrontier, type EfficientFrontier } from "@/domain/efficient-frontier";
 import { isValidSymbol, normalizeSymbol } from "@/domain/market-overview";
 import {
   MAX_PORTFOLIO_HOLDINGS,
@@ -66,6 +68,7 @@ import {
   type PortfolioDiagnosisSeverity,
   type PortfolioLabViewModel,
 } from "@/domain/portfolio-lab";
+import { simulatePeriodicRebalancing, type RebalancingResult } from "@/domain/portfolio-rebalancing";
 import { buildRiskContext, type RiskContextAnswers } from "@/domain/risk-context";
 import { MIN_COMMON_CLOSES, commonTradingDates } from "@/domain/stock-comparison";
 import { MarketDataError, loadMarketData } from "@/services/market-data-api";
@@ -829,6 +832,47 @@ export function PortfolioLab() {
 
   const assembled = useMemo(() => (run ? assemble(run) : undefined), [run]);
   const view = assembled?.view;
+  const rebalancingAnalysis = useMemo(() => {
+    const currentView = assembled?.view;
+    if (!currentView) return undefined;
+    const holdings = currentView.holdings.map((holding) => ({
+      symbol: holding.symbol,
+      targetWeight: holding.targetWeight,
+      returns: holding.dailyReturns,
+    }));
+    try {
+      return {
+        scenarios: (["none", "quarterly", "annual"] as const).map((frequency) =>
+          simulatePeriodicRebalancing({
+            holdings,
+            initialDate: currentView.window.startDate,
+            initialValue: currentView.allocatedCapital,
+            frequency,
+          }),
+        ),
+        unavailable: false as const,
+      };
+    } catch (error) {
+      if (error instanceof AnalyticsError) return { unavailable: true as const };
+      throw error;
+    }
+  }, [assembled]);
+  const frontierAnalysis = useMemo(() => {
+    const currentView = assembled?.view;
+    if (!currentView) return undefined;
+    if (currentView.holdings.length < 2) return { unavailable: true as const, needsTwo: true as const };
+    try {
+      return {
+        frontier: computeEfficientFrontier(
+          currentView.holdings.map((holding) => ({ symbol: holding.symbol, returns: holding.dailyReturns })),
+        ),
+        unavailable: false as const,
+      };
+    } catch (error) {
+      if (error instanceof AnalyticsError) return { unavailable: true as const, needsTwo: false as const };
+      throw error;
+    }
+  }, [assembled]);
 
   const failedHoldings = useMemo(
     () => run?.holdings.filter((load) => load.status === "error") ?? [],
@@ -857,7 +901,7 @@ export function PortfolioLab() {
     if (bars.length < 2) return undefined;
     // The domain measures the cumulative return; the only arithmetic here is restating it in the
     // portfolio's own starting dollars so the two lines share one axis.
-    return cumulativePriceReturns(bars).map((point) => ({
+    return cumulativePriceReturns(toReturnBasisBars(bars, view.returnBasis)).map((point) => ({
       date: point.date,
       cumulative: point.value,
       value: view.allocatedCapital * (1 + point.value),
@@ -867,7 +911,7 @@ export function PortfolioLab() {
   const chartData = (() => {
     if (!view) return [];
     const rows = new Map<DateString, Record<string, number | string>>(
-      view.valueSeries.map((point) => [point.date, { date: point.date, portfolioValue: point.value }]),
+      view.performanceValueSeries.map((point) => [point.date, { date: point.date, portfolioValue: point.value }]),
     );
     for (const point of view.cumulativeReturns) {
       const row = rows.get(point.date);
@@ -1268,6 +1312,19 @@ export function PortfolioLab() {
             ) : null}
 
             <HeadlineMetrics view={view} input={run.input} locale={locale} t={t} />
+            {rebalancingAnalysis && !rebalancingAnalysis.unavailable ? (
+              <RebalancingPanel scenarios={rebalancingAnalysis.scenarios} basis={view.returnBasis} locale={locale} t={t} />
+            ) : rebalancingAnalysis?.unavailable ? (
+              <AdvancedAnalysisUnavailable title={t("portfolioLab.rebalanceTitle")} body={t("portfolioLab.rebalanceUnavailable")} />
+            ) : null}
+            {frontierAnalysis && !frontierAnalysis.unavailable ? (
+              <EfficientFrontierPanel frontier={frontierAnalysis.frontier} locale={locale} t={t} />
+            ) : frontierAnalysis?.unavailable ? (
+              <AdvancedAnalysisUnavailable
+                title={t("portfolioLab.frontierTitle")}
+                body={t(frontierAnalysis.needsTwo ? "portfolioLab.frontierNeedsTwo" : "portfolioLab.frontierUnavailable")}
+              />
+            ) : null}
 
             <div className={styles.grid}>
               <div className={styles.mainColumn}>
@@ -1713,9 +1770,10 @@ function HeadlineMetrics({
       <dl className={styles.metricCards}>
         <MetricCard
           label={t("portfolioLab.metricFinalValue")}
-          value={formatMoney(view.finalValue, locale)}
+          value={formatMoney(view.performanceFinalValue, locale)}
           detail={t("portfolioLab.metricFinalValueDetail", {
-            gain: formatSignedMoney(view.totalGain, locale),
+            gain: formatSignedMoney(view.performanceGain, locale),
+            basis: t(view.returnBasis === "total" ? "portfolioLab.basisNameTotal" : "portfolioLab.basisNamePrice"),
           })}
           t={t}
         />
@@ -1843,6 +1901,81 @@ function MetricCard({
         {detail ? <em>{detail}</em> : null}
       </dd>
     </div>
+  );
+}
+
+function RebalancingPanel({
+  scenarios,
+  basis,
+  locale,
+  t,
+}: {
+  scenarios: RebalancingResult[];
+  basis: PortfolioLabViewModel["returnBasis"];
+  locale: string;
+  t: Translate;
+}) {
+  const labels = {
+    none: t("portfolioLab.rebalanceNone"),
+    quarterly: t("portfolioLab.rebalanceQuarterly"),
+    annual: t("portfolioLab.rebalanceAnnual"),
+  } as const;
+  return (
+    <section className={styles.rebalancePanel} aria-labelledby="portfolio-rebalance-title">
+      <header className={styles.panelHead}>
+        <div><h2 id="portfolio-rebalance-title">{t("portfolioLab.rebalanceTitle")}</h2><p className={styles.panelSub}>{t("portfolioLab.rebalanceSub", { basis: t(basis === "total" ? "portfolioLab.basisNameTotal" : "portfolioLab.basisNamePrice") })}</p></div>
+      </header>
+      <div className={styles.rebalanceTableWrap}>
+        <table className={styles.rebalanceTable}>
+          <thead><tr><th>{t("portfolioLab.rebalanceFrequency")}</th><th>{t("portfolioLab.rebalanceEnding")}</th><th>{t("portfolioLab.rebalanceReturn")}</th><th>{t("portfolioLab.rebalanceEvents")}</th><th>{t("portfolioLab.rebalanceTurnover")}</th></tr></thead>
+          <tbody>{scenarios.map((scenario) => <tr key={scenario.frequency}><th>{labels[scenario.frequency]}</th><td>{formatMoney(scenario.endingValue, locale)}</td><td className={scenario.totalReturn < 0 ? styles.negative : styles.positive}>{formatSignedRate(scenario.totalReturn, locale)}</td><td>{formatCount(scenario.events.length, locale)}</td><td>{formatRate(scenario.averageTurnover, locale)}</td></tr>)}</tbody>
+        </table>
+      </div>
+      <p className={styles.footnote}>{t("portfolioLab.rebalanceDisclosure")}</p>
+    </section>
+  );
+}
+
+function EfficientFrontierPanel({ frontier, locale, t }: { frontier: EfficientFrontier; locale: string; t: Translate }) {
+  const data = frontier.points.map((point) => ({
+    volatility: point.annualizedVolatility * 100,
+    annualReturn: point.annualizedReturn * 100,
+  }));
+  return (
+    <section className={styles.frontierPanel} aria-labelledby="portfolio-frontier-title">
+      <header className={styles.panelHead}><div><h2 id="portfolio-frontier-title">{t("portfolioLab.frontierTitle")}</h2><p className={styles.panelSub}>{t("portfolioLab.frontierSub", { count: formatCount(frontier.observations, locale) })}</p></div></header>
+      <div className={styles.frontierChart} role="img" aria-label={t("portfolioLab.frontierAria")}>
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart data={data} margin={{ top: 8, right: 18, bottom: 8, left: 4 }}>
+            <CartesianGrid stroke="#252b38" strokeDasharray="2 4" />
+            <XAxis type="number" dataKey="volatility" tick={{ fill: "#7f8796", fontSize: 10 }} tickFormatter={(value) => `${Number(value).toFixed(0)}%`} label={{ value: t("portfolioLab.frontierXAxis"), position: "insideBottom", offset: -2, fill: "#7f8796", fontSize: 10 }} />
+            <YAxis
+              type="number"
+              dataKey="annualReturn"
+              tick={{ fill: "#7f8796", fontSize: 10 }}
+              tickFormatter={(value) => `${Number(value).toFixed(0)}%`}
+              width={62}
+              label={{ value: t("portfolioLab.frontierYAxis"), angle: -90, position: "insideLeft", fill: "#7f8796", fontSize: 10 }}
+            />
+            <Tooltip formatter={(value) => [`${Number(value).toFixed(2)}%`, t("portfolioLab.frontierAnnualReturn")]} labelFormatter={(_, payload) => payload?.[0] ? t("portfolioLab.frontierTooltip", { volatility: `${Number(payload[0].payload.volatility).toFixed(2)}%` }) : ""} contentStyle={{ background: "#161b25", border: "1px solid #343b49", borderRadius: 4, fontSize: 11 }} />
+            <Line type="monotone" dataKey="annualReturn" stroke="#6f97ff" strokeWidth={2} dot={{ r: 2, fill: "#8aa9ff" }} activeDot={{ r: 4 }} isAnimationActive={false} />
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+      <p className={styles.footnote}>{t("portfolioLab.frontierDisclosure")}</p>
+    </section>
+  );
+}
+
+function AdvancedAnalysisUnavailable({ title, body }: { title: string; body: string }) {
+  return (
+    <section className={styles.advancedUnavailable} role="status">
+      <div>
+        <TriangleAlert size={15} aria-hidden="true" />
+        <h2>{title}</h2>
+      </div>
+      <p>{body}</p>
+    </section>
   );
 }
 
@@ -2643,6 +2776,8 @@ function buildCsv(view: PortfolioLabViewModel, input: PortfolioInput, t: Transla
     [t("portfolioLab.csvAllocatedCapital"), decimal(view.allocatedCapital, 2)],
     [t("portfolioLab.csvFinalValue"), decimal(view.finalValue, 2)],
     [t("portfolioLab.csvTotalGain"), decimal(view.totalGain, 2)],
+    [t("portfolioLab.csvPerformanceFinalValue"), decimal(view.performanceFinalValue, 2)],
+    [t("portfolioLab.csvPerformanceGain"), decimal(view.performanceGain, 2)],
     [t("portfolioLab.csvTotalReturn"), decimal(view.totalPriceReturn, 6)],
     [t("portfolioLab.csvVendorTotalReturn"), decimal(view.totalReturn, 6)],
     [t("portfolioLab.csvCagr"), decimal(view.cagr, 6)],

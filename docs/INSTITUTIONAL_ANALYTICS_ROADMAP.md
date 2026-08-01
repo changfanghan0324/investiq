@@ -284,8 +284,10 @@ after the routes and terminology stop changing; otherwise every UI revision make
    sector allocation.
 7. **Then:** enable Auth.js and private cloud saves after the login-provider decision.
 8. **Then:** add the citation-bound Investment Memo assistant with production privacy and budgets.
-9. **Later gate:** FastAPI optimization, minimum variance, efficient frontier, and periodic
-   rebalancing.
+9. **Completed TypeScript baseline:** long-only historical global minimum variance, the upper
+   efficient-frontier branch, and zero-friction quarterly/annual rebalancing comparisons are
+   deterministic, tested, and disclosed. FastAPI remains a future gate for shrinkage estimators,
+   larger universes, constrained optimization, or scheduled analytics workloads.
 10. **Final artifacts:** full Equity Research PDF, stabilized demo video, README evidence, and public
    deployment.
 

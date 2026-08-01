@@ -179,7 +179,17 @@ These hold across Market Context, Company price-risk context, Stock Comparison, 
 - A separate correlation-aware global minimum-variance control solves the long-only, fully invested
   historical variance objective from at least 60 aligned daily returns. The deterministic projected-
   gradient solver rejects flat, singular, and non-convergent inputs. GMV is in-sample and variance-
-  only; it is not a forecast, expected-return optimizer, efficient frontier, or recommendation.
+  only; it is not a forecast or recommendation.
+- The historical efficient frontier uses the same aligned daily sample, arithmetic sample means,
+  and sample covariance matrix. It enumerates long-only active sets, begins at the long-only GMV
+  portfolio, ends at the minimum-variance mix among the highest-mean holdings, and omits the
+  dominated lower branch. Expected-return estimates are especially noisy; the displayed curve is
+  in-sample evidence, never a forecast or suggested allocation.
+- Periodic-rebalancing comparisons keep the entered target weights and show buy-and-hold,
+  calendar-quarterly, and calendar-annual scenarios on the same return basis. Resets occur on the
+  first shared trading session on or after each anchored calendar boundary. They are self-financing
+  and assume zero commissions, spreads, taxes, slippage, and market impact; one-way turnover is
+  reported so the omitted implementation burden remains visible.
 - Every function is deterministic: no clock, no randomness, no I/O.
 - `undefined` means "not computable from this data", never `0`. A short history yields missing
   metrics rather than invented ones.
@@ -234,12 +244,14 @@ holdings' trading dates. One security listing later, or missing a session, short
 all of them. Nothing is back-filled, carried forward, or read as a zero return. Ties resolve
 alphabetically so the same input always compares the same way.
 
-### Portfolio Lab: buy-and-hold only
+### Portfolio Lab: primary buy-and-hold result plus historical scenarios
 
 Capital is deployed **once**, on the first trading date every holding shares. Fractional share counts
 are then fixed forever: nothing is rebalanced, trimmed, topped up, or drifted back toward the target
 weights. A holding that doubles simply becomes a larger fraction of the portfolio, and that drift is
-reported rather than corrected. Weights must sum to 1 within `1e-6`.
+reported rather than corrected. Weights must sum to 1 within `1e-6`. Separate quarterly and annual
+rebalancing tables are explicitly labelled zero-friction historical scenarios; they do not alter the
+headline buy-and-hold result.
 
 ### DCA Backtest calculation contract
 
@@ -466,7 +478,7 @@ estimates and can never be merged with historical backtests or described as pred
 | Fees | Not modeled | Versioned broker-specific fee engine with auditable components and source-backed presets |
 | Taxes | Not modeled | Dividend withholding, plus capital-gains tax on optional liquidation |
 | Drawdown | Close-to-close on the price or portfolio series | Cash-flow-neutral unit value, so contributions are not read as performance |
-| Rebalancing | Portfolio Lab: none, weights drift and drift is reported | Not applicable; each holding runs its own schedule |
+| Rebalancing | Headline result: none; separate zero-friction quarterly/annual historical scenarios with turnover | Not applicable; each holding runs its own schedule |
 | Future periods | Not offered | Not offered; historical completed sessions only |
 | Corporate actions | Split-adjusted closes | Fail-closed cross-provider verification |
 | Download | Stock Comparison: CSV | Multi-page PDF report |
@@ -617,7 +629,8 @@ exists in both languages, and it is deliberately kept out of the primary navigat
   sqrt-time annualization is approximate under serial correlation.
 - **Risk metrics need a sufficient sample.** Volatility, Sharpe, beta, and correlation are unavailable
   below 60 aligned daily returns and flagged as a limited sample below 252.
-- **Portfolio Lab never rebalances.** It measures a single lump-sum buy-and-hold allocation.
+- **Portfolio Lab's headline result never rebalances.** Quarterly and annual comparisons are separate
+  historical, self-financing, zero-friction scenarios and report turnover without modeling its cost.
 - **No sector data.** Sector concentration is reported as unavailable rather than inferred.
 - **Past history only.** Future dates are rejected. The isolated projection engine is experimental,
   unreachable from the UI and report services, and not a product feature.

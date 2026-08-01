@@ -987,6 +987,21 @@
   line-height: 1.55;
 }
 
+.rebalancePanel { margin-top: 12px; padding: 14px; border: 1px solid var(--line); border-radius: 5px; background: var(--panel); }
+.rebalanceTableWrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 4px; }
+.rebalanceTable { width: 100%; min-width: 650px; border-collapse: collapse; color: #c8ceda; font-size: calc(10px * var(--ui-font-scale, 1)); }
+.rebalanceTable th, .rebalanceTable td { padding: 10px 12px; border-bottom: 1px solid var(--line); text-align: right; font-variant-numeric: tabular-nums; }
+.rebalanceTable th:first-child, .rebalanceTable td:first-child { text-align: left; }
+.rebalanceTable thead th { color: var(--muted); background: var(--panel-2); font-size: calc(9px * var(--ui-font-scale, 1)); font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
+.rebalanceTable tbody th { color: #e2e5ec; font-weight: 600; }
+.rebalanceTable tbody tr:last-child th, .rebalanceTable tbody tr:last-child td { border-bottom: 0; }
+.frontierPanel { margin-top: 12px; padding: 14px; border: 1px solid var(--line); border-radius: 5px; background: var(--panel); }
+.frontierChart { width: 100%; height: 260px; border: 1px solid var(--line); border-radius: 4px; background: #11151e; }
+.advancedUnavailable { margin-top: 12px; padding: 12px 14px; border: 1px solid #4e4431; border-radius: 5px; background: #1d1a14; color: #c7ad74; }
+.advancedUnavailable div { display: flex; align-items: center; gap: 7px; }
+.advancedUnavailable h2 { margin: 0; color: #e2c98f; font-size: calc(11.5px * var(--ui-font-scale, 1)); font-weight: 600; }
+.advancedUnavailable p { margin: 6px 0 0 22px; color: #a99b7c; font-size: calc(10.5px * var(--ui-font-scale, 1)); line-height: 1.5; }
+
 .metricCards {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(178px, 1fr));

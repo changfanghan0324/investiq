@@ -1134,6 +1134,22 @@ describe('return basis', () => {
     assertClose(view.totalPriceReturn, 0);
     assertClose(view.finalValue, 1000);
     assertClose(view.allocatedCapital, 1000);
+    assertClose(view.performanceFinalValue, 1500);
+    assertClose(view.performanceGain, 500);
+    assertClose(view.performanceValueSeries[view.performanceValueSeries.length - 1].value, 1500);
+  });
+
+  it('keeps performance dollars identical to market-value dollars on the price basis', () => {
+    const view = buildPortfolioLab({
+      holdings: [holding('AAA', dates, closes, 1)],
+      initialCapital: CAPITAL,
+      annualRiskFreeRate: 0,
+    });
+
+    assert.equal(view.returnBasis, 'price');
+    assertClose(view.performanceFinalValue, view.finalValue);
+    assertClose(view.performanceGain, view.totalGain);
+    view.performanceValueSeries.forEach((point, index) => assertClose(point.value, view.valueSeries[index].value));
   });
 
   it('is invariant to the vendor adjusted-close scale of any holding', () => {
