@@ -508,7 +508,9 @@ export function buildPortfolioLab(request: PortfolioLabRequest): PortfolioLabVie
     valueSeries,
     cumulativeReturns: cumulativePriceReturns(bars),
     dailyReturns,
-    cagr: compoundAnnualGrowthRate(bars),
+    // A very short window can turn a small move into an absurd annualized headline. Use the
+    // same minimum sample gate as the risk statistics; total period return remains available.
+    cagr: riskSample.sufficient ? compoundAnnualGrowthRate(bars) : undefined,
     volatility,
     sharpeRatio: annualizedSharpeRatio(dailyReturns, annualRiskFreeRate),
     sortinoRatio: annualizedSortinoRatio(dailyReturns, annualRiskFreeRate),

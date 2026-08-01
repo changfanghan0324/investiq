@@ -54,7 +54,7 @@ import {
 } from "recharts";
 
 import { AppShell, ShellDisclaimer } from "@/components/app-shell";
-import { HOLDING_CONCENTRATION_THRESHOLD, cumulativePriceReturns, inverseVolatilityWeights } from "@/domain/analytics";
+import { HOLDING_CONCENTRATION_THRESHOLD, cumulativePriceReturns, globalMinimumVarianceWeights, inverseVolatilityWeights } from "@/domain/analytics";
 import { isValidSymbol, normalizeSymbol } from "@/domain/market-overview";
 import {
   MAX_PORTFOLIO_HOLDINGS,
@@ -786,6 +786,23 @@ export function PortfolioLab() {
     }
   }
 
+  /** Applies the correlation-aware, long-only historical global minimum-variance solution. */
+  function applyMinimumVarianceWeights() {
+    if (!view) return;
+    try {
+      const allocation = globalMinimumVarianceWeights(
+        view.holdings.map((holding) => ({ symbol: holding.symbol, returns: holding.dailyReturns })),
+      );
+      const percents = allocationPercents(allocation.weights.map((entry) => entry.weight));
+      const bySymbol = new Map(allocation.weights.map((entry, index) => [entry.symbol, percents[index]]));
+      setSlots((prev) => prev.map((slot) => ({ ...slot, weightPercent: bySymbol.get(normalizeSymbol(slot.symbol)) ?? slot.weightPercent })));
+      setErrors([]);
+      invalidateCurrentRun();
+    } catch {
+      setErrors([{ field: "weights", messageKey: "portfolioLab.minimumVarianceUnavailable" }]);
+    }
+  }
+
   function updateField(field: keyof FormState, value: string) {
     setForm((prev) => ({ ...prev, [field]: value }));
     setErrors([]);
@@ -997,6 +1014,10 @@ export function PortfolioLab() {
               <button type="button" className={styles.equalButton} onClick={applyRiskAdjustedWeights} disabled={!view}>
                 <Activity size={13} aria-hidden="true" />
                 <span>{t("portfolioLab.riskAdjustedWeight")}</span>
+              </button>
+              <button type="button" className={styles.equalButton} onClick={applyMinimumVarianceWeights} disabled={!view}>
+                <Activity size={13} aria-hidden="true" />
+                <span>{t("portfolioLab.minimumVarianceWeight")}</span>
               </button>
             </div>
 

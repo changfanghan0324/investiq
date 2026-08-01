@@ -443,6 +443,18 @@ describe('one-asset equivalence', () => {
   });
 });
 
+describe('annualization sample gate', () => {
+  it('withholds CAGR below sixty daily observations while preserving total period return', () => {
+    const view = buildPortfolioLab({
+      holdings: [holding('AAA', THREE, [100, 105, 110], 1)],
+      initialCapital: CAPITAL,
+      annualRiskFreeRate: 0,
+    });
+    assert.equal(view.cagr, undefined);
+    assertClose(view.totalPriceReturn, 0.1);
+  });
+});
+
 describe('buy-and-hold allocation', () => {
   it('turns 50/50 into a 50% portfolio return and a two-thirds final weight', () => {
     const view = buildPortfolioLab({

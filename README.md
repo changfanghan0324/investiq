@@ -176,6 +176,10 @@ These hold across Market Context, Company price-risk context, Stock Comparison, 
 - Risk-adjusted portfolio weights use inverse historical annualized volatility only. The method is a
   deterministic long-only allocation rule, not an optimizer, minimum-variance portfolio, efficient
   frontier, or recommendation.
+- A separate correlation-aware global minimum-variance control solves the long-only, fully invested
+  historical variance objective from at least 60 aligned daily returns. The deterministic projected-
+  gradient solver rejects flat, singular, and non-convergent inputs. GMV is in-sample and variance-
+  only; it is not a forecast, expected-return optimizer, efficient frontier, or recommendation.
 - Every function is deterministic: no clock, no randomness, no I/O.
 - `undefined` means "not computable from this data", never `0`. A short history yields missing
   metrics rather than invented ones.

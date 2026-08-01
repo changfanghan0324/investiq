@@ -785,7 +785,262 @@ export function inverseVolatilityWeights(series: ReturnSeries[]): InverseVolatil
   };
 }
 
+// --- Global minimum-variance allocation -------------------------------------
+
+/** Lower and upper bounds on the number of series the minimum-variance optimizer accepts. */
+export const MIN_VARIANCE_MIN_SERIES = 1;
+export const MIN_VARIANCE_MAX_SERIES = 10;
+
+/**
+ * Hard ceiling on projected-gradient iterations. Convergence is bounded: the descent always
+ * stops here even if the weight change has not yet fallen below the tolerance, so the routine
+ * can never spin without terminating.
+ */
+export const MIN_VARIANCE_MAX_ITERATIONS = 20000;
+
+/**
+ * The optimizer has converged once the largest single-weight change between two consecutive
+ * projected-gradient steps falls below this threshold. Far tighter than the 1e-6 weight-sum
+ * tolerance the weights are later validated against, so a converged allocation is exact to
+ * display precision.
+ */
+export const MIN_VARIANCE_CONVERGENCE_TOLERANCE = 1e-12;
+
+/** One holding's weight in the long-only global minimum-variance portfolio. */
+export interface MinimumVarianceWeight {
+  symbol: string;
+  weight: number;
+}
+
+/**
+ * A long-only global minimum-variance (GMV) allocation: the fully invested, no-short weights
+ * that minimize the sample variance of the combined daily return series. Unlike
+ * `inverseVolatilityWeights`, this DOES read the covariance between holdings, so two highly
+ * correlated names are down-weighted together rather than each judged in isolation.
+ *
+ * This is a historical, in-sample optimizer, not a forecast: it minimizes the variance the
+ * holdings actually exhibited over the aligned window, and sample covariance is a noisy estimate
+ * that need not persist. It targets only variance — never expected return — so it is the single
+ * lowest-variance long-only portfolio, not a point on an expected-return efficient frontier, and
+ * it does not claim to be optimal for any return objective.
+ */
+export interface MinimumVarianceAllocation {
+  /** Names the method so a view never mislabels it as a return-maximizing optimization. */
+  method: 'global-minimum-variance';
+  weights: MinimumVarianceWeight[];
+  /** Aligned daily observations, present in every series, behind the covariance estimate. */
+  observations: number;
+  /** Annualized volatility of the optimized portfolio: sqrt(wᵀΣw · 252) on the daily covariance. */
+  volatility: number;
+  /** Projected-gradient iterations run before convergence or the iteration ceiling. */
+  iterations: number;
+  /** True when the descent met `MIN_VARIANCE_CONVERGENCE_TOLERANCE` before the iteration ceiling. */
+  converged: boolean;
+}
+
+/**
+ * Deterministic long-only global minimum-variance weights from aligned daily returns.
+ *
+ * Method, stated exactly:
+ * - Alignment: the series are inner-joined on date (every date must be present in EVERY series),
+ *   so a holiday or a shorter listing history never pairs mismatched days or imputes a return.
+ * - Sample covariance: the n×n covariance matrix is built from the aligned columns with the same
+ *   Bessel-corrected (÷ N-1) estimator the rest of this module uses for variance and covariance.
+ * - Objective: minimize wᵀΣw subject to wᵢ ≥ 0 and Σwᵢ = 1 (the probability simplex), so the
+ *   result is fully invested and never shorts.
+ * - Solver: projected gradient descent. Each step takes a gradient step 2Σw with a constant size
+ *   1 / (2·‖Σ‖∞) — the reciprocal of an upper bound on the gradient's Lipschitz constant, which
+ *   guarantees descent — then projects back onto the simplex with the exact O(n log n)
+ *   sort-and-threshold projection (Held–Wolfe–Crowder / Duchi). It stops when the largest weight
+ *   change drops below `MIN_VARIANCE_CONVERGENCE_TOLERANCE` or at `MIN_VARIANCE_MAX_ITERATIONS`.
+ *
+ * Rejections — the optimizer never fabricates weights from unusable data:
+ * - Between `MIN_VARIANCE_MIN_SERIES` and `MIN_VARIANCE_MAX_SERIES` series, every symbol distinct.
+ * - Fewer than `MIN_RISK_OBSERVATIONS` aligned observations is REJECTED with an `AnalyticsError`,
+ *   the same statistical floor volatility, beta, and correlation use — a covariance from a
+ *   handful of overlapping days would mislead more than inform.
+ * - A flat holding (zero variance) or a singular covariance matrix (e.g. two perfectly correlated
+ *   series, or more holdings than independent observations) is REJECTED, because the minimum is
+ *   then not unique and the weights would be arbitrary. Positive-definiteness is checked with a
+ *   Cholesky factorization; a non-positive pivot rejects the input.
+ */
+export function globalMinimumVarianceWeights(series: ReturnSeries[]): MinimumVarianceAllocation {
+  if (series.length < MIN_VARIANCE_MIN_SERIES || series.length > MIN_VARIANCE_MAX_SERIES) {
+    throw new AnalyticsError(
+      `Minimum-variance weighting needs between ${MIN_VARIANCE_MIN_SERIES} and ` +
+        `${MIN_VARIANCE_MAX_SERIES} return series; received ${series.length}.`,
+    );
+  }
+
+  const seen = new Set<string>();
+  for (const entry of series) {
+    if (seen.has(entry.symbol)) {
+      throw new AnalyticsError(`Return series ${entry.symbol} appears more than once.`);
+    }
+    seen.add(entry.symbol);
+    validateReturnSeries(entry.returns, entry.symbol);
+  }
+
+  const columns = alignReturnColumns(series.map((entry) => entry.returns));
+  const observations = columns.length === 0 ? 0 : columns[0].length;
+  if (observations < MIN_RISK_OBSERVATIONS) {
+    throw new AnalyticsError(
+      `Minimum-variance weighting needs at least ${MIN_RISK_OBSERVATIONS} aligned observations ` +
+        `across every series; only ${observations} dates overlap.`,
+    );
+  }
+
+  const covariance = sampleCovarianceMatrix(columns);
+  if (!isPositiveDefinite(covariance)) {
+    throw new AnalyticsError(
+      'The covariance matrix is singular or not positive definite (a flat holding, perfectly ' +
+        'correlated holdings, or too few observations), so the minimum-variance portfolio is not ' +
+        'unique; minimum-variance weighting is rejected.',
+    );
+  }
+
+  const { weights, iterations, converged } = minimizeVarianceOnSimplex(covariance);
+  if (!converged) {
+    throw new AnalyticsError(
+      `Minimum-variance weighting did not converge within ${MIN_VARIANCE_MAX_ITERATIONS} iterations.`,
+    );
+  }
+  const dailyVariance = quadraticForm(covariance, weights);
+  const volatility = Math.sqrt(Math.max(0, dailyVariance) * TRADING_DAYS_PER_YEAR);
+
+  return {
+    method: 'global-minimum-variance',
+    weights: series.map((entry, index) => ({ symbol: entry.symbol, weight: weights[index] })),
+    observations,
+    volatility,
+    iterations,
+    converged,
+  };
+}
+
 // --- Internal helpers -------------------------------------------------------
+
+/**
+ * Inner-joins several dated return series on date, returning one aligned column of values per
+ * series in the original order. A date survives only when EVERY series carries it, so no column
+ * is ever padded with an imputed return. Columns are ordered by date so the covariance is
+ * reproducible.
+ */
+function alignReturnColumns(seriesReturns: DatedValue[][]): number[][] {
+  if (seriesReturns.length === 0) return [];
+
+  const maps = seriesReturns.map((points) => new Map(points.map((point) => [point.date, point.value])));
+  const sharedDates = [...new Set(seriesReturns[0].map((point) => point.date))]
+    .filter((date) => maps.every((byDate) => byDate.has(date)))
+    .sort((left, right) => left.localeCompare(right));
+
+  return maps.map((byDate) => sharedDates.map((date) => byDate.get(date) as number));
+}
+
+/** Symmetric sample covariance matrix of aligned columns, using the shared ÷(N-1) estimator. */
+function sampleCovarianceMatrix(columns: number[][]): number[][] {
+  const n = columns.length;
+  const matrix = Array.from({ length: n }, () => new Array<number>(n).fill(0));
+  for (let i = 0; i < n; i += 1) {
+    for (let j = i; j < n; j += 1) {
+      const value = sampleCovariance(columns[i], columns[j]);
+      matrix[i][j] = value;
+      matrix[j][i] = value;
+    }
+  }
+  return matrix;
+}
+
+/**
+ * Tests positive-definiteness by attempting a Cholesky factorization: a non-positive pivot means
+ * the matrix is singular or indefinite. The pivot threshold is relative to the largest diagonal
+ * entry so it holds across the tiny magnitudes daily-return covariances take.
+ */
+function isPositiveDefinite(matrix: number[][]): boolean {
+  const n = matrix.length;
+  const scale = Math.max(...matrix.map((row, index) => row[index]), 0);
+  const pivotFloor = scale * 1e-10;
+
+  const lower = Array.from({ length: n }, () => new Array<number>(n).fill(0));
+  for (let i = 0; i < n; i += 1) {
+    for (let j = 0; j <= i; j += 1) {
+      let sum = matrix[i][j];
+      for (let k = 0; k < j; k += 1) sum -= lower[i][k] * lower[j][k];
+      if (i === j) {
+        if (sum <= pivotFloor) return false;
+        lower[i][i] = Math.sqrt(sum);
+      } else {
+        lower[i][j] = sum / lower[j][j];
+      }
+    }
+  }
+  return true;
+}
+
+/**
+ * Minimizes wᵀΣw over the probability simplex with projected gradient descent from the
+ * equal-weight start. A constant step of 1 / (2·‖Σ‖∞) is the reciprocal of an upper bound on the
+ * gradient's Lipschitz constant (Gershgorin bounds the spectral radius by the max absolute row
+ * sum), so every step is a descent and the iteration converges.
+ */
+function minimizeVarianceOnSimplex(covariance: number[][]): {
+  weights: number[];
+  iterations: number;
+  converged: boolean;
+} {
+  const n = covariance.length;
+  const lipschitzBound = Math.max(
+    ...covariance.map((row) => row.reduce((total, value) => total + Math.abs(value), 0)),
+  );
+  const stepSize = 1 / (2 * lipschitzBound);
+
+  let weights = new Array<number>(n).fill(1 / n);
+  let iterations = 0;
+  let converged = false;
+
+  while (iterations < MIN_VARIANCE_MAX_ITERATIONS) {
+    const gradient = covariance.map((row) => 2 * row.reduce((total, value, j) => total + value * weights[j], 0));
+    const stepped = weights.map((weight, i) => weight - stepSize * gradient[i]);
+    const next = projectOntoSimplex(stepped);
+    iterations += 1;
+
+    let maxChange = 0;
+    for (let i = 0; i < n; i += 1) maxChange = Math.max(maxChange, Math.abs(next[i] - weights[i]));
+    weights = next;
+    if (maxChange < MIN_VARIANCE_CONVERGENCE_TOLERANCE) {
+      converged = true;
+      break;
+    }
+  }
+
+  return { weights, iterations, converged };
+}
+
+/**
+ * Exact Euclidean projection of a vector onto the probability simplex {w : wᵢ ≥ 0, Σwᵢ = 1}
+ * (Held–Wolfe–Crowder / Duchi): sort descending, find the largest prefix whose thresholded values
+ * stay positive, and subtract the resulting threshold. Deterministic and O(n log n).
+ */
+function projectOntoSimplex(vector: number[]): number[] {
+  const sorted = [...vector].sort((left, right) => right - left);
+  let cumulative = 0;
+  let threshold = 0;
+  for (let j = 0; j < sorted.length; j += 1) {
+    cumulative += sorted[j];
+    const candidate = (cumulative - 1) / (j + 1);
+    if (sorted[j] - candidate > 0) threshold = candidate;
+  }
+  return vector.map((value) => Math.max(value - threshold, 0));
+}
+
+/** The quadratic form wᵀΣw: the sample variance of the weighted daily portfolio return. */
+function quadraticForm(matrix: number[][], vector: number[]): number {
+  let total = 0;
+  for (let i = 0; i < vector.length; i += 1) {
+    for (let j = 0; j < vector.length; j += 1) total += vector[i] * matrix[i][j] * vector[j];
+  }
+  return total;
+}
 
 function validateReturnSeries(returns: DatedValue[], label?: string): void {
   const subject = label ? `Return series for ${label}` : 'Return series';

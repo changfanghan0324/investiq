@@ -18,9 +18,11 @@ import {
   cumulativePriceReturns,
   dailyCloseReturns,
   downsideDeviation,
+  globalMinimumVarianceWeights,
   historicalValueAtRisk,
   inverseVolatilityWeights,
   jensenAlpha,
+  MIN_VARIANCE_MAX_SERIES,
   maxCloseDrawdown,
   portfolioDailyReturns,
   resolveReturnBasis,
@@ -750,5 +752,211 @@ describe('inverse-volatility weights', () => {
       () => inverseVolatilityWeights([{ symbol: 'AAA', returns: moving }, { symbol: 'AAA', returns: moving }]),
       AnalyticsError,
     );
+  });
+});
+
+describe('global minimum-variance weights', () => {
+  // N is a multiple of 8 so the three ±1 patterns below are each zero-mean and MUTUALLY
+  // uncorrelated over the sample, which makes every covariance below exactly hand-computable.
+  const N = MIN_RISK_OBSERVATIONS * 2;
+
+  const pattern2 = (index: number): number => (index % 2 === 0 ? 1 : -1); // period 2
+  const pattern4 = (index: number): number => (Math.floor(index / 2) % 2 === 0 ? 1 : -1); // period 4
+  const pattern8 = (index: number): number => (Math.floor(index / 4) % 2 === 0 ? 1 : -1); // period 8
+
+  /** A return series that is a linear blend of the three orthogonal patterns. */
+  function blend(a: number, b: number, c: number): DatedValue[] {
+    return seriesReturns(N, (index) => a * pattern2(index) + b * pattern4(index) + c * pattern8(index));
+  }
+
+  /** Independent sample covariance of two equal-length aligned columns, using the ÷(N-1) estimator. */
+  function sampleCovariance(a: number[], b: number[]): number {
+    const meanA = sampleMean(a);
+    const meanB = sampleMean(b);
+    const sum = a.reduce((total, value, index) => total + (value - meanA) * (b[index] - meanB), 0);
+    return sum / (a.length - 1);
+  }
+
+  function covarianceMatrix(columns: number[][]): number[][] {
+    return columns.map((rowColumn) => columns.map((colColumn) => sampleCovariance(rowColumn, colColumn)));
+  }
+
+  function values(series: DatedValue[]): number[] {
+    return series.map((point) => point.value);
+  }
+
+  /** Portfolio sample variance wᵀΣw. */
+  function portfolioVariance(cov: number[][], weights: number[]): number {
+    let total = 0;
+    for (let i = 0; i < weights.length; i += 1) {
+      for (let j = 0; j < weights.length; j += 1) total += weights[i] * cov[i][j] * weights[j];
+    }
+    return total;
+  }
+
+  /** Unconstrained two-asset GMV weight on the first asset: (σ₂₂ − σ₁₂)/(σ₁₁ + σ₂₂ − 2σ₁₂). */
+  function twoAssetWeightOnFirst(cov: number[][]): number {
+    return (cov[1][1] - cov[0][1]) / (cov[0][0] + cov[1][1] - 2 * cov[0][1]);
+  }
+
+  it('matches the closed-form two-asset solution for an interior optimum', () => {
+    // A = 0.01·p2, B = 0.005·p2 + 0.01·p4 → σAA∝1, σBB∝1.25, σAB∝0.5 (in units of 0.0001·v),
+    // so the closed-form weight on A is (1.25−0.5)/(1+1.25−1) = 0.6, strictly interior.
+    const assetA = blend(0.01, 0, 0);
+    const assetB = blend(0.005, 0.01, 0);
+    const cov = covarianceMatrix([values(assetA), values(assetB)]);
+
+    const expectedFirst = twoAssetWeightOnFirst(cov);
+    // Guard the fixture: this scenario must actually be interior for the closed form to apply.
+    assert.ok(expectedFirst > 0 && expectedFirst < 1);
+    assertClose(expectedFirst, 0.6, 1e-12);
+
+    const allocation = globalMinimumVarianceWeights([
+      { symbol: 'AAA', returns: assetA },
+      { symbol: 'BBB', returns: assetB },
+    ]);
+
+    assert.equal(allocation.method, 'global-minimum-variance');
+    assert.equal(allocation.observations, N);
+    assert.ok(allocation.converged);
+    assertClose(allocation.weights[0].weight, expectedFirst, 1e-8);
+    assertClose(allocation.weights[1].weight, 1 - expectedFirst, 1e-8);
+
+    // The reported volatility is the annualized objective at the returned weights.
+    const dailyVariance = portfolioVariance(cov, allocation.weights.map((entry) => entry.weight));
+    assertClose(allocation.volatility, Math.sqrt(dailyVariance * TRADING_DAYS_PER_YEAR), 1e-8);
+  });
+
+  it('returns non-negative weights that sum to one', () => {
+    // Three uncorrelated assets with distinct variances → an interior inverse-variance optimum.
+    const allocation = globalMinimumVarianceWeights([
+      { symbol: 'AAA', returns: blend(0.01, 0, 0) },
+      { symbol: 'BBB', returns: blend(0, 0.02, 0) },
+      { symbol: 'CCC', returns: blend(0, 0, 0.015) },
+    ]);
+
+    for (const entry of allocation.weights) assert.ok(entry.weight >= 0);
+    assertClose(
+      allocation.weights.reduce((total, entry) => total + entry.weight, 0),
+      1,
+      1e-9,
+    );
+  });
+
+  it('achieves variance no worse than the equal-weight portfolio', () => {
+    const series = [
+      { symbol: 'AAA', returns: blend(0.01, 0, 0) },
+      { symbol: 'BBB', returns: blend(0, 0.02, 0) },
+      { symbol: 'CCC', returns: blend(0, 0, 0.015) },
+    ];
+    const cov = covarianceMatrix(series.map((entry) => values(entry.returns)));
+
+    const allocation = globalMinimumVarianceWeights(series);
+    const optimized = portfolioVariance(cov, allocation.weights.map((entry) => entry.weight));
+    const equalWeight = portfolioVariance(cov, series.map(() => 1 / series.length));
+
+    // The minimum-variance portfolio can never be more volatile than naive equal weighting, and
+    // with distinct variances it is strictly less.
+    assert.ok(optimized < equalWeight);
+  });
+
+  it('drives a dominated holding to a zero-weight corner', () => {
+    // HIGH = 0.03·p2 + 0.01·p4 is highly correlated with LOW = 0.01·p2 but far more volatile:
+    // σLOW∝1, σHIGH∝10, σ(LOW,HIGH)∝3, so the unconstrained weight on HIGH is (1−3)/(1+10−6) =
+    // −0.4. The long-only constraint pins HIGH to exactly zero and LOW to one.
+    const low = blend(0.01, 0, 0);
+    const high = blend(0.03, 0.01, 0);
+    const cov = covarianceMatrix([values(low), values(high)]);
+
+    // Guard the fixture: the unconstrained weight on HIGH must be negative for this to be a corner.
+    assert.ok(1 - twoAssetWeightOnFirst(cov) < 0);
+
+    const allocation = globalMinimumVarianceWeights([
+      { symbol: 'LOW', returns: low },
+      { symbol: 'HIGH', returns: high },
+    ]);
+
+    assertClose(allocation.weights[0].weight, 1, 1e-8);
+    assertClose(allocation.weights[1].weight, 0, 1e-8);
+  });
+
+  it('is invariant to scaling every return by the same positive constant', () => {
+    const assetA = blend(0.01, 0, 0);
+    const assetB = blend(0, 0.02, 0);
+    const scale = 4; // A power of two keeps the covariance an exact multiple, isolating the invariance.
+
+    const base = globalMinimumVarianceWeights([
+      { symbol: 'AAA', returns: assetA },
+      { symbol: 'BBB', returns: assetB },
+    ]);
+    const scaled = globalMinimumVarianceWeights([
+      { symbol: 'AAA', returns: assetA.map((point) => ({ date: point.date, value: point.value * scale })) },
+      { symbol: 'BBB', returns: assetB.map((point) => ({ date: point.date, value: point.value * scale })) },
+    ]);
+
+    assertClose(scaled.weights[0].weight, base.weights[0].weight, 1e-9);
+    assertClose(scaled.weights[1].weight, base.weights[1].weight, 1e-9);
+    // Uniformly scaling returns scales the volatility by the same constant.
+    assertClose(scaled.volatility, base.volatility * scale, 1e-9);
+  });
+
+  it('rejects fewer than sixty aligned observations', () => {
+    const tooShort = seriesReturns(MIN_RISK_OBSERVATIONS - 1, (index) => 0.02 * pattern2(index));
+    assert.throws(() => globalMinimumVarianceWeights([{ symbol: 'AAA', returns: tooShort }]), AnalyticsError);
+
+    // Individually long enough, but their trading days do not overlap, so the intersection is empty.
+    const early = seriesReturns(MIN_RISK_OBSERVATIONS, (index) => 0.02 * pattern2(index), '2024-01-02');
+    const late = seriesReturns(MIN_RISK_OBSERVATIONS, (index) => 0.02 * pattern4(index), '2025-06-02');
+    assert.throws(
+      () => globalMinimumVarianceWeights([{ symbol: 'AAA', returns: early }, { symbol: 'BBB', returns: late }]),
+      AnalyticsError,
+    );
+  });
+
+  it('rejects a flat holding and a singular covariance matrix', () => {
+    const moving = blend(0.01, 0.005, 0);
+    const flat = seriesReturns(N, () => 0);
+    // Two identical series are perfectly correlated, so the covariance matrix is singular.
+    const duplicate = blend(0.01, 0.005, 0);
+
+    assert.throws(() => globalMinimumVarianceWeights([{ symbol: 'FLAT', returns: flat }]), AnalyticsError);
+    assert.throws(
+      () => globalMinimumVarianceWeights([{ symbol: 'AAA', returns: moving }, { symbol: 'FLAT', returns: flat }]),
+      AnalyticsError,
+    );
+    assert.throws(
+      () => globalMinimumVarianceWeights([{ symbol: 'AAA', returns: moving }, { symbol: 'BBB', returns: duplicate }]),
+      AnalyticsError,
+    );
+  });
+
+  it('rejects too few, too many, and duplicate series', () => {
+    const moving = blend(0.01, 0.005, 0);
+
+    assert.throws(() => globalMinimumVarianceWeights([]), AnalyticsError);
+    assert.throws(
+      () =>
+        globalMinimumVarianceWeights(
+          Array.from({ length: MIN_VARIANCE_MAX_SERIES + 1 }, (unused, index) => ({
+            symbol: `SYM${index}`,
+            returns: moving,
+          })),
+        ),
+      AnalyticsError,
+    );
+    assert.throws(
+      () => globalMinimumVarianceWeights([{ symbol: 'AAA', returns: moving }, { symbol: 'AAA', returns: moving }]),
+      AnalyticsError,
+    );
+  });
+
+  it('is deterministic: identical inputs yield an identical allocation', () => {
+    const series = [
+      { symbol: 'AAA', returns: blend(0.01, 0.005, 0) },
+      { symbol: 'BBB', returns: blend(0, 0.02, 0.005) },
+      { symbol: 'CCC', returns: blend(0.003, 0, 0.015) },
+    ];
+
+    assert.deepEqual(globalMinimumVarianceWeights(series), globalMinimumVarianceWeights(series));
   });
 });
