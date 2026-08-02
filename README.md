@@ -877,6 +877,12 @@ service-unavailable response before any provider work, and the browser keeps its
 mode. Local and preview deployments are ungated, so personal credentials can be used for private
 testing.
 
+Portfolio Lab and Stock Comparison probe `/api/health` before loading a symbol. When price analysis
+is unavailable, they do not issue doomed live-data requests: they run the analytics locally on
+generated series whose source, on-screen notice, asset names, and CSV disclosure all say **synthetic
+demo — not market history**. This keeps the public portfolio demonstration usable without weakening
+the server gate or presenting generated figures as AAPL, MSFT, SPY, or any other real security.
+
 The flag confers **no rights of any kind** — setting it only records that the operator has confirmed
 they already hold them. Enable it only after securing written rights that cover public end-user display
 *and* derived analytics for **every** source in use, and treat it as server-only: never prefix it with

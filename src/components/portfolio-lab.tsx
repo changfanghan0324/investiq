@@ -71,7 +71,8 @@ import {
 import { simulatePeriodicRebalancing, type RebalancingResult } from "@/domain/portfolio-rebalancing";
 import { buildRiskContext, type RiskContextAnswers } from "@/domain/risk-context";
 import { MIN_COMMON_CLOSES, commonTradingDates } from "@/domain/stock-comparison";
-import { MarketDataError, loadMarketData } from "@/services/market-data-api";
+import { loadAnalysisMarketData } from "@/services/analysis-market-data";
+import { MarketDataError } from "@/services/market-data-api";
 import { type Translate, type TranslationKey, useLanguage } from "@/i18n/language";
 import {
   FREQUENCY_OPTIONS,
@@ -95,7 +96,7 @@ import styles from "./portfolio-lab.module.css";
 /** Benchmark for beta and the optional overlay. An investable ETF, not the index itself. */
 const BENCHMARK_SYMBOL = "SPY";
 
-/** Opening example, so the workspace shows real output instead of an empty form. */
+/** Opening example, so the workspace shows a usable analysis instead of an empty form. */
 const EXAMPLE_HOLDINGS: Array<{ symbol: string; weightPercent: string }> = [
   { symbol: "AAPL", weightPercent: "40.0" },
   { symbol: "MSFT", weightPercent: "30.0" },
@@ -494,12 +495,11 @@ async function loadSymbol(
 ): Promise<FailureMessage & { data?: MarketData }> {
   try {
     return {
-      data: await loadMarketData({
+      data: await loadAnalysisMarketData({
         ticker: symbol,
         from: startDate,
         to: endDate,
         requiredStart: startDate,
-        mode: "analysis",
       }),
     };
   } catch (error) {
@@ -832,6 +832,7 @@ export function PortfolioLab() {
 
   const assembled = useMemo(() => (run ? assemble(run) : undefined), [run]);
   const view = assembled?.view;
+  const isDemoRun = run?.holdings.some((load) => load.data?.source === "demo") ?? false;
   const rebalancingAnalysis = useMemo(() => {
     const currentView = assembled?.view;
     if (!currentView) return undefined;
@@ -942,7 +943,7 @@ export function PortfolioLab() {
 
   function handleDownload() {
     if (!view || !run) return;
-    downloadCsv(buildCsv(view, run.input, t), csvFilename(view));
+    downloadCsv(buildCsv(view, run.input, t, isDemoRun), csvFilename(view));
   }
 
   return (
@@ -972,6 +973,13 @@ export function PortfolioLab() {
           <h1>{t("portfolioLab.title")}</h1>
           <p className={styles.subtitle}>{t("portfolioLab.subtitle")}</p>
         </div>
+
+        {isDemoRun ? (
+          <section className={styles.demoNotice} aria-labelledby="portfolio-demo-title">
+            <strong id="portfolio-demo-title">{t("analysisDemo.title")}</strong>
+            <p>{t("analysisDemo.body")}</p>
+          </section>
+        ) : null}
 
         <form className={styles.controls} onSubmit={handleSubmit} aria-label={t("portfolioLab.controlsTitle")}>
           <fieldset className={styles.holdingFields}>
@@ -2752,11 +2760,12 @@ function ChartTooltip({
  * could not support is written as an empty cell rather than a zero, and the header states the
  * buy-and-hold basis so the file cannot be read as a rebalanced or total-return result.
  */
-function buildCsv(view: PortfolioLabViewModel, input: PortfolioInput, t: Translate): string {
+function buildCsv(view: PortfolioLabViewModel, input: PortfolioInput, t: Translate, demo: boolean): string {
   const { window, concentration, attribution, benchmark } = view;
 
   const rows: string[][] = [
     [t("portfolioLab.csvTitle")],
+    [t("analysisDemo.csvSource"), t(demo ? "analysisDemo.csvSynthetic" : "analysisDemo.csvLive")],
     [t("portfolioLab.csvBasis"), t("portfolioLab.csvBasisText")],
     [t("portfolioLab.csvEmptyCells"), t("portfolioLab.csvEmptyCellsText")],
     [t("portfolioLab.csvRequestedWindow"), `${input.startDate} / ${input.endDate}`],

@@ -55,7 +55,8 @@ import {
   type ComparisonNoteCode,
   type StockComparisonViewModel,
 } from "@/domain/stock-comparison";
-import { MarketDataError, loadMarketData } from "@/services/market-data-api";
+import { loadAnalysisMarketData } from "@/services/analysis-market-data";
+import { MarketDataError } from "@/services/market-data-api";
 import { type Translate, type TranslationKey, useLanguage } from "@/i18n/language";
 import type { DateString, MarketData } from "@/types/backtest";
 import { daysBetween } from "@/utils/date";
@@ -65,7 +66,7 @@ import styles from "./stock-comparison.module.css";
 /** Benchmark for beta. An investable ETF, not the index itself. */
 const BENCHMARK_SYMBOL = "SPY";
 
-/** Opening example, so the workspace shows real output instead of an empty form. */
+/** Opening example, so the workspace shows a usable comparison instead of an empty form. */
 const EXAMPLE_SYMBOLS = ["AAPL", "MSFT"];
 
 /** Trailing window of the opening example, in years. */
@@ -281,12 +282,11 @@ async function loadSymbol(
 ): Promise<FailureMessage & { data?: MarketData }> {
   try {
     return {
-      data: await loadMarketData({
+      data: await loadAnalysisMarketData({
         ticker: symbol,
         from: startDate,
         to: endDate,
         requiredStart: startDate,
-        mode: "analysis",
       }),
     };
   } catch (error) {
@@ -534,6 +534,7 @@ export function StockComparison() {
 
   const assembled = useMemo(() => (run ? assemble(run) : undefined), [run]);
   const view = assembled?.view;
+  const isDemoRun = run?.securities.some((load) => load.data?.source === "demo") ?? false;
 
   const failedSecurities = useMemo(
     () => run?.securities.filter((load) => load.status === "error") ?? [],
@@ -598,7 +599,7 @@ export function StockComparison() {
 
   function handleDownload() {
     if (!view || !run) return;
-    downloadCsv(buildCsv(view, run.input, t), csvFilename(view));
+    downloadCsv(buildCsv(view, run.input, t, isDemoRun), csvFilename(view));
   }
 
   return (
@@ -628,6 +629,13 @@ export function StockComparison() {
           <h1>{t("compare.title")}</h1>
           <p className={styles.subtitle}>{t("compare.subtitle")}</p>
         </div>
+
+        {isDemoRun ? (
+          <section className={styles.demoNotice} aria-labelledby="comparison-demo-title">
+            <strong id="comparison-demo-title">{t("analysisDemo.title")}</strong>
+            <p>{t("analysisDemo.body")}</p>
+          </section>
+        ) : null}
 
         <form className={styles.controls} onSubmit={handleSubmit} aria-label={t("compare.controlsTitle")}>
           <fieldset className={styles.symbolFields}>
@@ -1682,9 +1690,10 @@ function ChartTooltip({
  * fractions with a dot separator so the file stays machine-readable in every locale, and a metric
  * the window could not support is written as an empty cell rather than a zero.
  */
-function buildCsv(view: StockComparisonViewModel, input: ComparisonInput, t: Translate): string {
+function buildCsv(view: StockComparisonViewModel, input: ComparisonInput, t: Translate, demo: boolean): string {
   const rows: string[][] = [
     [t("compare.csvTitle")],
+    [t("analysisDemo.csvSource"), t(demo ? "analysisDemo.csvSynthetic" : "analysisDemo.csvLive")],
     [t("compare.csvWindowStart"), view.commonWindow.startDate],
     [t("compare.csvWindowEnd"), view.commonWindow.endDate],
     [t("compare.csvSessions"), String(view.commonWindow.sessions)],

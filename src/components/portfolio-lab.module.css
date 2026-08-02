@@ -134,6 +134,30 @@
   line-height: 1.6;
 }
 
+.demoNotice {
+  display: grid;
+  margin-top: 14px;
+  padding: 11px 13px;
+  border: 1px solid rgba(242, 182, 54, 0.34);
+  border-left: 3px solid #f2b636;
+  border-radius: 4px;
+  color: #c9ccd5;
+  background: rgba(77, 56, 18, 0.22);
+  font-size: calc(11px * var(--ui-font-scale, 1));
+  line-height: 1.55;
+  gap: 3px;
+}
+
+.demoNotice strong {
+  color: #f4c567;
+  font-size: calc(11.5px * var(--ui-font-scale, 1));
+  font-weight: 600;
+}
+
+.demoNotice p {
+  max-width: 100ch;
+}
+
 /* Builder. Two blocks in one card: the weighted holdings, then the window, the capital, and the
    rate beside the run button. */
 

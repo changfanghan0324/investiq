@@ -110,7 +110,7 @@ export function DcaBacktestDashboard() {
     fetch("/api/health", { cache: "no-store" })
       .then((response) => response.json())
       .then((payload) => {
-        if (active) setHealth(payload.services?.marketData === "ready" ? "ready" : "degraded");
+        if (active) setHealth(payload.services?.dca === "ready" ? "ready" : "degraded");
       })
       .catch(() => {
         if (active) setHealth("degraded");
