@@ -216,6 +216,11 @@ MARKET_DATA_PUBLIC_DISPLAY_LICENSE_CONFIRMED=true
 
 该变量只是运营者确认，不会自动产生法律授权。没有确认时，公开生产环境只应使用明确标记的 demo 数据。
 
+Portfolio Lab 与 Stock Comparison 会在读取股票前检查 `/api/health`。当真实价格分析不可用时，
+页面不会继续发送必然失败的实时数据请求，而是在浏览器中使用生成的示例序列完成分析。页面告知、
+资产名称与 CSV 都会明确标示“合成演示数据——不是市场历史”，不会把生成结果描述为 AAPL、MSFT、
+SPY 或任何其他真实证券的表现。
+
 ## 安全说明
 
 - API key 只能由 `src/server/` 下的服务器模块读取。
