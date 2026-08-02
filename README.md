@@ -1,5 +1,7 @@
 # InvestIQ — Investment Research & Portfolio Analytics
 
+**Language:** [English](README.md) | [简体中文](README.zh-CN.md)
+
 [![CI](https://github.com/changfanghan0324/investiq/actions/workflows/ci.yml/badge.svg)](https://github.com/changfanghan0324/investiq/actions/workflows/ci.yml)
 
 InvestIQ is an evidence-first research platform for finance students, aspiring equity-research
@@ -119,7 +121,7 @@ Browser UI (research, company, comparison, portfolio, tools)
   and request timeouts, and return neutral 5xx messages (`src/server/errors.ts`,
   `src/server/rate-limit.ts`). Provider responses and the serialized route response are also byte-bounded.
 - `/api/health` reports an overall `ready`, `degraded`, or `unavailable` alongside separate
-  `priceAnalysis`, `dca`, `assistant`, and `database` readiness, and nothing else. A missing Massive
+  `priceAnalysis`, `dca`, and `assistant` readiness plus database configuration status, and nothing else. A missing Massive
   key degrades `dca` alone; price analysis stays ready, so it never forces an overall `503`.
 - The database migration contract lives in `drizzle/`. Snapshot, source, and audit rows are
   append-only at the database layer; cross-owner snapshot, memo, peer, and portfolio writes are
@@ -667,6 +669,7 @@ exists in both languages, and it is deliberately kept out of the primary navigat
 | Path | Purpose |
 | --- | --- |
 | `README.md` | This document: product scope, calculation contract, architecture, setup, verification, deployment. |
+| `README.zh-CN.md` | Simplified-Chinese README with matching product, setup, methodology, deployment, and safety guidance. |
 | `CLAUDE.md` | Working agreement and change-control rules for contributors. |
 | `docs/INVESTIQ_PRODUCT_SPEC.md` | Product specification: workspaces, localization, accessibility, ownership. |
 | `package.json` / `package-lock.json` | Runtime requirements, scripts, dependencies, and the reproducible lockfile. |

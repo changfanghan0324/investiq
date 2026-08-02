@@ -1,5 +1,5 @@
 import { isAssistantConfigured } from '@/server/assistant';
-import { checkDatabaseHealth } from '@/server/database-health';
+import { isDatabaseConfigured } from '@/server/db';
 import { jsonResponse } from '@/server/errors';
 import { marketDataCapabilities } from '@/server/market-data';
 
@@ -9,8 +9,11 @@ export const dynamic = 'force-dynamic';
 export async function GET(): Promise<Response> {
   const { priceAnalysis, dca } = marketDataCapabilities();
   const assistantReady = isAssistantConfigured();
-  const database = await checkDatabaseHealth();
-  const supportingServicesReady = dca && assistantReady && database === 'ready';
+  // This endpoint is public and may be polled frequently. Report configuration
+  // capability only; a live database round-trip belongs behind protected platform
+  // monitoring so anonymous requests cannot fan out Neon work across instances.
+  const databaseConfigured = isDatabaseConfigured();
+  const supportingServicesReady = dca && assistantReady && databaseConfigured;
 
   // Price-only analysis needs no Massive key, so a missing key degrades DCA alone
   // and must never force an overall 503. The platform is only "unavailable" when
@@ -28,7 +31,7 @@ export async function GET(): Promise<Response> {
         priceAnalysis: priceAnalysis ? 'ready' : 'unavailable',
         dca: dca ? 'ready' : 'unavailable',
         assistant: assistantReady ? 'ready' : 'unavailable',
-        database,
+        database: databaseConfigured ? 'configured' : 'not-configured',
       },
     },
     priceAnalysis ? 200 : 503,
