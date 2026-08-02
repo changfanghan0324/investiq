@@ -10,6 +10,7 @@ import {
   buildScenarioRange,
   buildWaccTerminalGrowthSensitivity,
   compareToCurrentPrice,
+  parseRequiredValuationNumber,
 } from '@/domain/valuation';
 import type { DcfAssumptions } from '@/domain/valuation';
 
@@ -54,6 +55,18 @@ function approx(actual: number, expected: number, eps = 1e-9): void {
     `expected ${actual} to be within ${eps} of ${expected} (diff ${Math.abs(actual - expected)})`,
   );
 }
+
+describe('parseRequiredValuationNumber', () => {
+  it('rejects a blank input instead of coercing it to zero', () => {
+    assert.throws(() => parseRequiredValuationNumber('', 'netDebt'), /is required/);
+    assert.throws(() => parseRequiredValuationNumber('   ', 'netDebt'), /is required/);
+  });
+
+  it('preserves explicit zero and net cash values', () => {
+    assert.equal(parseRequiredValuationNumber('0', 'netDebt'), 0);
+    assert.equal(parseRequiredValuationNumber('-125', 'netDebt'), -125);
+  });
+});
 
 describe('buildDcfValuation — hand-calculated fixture', () => {
   it('reproduces every forecast row exactly', () => {

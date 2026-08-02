@@ -49,6 +49,19 @@ function annual(fy: number, val: number, over: Partial<SecFact> = {}): SecFact {
   };
 }
 
+function instant(fy: number, val: number, over: Partial<SecFact> = {}): SecFact {
+  return {
+    end: `${fy}-09-30`,
+    val,
+    accn: `0000320193-${String(fy).slice(2)}-000001`,
+    fy,
+    fp: 'FY',
+    form: '10-K',
+    filed: `${fy}-11-03`,
+    ...over,
+  };
+}
+
 function series(result: FundamentalsResult, key: FundamentalsMetricKey): FundamentalsSeries {
   const found = result.metrics.find((metric) => metric.metric === key);
   assert.ok(found, `missing metric ${key}`);
@@ -90,6 +103,43 @@ describe('concept alias precedence', () => {
     const byYear = new Map(revenue.observations.map((o) => [o.fiscalYear, o]));
     assert.equal(byYear.get(2023)?.receipts[0].concept, 'RevenueFromContractWithCustomerExcludingAssessedTax');
     assert.equal(byYear.get(2022)?.receipts[0].concept, 'Revenues');
+  });
+
+  it('prefers comprehensive D&A over the PP&E-only depreciation tag', () => {
+    const facts = companyFacts({
+      'us-gaap': {
+        Revenues: { units: { USD: [annual(2023, 1_000)] } },
+        DepreciationAndAmortization: { units: { USD: [annual(2023, 80)] } },
+        DepreciationDepletionAndAmortizationPropertyPlantAndEquipment: {
+          units: { USD: [annual(2023, 50)] },
+        },
+      },
+    });
+
+    const da = series(buildFundamentals(facts, identity()), 'depreciationAndAmortization');
+    assert.equal(da.observations[0].value, 80);
+    assert.equal(da.observations[0].receipts[0].concept, 'DepreciationAndAmortization');
+  });
+
+  it('selects conservative statement-input aliases for ratio construction', () => {
+    const facts = companyFacts({
+      'us-gaap': {
+        Revenues: { units: { USD: [annual(2024, 1_000)] } },
+        CostOfGoodsAndServicesSold: { units: { USD: [annual(2024, 600)] } },
+        CostOfRevenue: { units: { USD: [annual(2024, 999)] } },
+        Assets: { units: { USD: [instant(2024, 2_000)] } },
+        StockholdersEquity: { units: { USD: [instant(2024, 800)] } },
+        AccountsReceivableNetCurrent: { units: { USD: [instant(2024, 125)] } },
+        ReceivablesNetCurrent: { units: { USD: [instant(2024, 999)] } },
+      },
+    });
+    const output = buildFundamentals(facts, identity());
+    assert.equal(series(output, 'costOfRevenue').observations[0].value, 600);
+    assert.equal(series(output, 'costOfRevenue').observations[0].receipts[0].concept, 'CostOfGoodsAndServicesSold');
+    assert.equal(series(output, 'totalAssets').observations[0].value, 2_000);
+    assert.equal(series(output, 'stockholdersEquity').observations[0].value, 800);
+    assert.equal(series(output, 'accountsReceivableNetCurrent').observations[0].value, 125);
+    assert.equal(series(output, 'accountsReceivableNetCurrent').observations[0].receipts[0].concept, 'AccountsReceivableNetCurrent');
   });
 });
 
@@ -398,5 +448,62 @@ describe('view shape and windowing', () => {
       secFilingIndexUrl(320193, '0000320193-23-000106'),
       'https://www.sec.gov/Archives/edgar/data/320193/000032019323000106/0000320193-23-000106-index.htm',
     );
+  });
+});
+
+describe('valuation balance-sheet anchors', () => {
+  it('constructs reported EBITDA and net debt only from aligned SEC periods', () => {
+    const facts = companyFacts({
+      'us-gaap': {
+        Revenues: { units: { USD: [annual(2023, 1_000)] } },
+        OperatingIncomeLoss: { units: { USD: [annual(2023, 200)] } },
+        DepreciationDepletionAndAmortization: { units: { USD: [annual(2023, 35)] } },
+        DebtCurrent: { units: { USD: [instant(2023, 100)] } },
+        LongTermDebtNoncurrent: { units: { USD: [instant(2023, 400)] } },
+        CashAndCashEquivalentsAtCarryingValue: { units: { USD: [instant(2023, 120)] } },
+      },
+    });
+
+    const result = buildFundamentals(facts, identity());
+    const ebitda = series(result, 'ebitda');
+    const netDebt = series(result, 'netDebt');
+
+    assert.equal(ebitda.observations[0].value, 235);
+    assert.deepEqual(
+      ebitda.observations[0].receipts.map((receipt) => receipt.concept),
+      ['OperatingIncomeLoss', 'DepreciationDepletionAndAmortization'],
+    );
+    assert.equal(netDebt.observations[0].value, 380);
+    assert.deepEqual(
+      netDebt.observations[0].receipts.map((receipt) => receipt.concept),
+      ['DebtCurrent', 'LongTermDebtNoncurrent', 'CashAndCashEquivalentsAtCarryingValue'],
+    );
+  });
+
+  it('keeps net debt unavailable instead of treating missing debt as zero', () => {
+    const facts = companyFacts({
+      'us-gaap': {
+        Revenues: { units: { USD: [annual(2023, 1_000)] } },
+        CashAndCashEquivalentsAtCarryingValue: { units: { USD: [instant(2023, 120)] } },
+      },
+    });
+
+    const netDebt = series(buildFundamentals(facts, identity()), 'netDebt');
+    assert.equal(netDebt.available, false);
+    assert.deepEqual(netDebt.observations, []);
+    assert.match(netDebt.unavailableReason ?? '', /total debt and cash equivalents/i);
+  });
+
+  it('allows negative net debt for a net-cash issuer', () => {
+    const facts = companyFacts({
+      'us-gaap': {
+        Revenues: { units: { USD: [annual(2023, 1_000)] } },
+        DebtCurrent: { units: { USD: [instant(2023, 10)] } },
+        LongTermDebtNoncurrent: { units: { USD: [instant(2023, 40)] } },
+        CashAndCashEquivalentsAtCarryingValue: { units: { USD: [instant(2023, 120)] } },
+      },
+    });
+
+    assert.equal(series(buildFundamentals(facts, identity()), 'netDebt').observations[0].value, -70);
   });
 });

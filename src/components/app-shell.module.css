@@ -339,3 +339,9 @@
     min-width: 27px;
   }
 }
+
+@media print {
+  .shell { min-height: 0; padding: 0; }
+  .header, .bottomNav, .skipLink { display: none; }
+  .main { display: block; }
+}

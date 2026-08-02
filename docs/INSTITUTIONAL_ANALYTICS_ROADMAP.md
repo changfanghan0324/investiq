@@ -124,8 +124,11 @@ temporary-unavailable response; never silently switch providers or invent values
 
 ## 5. Database and identity decision
 
-**Selected direction:** Neon Postgres plus Auth.js when saved cloud portfolios enter scope. Do not add
-a database merely to claim PostgreSQL on a résumé.
+**Implemented foundation:** the Vercel-managed `investiq-research` Neon Free project is provisioned,
+the pooled application and direct migration variables are encrypted in Vercel, and the 16-table
+Drizzle migration has been applied. PostgreSQL enforces immutable snapshots/source/audit records,
+portfolio weights, and cross-owner references. Auth.js remains the gate before any private cloud-save
+workflow is exposed; the existing browser-local workflow remains the only user-facing save path.
 
 Minimum tables:
 
@@ -145,9 +148,10 @@ Do not store full historical price series in the 0.5 GB demo database. Store ana
 hashes, dates, and derived snapshots. Large licensed source datasets belong in provider storage or
 object storage under the governing license.
 
-**Needed from the owner when this phase starts:** authorize a Neon project and choose the login
-method. Recommended first login is GitHub OAuth for a portfolio project; email magic links can be
-added if non-GitHub users become a real audience.
+**Remaining owner decision:** authorize a login provider. GitHub OAuth remains the recommended first
+provider for a portfolio project; email magic links can be added if non-GitHub users become a real
+audience. The schema is Auth.js-compatible, but no placeholder credentials or anonymous ownership
+are accepted.
 
 ## 6. Automated peers and sector allocation
 
@@ -269,20 +273,22 @@ after the routes and terminology stop changing; otherwise every UI revision make
 ## 11. Delivery order and gates
 
 1. **Completed:** Production SEC contact configuration and live AAPL/MSFT/GOOG fundamentals checks.
-2. **Completed locally, remote authorization pending:** GitHub Actions workflow runs typecheck,
-   lint, the Vitest suite, and Production build. Local evidence on 2026-08-01 was produced by
-   `npm run check && npm run build`: 18 test files and 511 tests passed. Commit `4007a22` is waiting
-   for the signed-in GitHub OAuth grant to add the `workflow` scope before GitHub will accept the
-   workflow file.
-3. **Next:** complete remaining company financial ratios with XBRL coverage gates and source receipts.
-4. **Next:** build company-specific DCF defaults and immutable assumption/output snapshots.
-5. **Then:** implement SEC-SIC peer candidates, scoring explanations, analyst override, and internal
+2. **Completed:** GitHub Actions runs typecheck, lint, Vitest, and the Production build on pushes and
+   pull requests. The workflow authorization and Node 24 action updates are live.
+3. **Completed foundation:** Neon Free is provisioned and the typed schema, ordered migrations,
+   database health check, append-only evidence controls, ownership guards, and migration runbook are
+   implemented. Auth.js and private cloud saves remain disabled until a real login provider is authorized.
+4. **Next:** complete remaining company financial ratios with XBRL coverage gates and source receipts.
+5. **Next:** build company-specific DCF defaults and connect immutable assumption/output snapshots.
+6. **Then:** implement SEC-SIC peer candidates, scoring explanations, analyst override, and internal
    sector allocation.
-6. **Then:** add Neon + Auth.js only when cloud-saved portfolios are part of the release.
-7. **Then:** add the citation-bound Investment Memo assistant with production privacy and budgets.
-8. **Later gate:** FastAPI optimization, minimum variance, efficient frontier, and periodic
-   rebalancing.
-9. **Final artifacts:** full Equity Research PDF, stabilized demo video, README evidence, and public
+7. **Then:** enable Auth.js and private cloud saves after the login-provider decision.
+8. **Then:** add the citation-bound Investment Memo assistant with production privacy and budgets.
+9. **Completed TypeScript baseline:** long-only historical global minimum variance, the upper
+   efficient-frontier branch, and zero-friction quarterly/annual rebalancing comparisons are
+   deterministic, tested, and disclosed. FastAPI remains a future gate for shrinkage estimators,
+   larger universes, constrained optimization, or scheduled analytics workloads.
+10. **Final artifacts:** full Equity Research PDF, stabilized demo video, README evidence, and public
    deployment.
 
 At every stage, a feature is complete only when its calculations, data lineage, failure states,

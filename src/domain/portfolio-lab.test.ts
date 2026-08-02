@@ -443,6 +443,18 @@ describe('one-asset equivalence', () => {
   });
 });
 
+describe('annualization sample gate', () => {
+  it('withholds CAGR below sixty daily observations while preserving total period return', () => {
+    const view = buildPortfolioLab({
+      holdings: [holding('AAA', THREE, [100, 105, 110], 1)],
+      initialCapital: CAPITAL,
+      annualRiskFreeRate: 0,
+    });
+    assert.equal(view.cagr, undefined);
+    assertClose(view.totalPriceReturn, 0.1);
+  });
+});
+
 describe('buy-and-hold allocation', () => {
   it('turns 50/50 into a 50% portfolio return and a two-thirds final weight', () => {
     const view = buildPortfolioLab({
@@ -1122,6 +1134,22 @@ describe('return basis', () => {
     assertClose(view.totalPriceReturn, 0);
     assertClose(view.finalValue, 1000);
     assertClose(view.allocatedCapital, 1000);
+    assertClose(view.performanceFinalValue, 1500);
+    assertClose(view.performanceGain, 500);
+    assertClose(view.performanceValueSeries[view.performanceValueSeries.length - 1].value, 1500);
+  });
+
+  it('keeps performance dollars identical to market-value dollars on the price basis', () => {
+    const view = buildPortfolioLab({
+      holdings: [holding('AAA', dates, closes, 1)],
+      initialCapital: CAPITAL,
+      annualRiskFreeRate: 0,
+    });
+
+    assert.equal(view.returnBasis, 'price');
+    assertClose(view.performanceFinalValue, view.finalValue);
+    assertClose(view.performanceGain, view.totalGain);
+    view.performanceValueSeries.forEach((point, index) => assertClose(point.value, view.valueSeries[index].value));
   });
 
   it('is invariant to the vendor adjusted-close scale of any holding', () => {

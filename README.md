@@ -1,5 +1,7 @@
 # InvestIQ — Investment Research & Portfolio Analytics
 
+**Language:** [English](README.md) | [简体中文](README.zh-CN.md)
+
 [![CI](https://github.com/changfanghan0324/investiq/actions/workflows/ci.yml/badge.svg)](https://github.com/changfanghan0324/investiq/actions/workflows/ci.yml)
 
 InvestIQ is an evidence-first research platform for finance students, aspiring equity-research
@@ -37,6 +39,7 @@ detail routes only after a ticker is selected.
 | `/company/[ticker]/financials` | Financial Analysis | Five-year growth, profitability, cash generation, coverage gates, and filing-level source receipts. |
 | `/company/[ticker]/valuation` | Valuation | Five-year unlevered FCFF DCF, bear/base/bull range, two 5×5 sensitivities, EV→equity bridge, and a user-sourced comparable-multiple method. |
 | `/company/[ticker]/memo` | Investment Memo | One-page evidence record separating reported facts, model assumptions, thesis, catalysts, risks, and interpretation; printable to PDF. |
+| `/company/[ticker]/report` | Equity Research Report | Bilingual, print-ready A4 report with five-year SEC evidence, ratio diagnostics, DCF assumptions and scenarios, filing register, limitations, and page numbers. |
 | `/compare` | Stock Comparison | Two to five symbols aligned to common trading dates: cumulative return, risk table, correlation matrix, neutral narrative, and CSV. |
 | `/portfolio` | Portfolio Lab | One to ten long-only holdings: return, volatility, Sharpe, Sortino, beta, alpha, historical VaR, drawdown, attribution, concentration, correlation, equal/user/inverse-volatility weights. |
 | `/tools` | Research Tools | Secondary calculators and market context. |
@@ -56,6 +59,9 @@ Reference visual concepts for each workspace live in `design/investiq/`.
   fallback.
 - **Text size:** four levels — `25`, `50`, `75`, `100` — with `25` as the default. The level is applied
   as a root multiplier (`1`, `1.15`, `1.3`, `1.45`) and every layout stays usable at `100`.
+- Browser-print research reports and memos use the stable default type scale so A4 pagination does
+  not change with a temporary screen-reading preference. Readers can use their PDF viewer's zoom or
+  accessibility controls without changing the report's page structure.
 - Language and text size persist per browser in `localStorage` under the `investiq-` key namespace
   (`investiq-language`, `investiq-font-scale`, `investiq-market-watchlist`,
   `investiq-dca-portfolio-name`). No account, no server-side profile, no analytics.
@@ -84,8 +90,8 @@ Constraints enforced in `src/domain/risk-context.ts` and locked by `src/domain/r
 
 ## Architecture
 
-The current MVP intentionally remains one Next.js deployment. A Python/FastAPI/PostgreSQL service is
-deferred until cross-user persistence or analytics workloads justify its operating cost.
+The application remains one Next.js deployment with a server-only Neon Postgres persistence
+foundation. Python/FastAPI is deferred until optimization or ETL workloads justify a second service.
 
 ```text
 Browser UI (research, company, comparison, portfolio, tools)
@@ -98,6 +104,8 @@ Browser UI (research, company, comparison, portfolio, tools)
   ├─ browser-local valuation/memo notes; PDF/print and CSV generation
   ├─ same-origin POST /api/assistant
   │    └─ Google Gemini: compact, report-grounded explanation
+  ├─ server-only Drizzle adapter → Neon pooled PostgreSQL
+  │    └─ identities, portfolios, immutable analysis/valuation receipts, peers, memos, audit log
   └─ GET /api/health → readiness only, never key values
 ```
 
@@ -113,8 +121,12 @@ Browser UI (research, company, comparison, portfolio, tools)
   and request timeouts, and return neutral 5xx messages (`src/server/errors.ts`,
   `src/server/rate-limit.ts`). Provider responses and the serialized route response are also byte-bounded.
 - `/api/health` reports an overall `ready`, `degraded`, or `unavailable` alongside separate
-  `priceAnalysis`, `dca`, and `assistant` readiness, and nothing else. A missing Massive key degrades
-  `dca` alone; price analysis stays ready, so it never forces an overall `503`.
+  `priceAnalysis`, `dca`, and `assistant` readiness plus database configuration status, and nothing else. A missing Massive
+  key degrades `dca` alone; price analysis stays ready, so it never forces an overall `503`.
+- The database migration contract lives in `drizzle/`. Snapshot, source, and audit rows are
+  append-only at the database layer; cross-owner snapshot, memo, peer, and portfolio writes are
+  rejected by PostgreSQL triggers. No authenticated cloud-save UI is enabled until Auth.js has a
+  real provider configuration.
 
 ### Sequential loading
 
@@ -170,6 +182,20 @@ These hold across Market Context, Company price-risk context, Stock Comparison, 
 - Risk-adjusted portfolio weights use inverse historical annualized volatility only. The method is a
   deterministic long-only allocation rule, not an optimizer, minimum-variance portfolio, efficient
   frontier, or recommendation.
+- A separate correlation-aware global minimum-variance control solves the long-only, fully invested
+  historical variance objective from at least 60 aligned daily returns. The deterministic projected-
+  gradient solver rejects flat, singular, and non-convergent inputs. GMV is in-sample and variance-
+  only; it is not a forecast or recommendation.
+- The historical efficient frontier uses the same aligned daily sample, arithmetic sample means,
+  and sample covariance matrix. It enumerates long-only active sets, begins at the long-only GMV
+  portfolio, ends at the minimum-variance mix among the highest-mean holdings, and omits the
+  dominated lower branch. Expected-return estimates are especially noisy; the displayed curve is
+  in-sample evidence, never a forecast or suggested allocation.
+- Periodic-rebalancing comparisons keep the entered target weights and show buy-and-hold,
+  calendar-quarterly, and calendar-annual scenarios on the same return basis. Resets occur on the
+  first shared trading session on or after each anchored calendar boundary. They are self-financing
+  and assume zero commissions, spreads, taxes, slippage, and market impact; one-way turnover is
+  reported so the omitted implementation burden remains visible.
 - Every function is deterministic: no clock, no randomness, no I/O.
 - `undefined` means "not computable from this data", never `0`. A short history yields missing
   metrics rather than invented ones.
@@ -184,12 +210,19 @@ These hold across Market Context, Company price-risk context, Stock Comparison, 
 - Annual eligibility: 10-K, 10-K/A, or 20-F with `fp=FY`; flow facts must span 350–380 days.
 - Facts are grouped by the economic period they describe. The displayed fiscal year comes from the
   period end. The latest filed/restated observation wins; alias precedence is explicit and tested.
-- Revenue, net income, operating income, diluted EPS, operating cash flow, capital expenditure, and
-  share counts are direct standardized facts. Operating margin and FCF are constructed only from
-  components sharing the same annual period.
-- Missing facts stay unavailable. Sector/GICS, gross margin, ROIC, balance-sheet ratios, turnover,
-  and cash conversion are not guessed. SEC SIC 6000–6999 activates a financial-issuer capability
-  gate for manufacturing-style metrics.
+- Revenue, income, cash-flow, debt, assets, equity, liquidity, inventory, receivable, payable, tax,
+  interest, and share-count inputs are direct standardized facts. Operating margin, FCF, EBITDA,
+  total debt, net debt, and fourteen financial ratios are constructed only from components sharing
+  the same annual period or balance-sheet date. Missing current or noncurrent debt makes net debt
+  unavailable; an absent line is never treated as zero.
+- ROE, ROA, ROIC, asset turnover, inventory turnover, receivables turnover, and cash conversion use
+  consecutive year-end average balances. Gross/net margin, leverage, liquidity, interest coverage,
+  and net-debt/EBITDA enforce positive-denominator and coverage gates. Quick ratio requires an
+  explicit inventory fact and cash conversion requires every DIO/DSO/DPO leg. Missing inputs stay
+  unavailable rather than being zero-filled.
+- SEC SIC 6000–6999 activates a financial-issuer gate for revenue-margin, conventional debt,
+  liquidity, interest-coverage, and manufacturing-style efficiency ratios. A missing SIC also
+  withholds issuer-sensitive ratios. Every available ratio retains all component filing receipts.
 - This latest-reported view is display-only and is never fed into a historical backtest.
 
 ### Valuation contract
@@ -198,6 +231,11 @@ These hold across Market Context, Company price-risk context, Stock Comparison, 
   automatic tax benefit because the model does not track NOLs or deferred tax assets.
 - Terminal value uses Gordon growth at the end of the final forecast year; `WACC > terminal growth`
   is a hard gate. EV bridges to equity through explicit net debt and diluted shares.
+- Blank net debt is rejected rather than coerced to zero. SEC-sourced net debt is prefilled only when
+  current debt, noncurrent debt, and cash align; otherwise the user must supply and own the assumption.
+  Diluted weighted-average shares are required—period-end shares are not substituted.
+- Historical starter values use medians only with sufficient aligned annual coverage. Comparable
+  EV/EBITDA uses SEC-derived EBITDA, never a D&A forecast assumption mixed into a historical metric.
 - No internal rounding. Market price never enters DCF math; the dated market comparison is separate.
 - Bear/base/bull ranges and WACC×g plus growth×margin grids rerun the complete model. They are
   assumption scenarios, never called fair value, price targets, predictions, or guarantees.
@@ -212,12 +250,14 @@ holdings' trading dates. One security listing later, or missing a session, short
 all of them. Nothing is back-filled, carried forward, or read as a zero return. Ties resolve
 alphabetically so the same input always compares the same way.
 
-### Portfolio Lab: buy-and-hold only
+### Portfolio Lab: primary buy-and-hold result plus historical scenarios
 
 Capital is deployed **once**, on the first trading date every holding shares. Fractional share counts
 are then fixed forever: nothing is rebalanced, trimmed, topped up, or drifted back toward the target
 weights. A holding that doubles simply becomes a larger fraction of the portfolio, and that drift is
-reported rather than corrected. Weights must sum to 1 within `1e-6`.
+reported rather than corrected. Weights must sum to 1 within `1e-6`. Separate quarterly and annual
+rebalancing tables are explicitly labelled zero-friction historical scenarios; they do not alter the
+headline buy-and-hold result.
 
 ### DCA Backtest calculation contract
 
@@ -444,7 +484,7 @@ estimates and can never be merged with historical backtests or described as pred
 | Fees | Not modeled | Versioned broker-specific fee engine with auditable components and source-backed presets |
 | Taxes | Not modeled | Dividend withholding, plus capital-gains tax on optional liquidation |
 | Drawdown | Close-to-close on the price or portfolio series | Cash-flow-neutral unit value, so contributions are not read as performance |
-| Rebalancing | Portfolio Lab: none, weights drift and drift is reported | Not applicable; each holding runs its own schedule |
+| Rebalancing | Headline result: none; separate zero-friction quarterly/annual historical scenarios with turnover | Not applicable; each holding runs its own schedule |
 | Future periods | Not offered | Not offered; historical completed sessions only |
 | Corporate actions | Split-adjusted closes | Fail-closed cross-provider verification |
 | Download | Stock Comparison: CSV | Multi-page PDF report |
@@ -457,6 +497,7 @@ estimates and can never be merged with historical backtests or described as pred
 - npm
 - A Massive API key for live market data
 - A Google Gemini API key if the AI report explainer is required
+- A Neon database only when testing persistence or migrations
 
 ### Install and configure
 
@@ -471,6 +512,8 @@ cp .env.example .env.local
 
 | Variable | Required | Purpose |
 | --- | --- | --- |
+| `DATABASE_URL` | Persistence | Neon pooled connection used only by server-side application queries. Vercel's Neon integration supplies it. |
+| `DATABASE_URL_UNPOOLED` | Migrations | Neon direct connection. `npm run db:migrate` fails closed when it is absent. |
 | `MASSIVE_API_KEY` | Yes, for live data | Ordinary dividend history and corporate-action (split) verification. |
 | `GEMINI_API_KEY` | Optional | The report-grounded AI explainer. Calculations, charts, CSV, and PDF export all work without it. |
 | `MARKET_DATA_PUBLIC_DISPLAY_LICENSE_CONFIRMED` | Production, for live data | Server-only acknowledgement that written public-display **and** derived-analytics rights are held for **every** source. Without it, public production serves demo only. The flag grants no rights (see [Production licensing gate](#production-licensing-gate)). |
@@ -498,7 +541,15 @@ npm run test       # vitest run
 npm run build      # production Next.js build
 npm run dev        # development server
 npm run start      # serve a completed production build
+npm run db:generate # generate a reviewed migration from src/db/schema.ts
+npm run db:check    # validate Drizzle's migration journal
+npm run db:migrate # apply committed migrations; requires DATABASE_URL_UNPOOLED
 ```
+
+Application queries use the pooled URL; migrations use the direct URL. Never run a raw migration
+file by hand or edit Drizzle's journal. The custom governance migrations contain triggers that are
+tracked by the migration journal even though Drizzle's schema diff does not introspect trigger
+bodies. Apply every migration through `npm run db:migrate` exactly once per database/branch.
 
 Test suites, all deterministic and network-free:
 
@@ -515,6 +566,7 @@ Test suites, all deterministic and network-free:
 | `src/domain/stock-comparison.test.ts` | Two-to-five alignment, risk table, correlation matrix, neutral narrative, CSV contents. |
 | `src/server/market-data.test.ts` | Supported split classification and fail-closed reorganization detection, with no network. |
 | `src/services/create-portfolio-report.test.ts` | Sequential holding load and aggregate report assembly. |
+| `src/server/database-health.test.ts` | Database configuration, success, failure, and timeout health states without a network. |
 
 Before release, also verify manually: live-data success and failure states, all chart modes,
 desktop and mobile layouts from 320px, reduced-motion behavior, both languages at every text size,
@@ -583,7 +635,8 @@ exists in both languages, and it is deliberately kept out of the primary navigat
   sqrt-time annualization is approximate under serial correlation.
 - **Risk metrics need a sufficient sample.** Volatility, Sharpe, beta, and correlation are unavailable
   below 60 aligned daily returns and flagged as a limited sample below 252.
-- **Portfolio Lab never rebalances.** It measures a single lump-sum buy-and-hold allocation.
+- **Portfolio Lab's headline result never rebalances.** Quarterly and annual comparisons are separate
+  historical, self-financing, zero-friction scenarios and report turnover without modeling its cost.
 - **No sector data.** Sector concentration is reported as unavailable rather than inferred.
 - **Past history only.** Future dates are rejected. The isolated projection engine is experimental,
   unreachable from the UI and report services, and not a product feature.
@@ -616,6 +669,7 @@ exists in both languages, and it is deliberately kept out of the primary navigat
 | Path | Purpose |
 | --- | --- |
 | `README.md` | This document: product scope, calculation contract, architecture, setup, verification, deployment. |
+| `README.zh-CN.md` | Simplified-Chinese README with matching product, setup, methodology, deployment, and safety guidance. |
 | `CLAUDE.md` | Working agreement and change-control rules for contributors. |
 | `docs/INVESTIQ_PRODUCT_SPEC.md` | Product specification: workspaces, localization, accessibility, ownership. |
 | `package.json` / `package-lock.json` | Runtime requirements, scripts, dependencies, and the reproducible lockfile. |
@@ -627,6 +681,8 @@ exists in both languages, and it is deliberately kept out of the primary navigat
 | `vitest.config.ts` | Vitest runtime and matching source alias. |
 | `eslint.config.mjs` | Next.js Core Web Vitals and TypeScript lint configuration. |
 | `vercel.json` | Pins the Vercel framework preset to Next.js. |
+| `drizzle.config.ts` / `drizzle.migrate.config.ts` | Schema generation config and fail-closed direct-connection migration config. |
+| `drizzle/` | Ordered SQL migrations, Drizzle snapshots, and append-only/ownership governance triggers. |
 | `next-env.d.ts` | Next.js-generated type declarations; do not edit manually. |
 | `design/investiq/*.png` | Current reference visual concepts, one per workspace plus mobile DCA. |
 | `design/stock-lens-web-concept.png`, `design/stock-lens-web-concept-v2.png` | **Legacy design references.** Visual direction from Stock Lens, the single-workspace DCA tool InvestIQ grew out of. Retained for design history only; they do not describe the current product. |
@@ -638,7 +694,7 @@ exists in both languages, and it is deliberately kept out of the primary navigat
 | `src/app/layout.tsx` | Root HTML layout, fonts, metadata, language provider, and global stylesheet. |
 | `src/app/globals.css` | Global reset, color foundation, font-scale variables, and reduced-motion behavior. |
 | `src/app/page.tsx` | Research home route (`/`). |
-| `src/app/company/[ticker]/` | Company summary plus nested financials, valuation, and memo routes. |
+| `src/app/company/[ticker]/` | Company summary plus nested financials, valuation, memo, and full-report routes. |
 | `src/app/stock/page.tsx` | Legacy redirect to `/company/AAPL`. |
 | `src/app/market/page.tsx` | Market Overview route (`/market`). |
 | `src/app/compare/page.tsx` | Stock Comparison route (`/compare`). |
@@ -690,9 +746,13 @@ exists in both languages, and it is deliberately kept out of the primary navigat
 | `src/server/assistant.ts` | Server-only Gemini integration, report-bound guardrails, payload limits, provider error translation. |
 | `src/server/errors.ts` | Incremental request/response byte limits, size-bounded JSON responses, and safe public/server error separation. |
 | `src/server/rate-limit.ts` | Per-client/per-region abuse rate limiting via Vercel WAF (`@vercel/firewall`) with production fail-closed semantics and a non-production in-process fallback. This is not a deployment-wide provider-call quota limiter — that durable shared limiter is still absent and is required before licensed public live mode. |
+| `src/server/db.ts`, `src/db/schema.ts` | Server-only Neon/Drizzle adapter and the typed 16-table persistence schema. |
+| `src/server/database-health.ts` | Deduplicated, timeout-bounded Neon readiness check with no credential disclosure. |
 | `src/services/market-data-api.ts` | Browser client for the same-origin market-data endpoint, with response validation and timeouts. |
 | `src/services/assistant-api.ts` | Builds the compact report summary and calls the same-origin assistant endpoint. |
 | `src/services/create-report.ts` | Coordinates live/demo loading, historical boundaries, and optional holding-level simulations. |
+| `src/services/create-equity-report.ts` | Pure, clock-injected equity-report assembler that keeps SEC facts, DCF assumptions, and analyst notes structurally separate. |
+| `src/components/equity-report.tsx` | English/Simplified-Chinese on-screen and browser-print Equity Research Report. |
 | `src/services/create-portfolio-report.ts` | Runs every holding sequentially and constructs aggregate historical and scenario reports. |
 | `src/services/pdf-export.ts` | Generates and downloads the multi-page DCA PDF in the browser. |
 | `src/data/demo-market-data.ts` | Deterministic, explicitly labelled synthetic series for product exploration. |

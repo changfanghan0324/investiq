@@ -123,6 +123,25 @@ describe('validateFundamentalsTicker', () => {
   });
 });
 
+describe('SEC contact configuration', () => {
+  it('fails closed before any request when no truthful User-Agent is configured', async () => {
+    const original = process.env.SEC_USER_AGENT;
+    delete process.env.SEC_USER_AGENT;
+    const { impl, calls } = makeFetch(happyHandlers());
+    try {
+      const error = await expectStatus(
+        () => loadFundamentals('AAPL', { fetchImpl: impl, gate: new SerialRateGate(0) }),
+        503,
+      );
+      assert.match(error.message, /contact configuration/);
+      assert.equal(calls.length, 0);
+    } finally {
+      if (original === undefined) delete process.env.SEC_USER_AGENT;
+      else process.env.SEC_USER_AGENT = original;
+    }
+  });
+});
+
 describe('CIK resolution', () => {
   it('builds a padded map and skips malformed rows', () => {
     const map = buildCikMap({

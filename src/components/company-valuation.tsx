@@ -12,6 +12,7 @@ import {
   buildScenarioRange,
   buildWaccTerminalGrowthSensitivity,
   compareToCurrentPrice,
+  parseRequiredValuationNumber,
   type DcfAssumptions,
   type DcfScenarioRange,
   type DcfValuation,
@@ -49,7 +50,7 @@ const STARTER: FormState = {
   nwc: "0.0",
   wacc: "9.0",
   terminal: "2.5",
-  netDebt: "0",
+  netDebt: "",
 };
 
 export function CompanyValuation({ rawTicker }: { rawTicker: string }) {
@@ -88,7 +89,7 @@ export function CompanyValuation({ rawTicker }: { rawTicker: string }) {
   }, [ticker]);
 
   const anchors = useMemo(() => fundamentals ? dcfAnchors(fundamentals) : undefined, [fundamentals]);
-  const comparableBasis = useMemo(() => fundamentals && anchors ? comparableValues(fundamentals, anchors, form) : undefined, [fundamentals, anchors, form]);
+  const comparableBasis = useMemo(() => fundamentals && anchors ? comparableValues(fundamentals, anchors) : undefined, [fundamentals, anchors]);
 
   function submit(event: FormEvent) {
     event.preventDefault();
@@ -128,7 +129,7 @@ export function CompanyValuation({ rawTicker }: { rawTicker: string }) {
     try {
       const financialMetric = comparableBasis[comparableMetric];
       if (financialMetric === undefined) throw new ValuationError(t("valuation.compsMetricUnavailable"));
-      const result = buildComparableValuation({ metric: comparableMetric, financialMetric, multiples: { low: finiteNumber(multiples.low, "lowMultiple"), median: finiteNumber(multiples.median, "medianMultiple"), high: finiteNumber(multiples.high, "highMultiple") }, ...(comparableMetric === "pe" ? {} : { netDebt: finiteNumber(form.netDebt, "netDebt"), dilutedShares: anchors.dilutedShares }) });
+      const result = buildComparableValuation({ metric: comparableMetric, financialMetric, multiples: { low: finiteNumber(multiples.low, "lowMultiple"), median: finiteNumber(multiples.median, "medianMultiple"), high: finiteNumber(multiples.high, "highMultiple") }, ...(comparableMetric === "pe" ? {} : { netDebt: parseRequiredValuationNumber(form.netDebt, "netDebt"), dilutedShares: anchors.dilutedShares }) });
       setComparable(result);
       setComparableError(undefined);
     } catch (caught) {
@@ -159,7 +160,7 @@ export function CompanyValuation({ rawTicker }: { rawTicker: string }) {
             <PercentField field="growth" label={t("valuation.revenueGrowth")} form={form} setForm={setForm} source={t("valuation.historicalStarter")} />
             <PercentField field="margin" label={t("valuation.operatingMargin")} form={form} setForm={setForm} source={t("valuation.latestStarter")} />
             <PercentField field="tax" label={t("valuation.cashTax")} form={form} setForm={setForm} source={t("valuation.manualStarter")} />
-            <PercentField field="da" label={t("valuation.daRevenue")} form={form} setForm={setForm} source={t("valuation.manualStarter")} />
+            <PercentField field="da" label={t("valuation.daRevenue")} form={form} setForm={setForm} source={t("valuation.historicalStarter")} />
             <PercentField field="capex" label={t("valuation.capexRevenue")} form={form} setForm={setForm} source={t("valuation.latestStarter")} />
             <PercentField field="nwc" label={t("valuation.nwcIncremental")} form={form} setForm={setForm} source={t("valuation.manualStarter")} />
             <PercentField field="wacc" label="WACC" form={form} setForm={setForm} source={t("valuation.manualStarter")} />
@@ -194,8 +195,8 @@ export function CompanyValuation({ rawTicker }: { rawTicker: string }) {
                 <div className={styles.multipleGrid}>
                   <Bridge label="P/E" value={comparableBasis.pe && price ? formatMultiple(price.value / comparableBasis.pe) : "—"} />
                   <Bridge label="Forward P/E" value="—" />
-                  <Bridge label="EV / Revenue" value={price ? formatMultiple((price.value * anchors.dilutedShares + finiteOrZero(form.netDebt)) / anchors.baseRevenue) : "—"} />
-                  <Bridge label="EV / EBITDA" value={price && comparableBasis["ev-ebitda"] ? formatMultiple((price.value * anchors.dilutedShares + finiteOrZero(form.netDebt)) / comparableBasis["ev-ebitda"]!) : "—"} />
+                  <Bridge label="EV / Revenue" value={price && optionalFinite(form.netDebt) !== undefined ? formatMultiple((price.value * anchors.dilutedShares + optionalFinite(form.netDebt)!) / anchors.baseRevenue) : "—"} />
+                  <Bridge label="EV / EBITDA" value={price && comparableBasis["ev-ebitda"] && optionalFinite(form.netDebt) !== undefined ? formatMultiple((price.value * anchors.dilutedShares + optionalFinite(form.netDebt)!) / comparableBasis["ev-ebitda"]!) : "—"} />
                   <Bridge label="Price / Book" value="—" />
                   <Bridge label="PEG" value="—" />
                 </div>
@@ -267,7 +268,7 @@ function PageState({ text, error = false }: { text: string; error?: boolean }) {
 function dcfAnchors(result: FundamentalsResult) {
   const revenue = metric(result, "revenue");
   const margin = metric(result, "operatingMargin");
-  const shares = metric(result, "dilutedShares") ?? metric(result, "sharesOutstanding");
+  const shares = metric(result, "dilutedShares");
   if (!revenue?.available || !margin?.available || !shares?.available) return undefined;
   const latestRevenue = revenue.observations[0];
   const sameMargin = margin.observations.find((item) => item.fiscalYear === latestRevenue.fiscalYear) ?? margin.observations[0];
@@ -276,35 +277,47 @@ function dcfAnchors(result: FundamentalsResult) {
 }
 
 function suggestedForm(result: FundamentalsResult, current: FormState): FormState {
-  const anchors = dcfAnchors(result);
   const revenue = metric(result, "revenue");
   const capex = metric(result, "capitalExpenditure");
-  const growth = revenue ? annualGrowth(revenue) : undefined;
-  const capexPercent = revenue && capex ? latestAlignedRatio(capex, revenue) : undefined;
-  return { ...current, ...(growth === undefined ? {} : { growth: (growth * 100).toFixed(1) }), ...(anchors ? { margin: (anchors.operatingMargin * 100).toFixed(1) } : {}), ...(capexPercent === undefined ? {} : { capex: (capexPercent * 100).toFixed(1) }) };
+  const da = metric(result, "depreciationAndAmortization");
+  const margin = metric(result, "operatingMargin");
+  const netDebt = metric(result, "netDebt")?.observations[0]?.value;
+  const growth = revenue ? medianAnnualGrowth(revenue) : undefined;
+  const medianMargin = margin ? medianSeriesValue(margin) : undefined;
+  const capexPercent = revenue && capex ? medianAlignedRatio(capex, revenue) : undefined;
+  const daPercent = revenue && da ? medianAlignedRatio(da, revenue) : undefined;
+  return {
+    ...current,
+    ...(growth === undefined ? {} : { growth: (growth * 100).toFixed(1) }),
+    ...(medianMargin === undefined ? {} : { margin: (medianMargin * 100).toFixed(1) }),
+    ...(capexPercent === undefined ? {} : { capex: (capexPercent * 100).toFixed(1) }),
+    ...(daPercent === undefined ? {} : { da: (daPercent * 100).toFixed(1) }),
+    ...(netDebt === undefined ? {} : { netDebt: netDebt.toFixed(0) }),
+  };
 }
 
-function comparableValues(result: FundamentalsResult, anchors: NonNullable<ReturnType<typeof dcfAnchors>>, form: FormState): Record<ComparableMetric, number | undefined> {
+function comparableValues(result: FundamentalsResult, anchors: NonNullable<ReturnType<typeof dcfAnchors>>): Record<ComparableMetric, number | undefined> {
   const eps = metric(result, "dilutedEps")?.observations[0]?.value;
-  const operatingIncome = metric(result, "operatingIncome")?.observations.find((item) => item.fiscalYear === anchors.fiscalYear)?.value;
-  const da = anchors.baseRevenue * numberRate(form.da);
-  return { pe: eps && eps > 0 ? eps : undefined, "ev-revenue": anchors.baseRevenue, "ev-ebitda": operatingIncome !== undefined && operatingIncome + da > 0 ? operatingIncome + da : undefined };
+  const ebitda = metric(result, "ebitda")?.observations.find((item) => item.fiscalYear === anchors.fiscalYear)?.value;
+  return { pe: eps && eps > 0 ? eps : undefined, "ev-revenue": anchors.baseRevenue, "ev-ebitda": ebitda !== undefined && ebitda > 0 ? ebitda : undefined };
 }
 
 function buildAssumptions(form: FormState, anchors: NonNullable<ReturnType<typeof dcfAnchors>>): DcfAssumptions {
-  return { baseRevenue: anchors.baseRevenue, dilutedShares: anchors.dilutedShares, forecastYears: 5, revenueGrowth: numberRate(form.growth), operatingMargin: numberRate(form.margin), cashTaxRate: numberRate(form.tax), daPercentOfRevenue: numberRate(form.da), capexPercentOfRevenue: numberRate(form.capex), nwcPercentOfIncrementalRevenue: numberRate(form.nwc), wacc: numberRate(form.wacc), terminalGrowth: numberRate(form.terminal), netDebt: finiteNumber(form.netDebt, "netDebt") };
+  return { baseRevenue: anchors.baseRevenue, dilutedShares: anchors.dilutedShares, forecastYears: 5, revenueGrowth: numberRate(form.growth), operatingMargin: numberRate(form.margin), cashTaxRate: numberRate(form.tax), daPercentOfRevenue: numberRate(form.da), capexPercentOfRevenue: numberRate(form.capex), nwcPercentOfIncrementalRevenue: numberRate(form.nwc), wacc: numberRate(form.wacc), terminalGrowth: numberRate(form.terminal), netDebt: parseRequiredValuationNumber(form.netDebt, "netDebt") };
 }
 
 function shiftScenario(base: DcfAssumptions, growth: number, margin: number, wacc: number, terminal: number): DcfAssumptions { return { ...base, revenueGrowth: clamp((base.revenueGrowth as number) + growth, -0.99, 1), operatingMargin: clamp((base.operatingMargin as number) + margin, -2, 1), wacc: clamp(base.wacc + wacc, 0.001, 1), terminalGrowth: Math.min(clamp(base.terminalGrowth + terminal, -1, 1), base.wacc + wacc - 0.001) }; }
 function around(value: number, step: number) { return [-2, -1, 0, 1, 2].map((offset) => value + offset * step); }
-function finiteNumber(value: string, name: string) { const parsed = Number(value); if (!Number.isFinite(parsed)) throw new ValuationError(`${name} must be a finite number.`); return parsed; }
+function finiteNumber(value: string, name: string) { return parseRequiredValuationNumber(value, name); }
 function numberRate(value: string) { return finiteNumber(value, "rate") / 100; }
 function metric(result: FundamentalsResult, key: FundamentalsMetricKey): FundamentalsSeries | undefined { return result.metrics.find((item) => item.metric === key); }
-function annualGrowth(series: FundamentalsSeries) { if (series.observations.length < 2) return undefined; const latest = series.observations[0]; const oldest = series.observations.at(-1)!; const years = latest.fiscalYear - oldest.fiscalYear; return latest.value > 0 && oldest.value > 0 && years > 0 ? Math.pow(latest.value / oldest.value, 1 / years) - 1 : undefined; }
-function latestAlignedRatio(numerator: FundamentalsSeries, denominator: FundamentalsSeries) { for (const item of numerator.observations) { const match = denominator.observations.find((other) => other.fiscalYear === item.fiscalYear && other.periodEnd === item.periodEnd); if (match && match.value > 0) return item.value / match.value; } return undefined; }
+function medianAnnualGrowth(series: FundamentalsSeries) { if (series.observations.length < 3) return undefined; const chronological = [...series.observations].sort((a, b) => a.fiscalYear - b.fiscalYear); const rates: number[] = []; for (let index = 1; index < chronological.length; index += 1) { const prior = chronological[index - 1]; const current = chronological[index]; if (prior.value > 0 && current.value > 0 && current.fiscalYear === prior.fiscalYear + 1) rates.push(current.value / prior.value - 1); } return rates.length >= 2 ? median(rates) : undefined; }
+function medianSeriesValue(series: FundamentalsSeries) { return series.observations.length >= 3 ? median(series.observations.map((item) => item.value)) : undefined; }
+function medianAlignedRatio(numerator: FundamentalsSeries, denominator: FundamentalsSeries) { const ratios: number[] = []; for (const item of numerator.observations) { const match = denominator.observations.find((other) => other.fiscalYear === item.fiscalYear && other.periodEnd === item.periodEnd); if (match && match.value > 0) ratios.push(item.value / match.value); } return ratios.length >= 3 ? median(ratios) : undefined; }
+function median(values: number[]) { const sorted = [...values].sort((a, b) => a - b); const middle = Math.floor(sorted.length / 2); return sorted.length % 2 === 1 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2; }
 function safeTicker(raw: string) { try { const value = decodeURIComponent(raw).trim().toUpperCase(); return TICKER_PATTERN.test(value) ? value : ""; } catch { return ""; } }
 function clamp(value: number, min: number, max: number) { return Math.min(max, Math.max(min, value)); }
-function finiteOrZero(value: string) { const parsed = Number(value); return Number.isFinite(parsed) ? parsed : 0; }
+function optionalFinite(value: string) { if (value.trim() === "") return undefined; const parsed = Number(value); return Number.isFinite(parsed) ? parsed : undefined; }
 function formatMultiple(value: number) { return Number.isFinite(value) && value > 0 ? `${value.toFixed(1)}×` : "—"; }
 function axis(label: string) { return label === "wacc" ? "WACC" : label === "terminalGrowth" ? "g" : label === "revenueGrowth" ? "Growth" : "Margin"; }
 function usd(value: number) { const sign = value < 0 ? "−" : ""; return `${sign}$${Math.abs(value).toLocaleString("en-US", { maximumFractionDigits: 2 })}`; }

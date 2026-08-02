@@ -38,6 +38,14 @@ export class ValuationError extends Error {
   }
 }
 
+/** Parses an explicit valuation input. Blank strings are unavailable, never zero. */
+export function parseRequiredValuationNumber(value: string, name: string): number {
+  if (value.trim() === '') throw new ValuationError(`${name} is required.`);
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) throw new ValuationError(`${name} must be a finite number.`);
+  return parsed;
+}
+
 /** A per-forecast-year assumption: one scalar expanded across years, or an explicit per-year vector. */
 export type YearlyRate = number | readonly number[];
 

@@ -7,27 +7,19 @@ import { Database, ExternalLink, FileDown, FileText, LoaderCircle, Save, Triangl
 import type { FundamentalsMetricKey, FundamentalsResult, FundamentalsSeries, SourceReceipt } from "@/domain/fundamentals";
 import { useLanguage, type Translate } from "@/i18n/language";
 import { loadCompanyFundamentals } from "@/services/fundamentals-api";
+import { EMPTY_MEMO_NOTES, loadMemoNotes, saveMemoNotes } from "@/services/memo-storage";
 import { loadValuationSnapshot, type ValuationSnapshot } from "@/services/valuation-snapshot";
 
 import styles from "./company-memo.module.css";
 
 const TICKER_PATTERN = /^[A-Z0-9.-]{1,12}$/;
 
-interface Notes {
-  thesis: string;
-  catalysts: string;
-  risks: string;
-  conclusion: string;
-}
-
-const EMPTY_NOTES: Notes = { thesis: "", catalysts: "", risks: "", conclusion: "" };
-
 export function CompanyMemo({ rawTicker }: { rawTicker: string }) {
   const { t, language } = useLanguage();
   const ticker = safeTicker(rawTicker);
   const [fundamentals, setFundamentals] = useState<FundamentalsResult>();
   const [valuation] = useState<ValuationSnapshot | undefined>(() => ticker ? loadValuationSnapshot(ticker) : undefined);
-  const [notes, setNotes] = useState<Notes>(() => ticker ? loadNotes(ticker) : EMPTY_NOTES);
+  const [notes, setNotes] = useState(() => ticker ? loadMemoNotes(ticker) : EMPTY_MEMO_NOTES);
   const [settled, setSettled] = useState(false);
   const [saved, setSaved] = useState(false);
 
@@ -44,7 +36,7 @@ export function CompanyMemo({ rawTicker }: { rawTicker: string }) {
   const receipt = useMemo(() => fundamentals ? latestReceipt(fundamentals) : undefined, [fundamentals]);
 
   function save() {
-    try { window.localStorage.setItem(notesKey(ticker), JSON.stringify(notes)); } catch { /* Browser storage may be disabled. */ }
+    saveMemoNotes(ticker, notes);
     setSaved(true);
     window.setTimeout(() => setSaved(false), 1600);
   }
@@ -60,7 +52,7 @@ export function CompanyMemo({ rawTicker }: { rawTicker: string }) {
     <div className={styles.page} id="investment-memo">
       <header className={styles.heading}>
         <div><span>{t("memo.eyebrow")}</span><h1>{t("memo.title")}</h1><p>{t("memo.subtitle")}</p></div>
-        <div className={styles.actions}><button type="button" onClick={save}><Save size={14} />{saved ? t("memo.saved") : t("memo.save")}</button><button type="button" onClick={() => window.print()}><FileDown size={14} />{t("memo.printPdf")}</button></div>
+        <div className={styles.actions}><button type="button" onClick={save}><Save size={14} />{saved ? t("memo.saved") : t("memo.save")}</button><Link className={styles.reportLink} href={`/company/${ticker}/report`} onClick={() => saveMemoNotes(ticker, notes)}><FileDown size={14} />{t("memo.fullReport")}</Link></div>
       </header>
 
       <section className={styles.memo}>
@@ -144,9 +136,6 @@ function seriesChange(series?: FundamentalsSeries) { if (!series?.available || s
 function annualGrowth(latest: number, oldest: number, years: number) { return latest > 0 && oldest > 0 && years > 0 ? Math.pow(latest / oldest, 1 / years) - 1 : undefined; }
 function metric(result: FundamentalsResult, key: FundamentalsMetricKey) { return result.metrics.find((item) => item.metric === key); }
 function latestReceipt(result: FundamentalsResult): SourceReceipt | undefined { return result.metrics.flatMap((item) => item.observations.flatMap((observation) => observation.receipts)).sort((a, b) => b.filed.localeCompare(a.filed))[0]; }
-function loadNotes(ticker: string): Notes { try { const value: unknown = JSON.parse(window.localStorage.getItem(notesKey(ticker)) ?? "null"); if (!value || typeof value !== "object") return EMPTY_NOTES; const notes = value as Partial<Notes>; return { thesis: text(notes.thesis), catalysts: text(notes.catalysts), risks: text(notes.risks), conclusion: text(notes.conclusion) }; } catch { return EMPTY_NOTES; } }
-function text(value: unknown) { return typeof value === "string" ? value.slice(0, 4000) : ""; }
-function notesKey(ticker: string) { return `investiq:memo:${ticker}`; }
 function safeTicker(raw: string) { try { const value = decodeURIComponent(raw).trim().toUpperCase(); return TICKER_PATTERN.test(value) ? value : ""; } catch { return ""; } }
 function signed(value: number) { return `${value > 0 ? "+" : ""}${value.toFixed(1)}`; }
 function usd(value: number) { return `${value < 0 ? "−" : ""}$${Math.abs(value).toLocaleString("en-US", { maximumFractionDigits: 2 })}`; }

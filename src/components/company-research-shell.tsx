@@ -23,6 +23,7 @@ export function CompanyResearchShell({ ticker: rawTicker, children }: { ticker: 
     { href: `${base}/financials`, label: t("company.tabFinancials") },
     { href: `${base}/valuation`, label: t("company.tabValuation") },
     { href: `${base}/memo`, label: t("company.tabMemo") },
+    { href: `${base}/report`, label: t("company.tabReport") },
   ];
 
   return (

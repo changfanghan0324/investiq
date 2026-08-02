@@ -156,10 +156,29 @@ export type FundamentalsMetricKey =
   | 'dilutedEps'
   | 'operatingCashFlow'
   | 'capitalExpenditure'
+  | 'depreciationAndAmortization'
+  | 'debtCurrent'
+  | 'longTermDebtNoncurrent'
+  | 'totalDebt'
+  | 'cashAndEquivalents'
+  | 'grossProfit'
+  | 'costOfRevenue'
+  | 'incomeTaxExpense'
+  | 'pretaxIncome'
+  | 'totalAssets'
+  | 'currentAssets'
+  | 'currentLiabilities'
+  | 'stockholdersEquity'
+  | 'inventoryNet'
+  | 'accountsReceivableNetCurrent'
+  | 'accountsPayableCurrent'
+  | 'interestExpense'
   | 'dilutedShares'
   | 'sharesOutstanding'
   | 'operatingMargin'
-  | 'freeCashFlow';
+  | 'freeCashFlow'
+  | 'ebitda'
+  | 'netDebt';
 
 interface ConceptAlias {
   taxonomy: string;
@@ -183,6 +202,10 @@ const REASON_MARGIN =
   'Operating margin is unavailable because operating income and revenue could not be aligned for a common fiscal year.';
 const REASON_FCF =
   'Free cash flow is unavailable because operating cash flow and capital expenditure could not be aligned for a common fiscal year.';
+const REASON_EBITDA =
+  'EBITDA is unavailable because operating income and depreciation/amortization could not be aligned for a common fiscal year.';
+const REASON_NET_DEBT =
+  'Net debt is unavailable because total debt and cash equivalents could not be aligned on a common annual balance-sheet date.';
 
 /**
  * Directly reported metrics. Revenue precedence follows the ASC 606 transition:
@@ -251,6 +274,158 @@ const DIRECT_METRICS: DirectMetricSpec[] = [
       { taxonomy: 'us-gaap', concept: 'PaymentsToAcquirePropertyPlantAndEquipment' },
       { taxonomy: 'us-gaap', concept: 'PaymentsToAcquireProductiveAssets' },
       { taxonomy: 'us-gaap', concept: 'PaymentsForCapitalImprovements' },
+    ],
+  },
+  {
+    key: 'depreciationAndAmortization',
+    kind: 'duration',
+    unit: 'USD',
+    basis: 'Depreciation, depletion, and amortization',
+    nonNegative: true,
+    aliases: [
+      { taxonomy: 'us-gaap', concept: 'DepreciationDepletionAndAmortization' },
+      { taxonomy: 'us-gaap', concept: 'DepreciationAndAmortization' },
+      { taxonomy: 'us-gaap', concept: 'DepreciationDepletionAndAmortizationPropertyPlantAndEquipment' },
+    ],
+  },
+  {
+    key: 'debtCurrent',
+    kind: 'instant',
+    unit: 'USD',
+    basis: 'Current interest-bearing debt and current maturities',
+    nonNegative: true,
+    aliases: [
+      { taxonomy: 'us-gaap', concept: 'DebtCurrent' },
+      { taxonomy: 'us-gaap', concept: 'ShortTermBorrowings' },
+      { taxonomy: 'us-gaap', concept: 'LongTermDebtCurrent' },
+    ],
+  },
+  {
+    key: 'longTermDebtNoncurrent',
+    kind: 'instant',
+    unit: 'USD',
+    basis: 'Noncurrent interest-bearing debt',
+    nonNegative: true,
+    aliases: [
+      { taxonomy: 'us-gaap', concept: 'LongTermDebtAndFinanceLeaseObligationsNoncurrent' },
+      { taxonomy: 'us-gaap', concept: 'LongTermDebtNoncurrent' },
+    ],
+  },
+  {
+    key: 'cashAndEquivalents',
+    kind: 'instant',
+    unit: 'USD',
+    basis: 'Cash and cash equivalents; restricted cash and short-term investments excluded',
+    nonNegative: true,
+    aliases: [{ taxonomy: 'us-gaap', concept: 'CashAndCashEquivalentsAtCarryingValue' }],
+  },
+  {
+    key: 'grossProfit',
+    kind: 'duration',
+    unit: 'USD',
+    basis: 'Gross profit',
+    aliases: [{ taxonomy: 'us-gaap', concept: 'GrossProfit' }],
+  },
+  {
+    key: 'costOfRevenue',
+    kind: 'duration',
+    unit: 'USD',
+    basis: 'Cost of revenue (positive expense)',
+    nonNegative: true,
+    aliases: [
+      { taxonomy: 'us-gaap', concept: 'CostOfGoodsAndServicesSold' },
+      { taxonomy: 'us-gaap', concept: 'CostOfRevenue' },
+      { taxonomy: 'us-gaap', concept: 'CostOfGoodsSold' },
+    ],
+  },
+  {
+    key: 'incomeTaxExpense',
+    kind: 'duration',
+    unit: 'USD',
+    basis: 'Income tax expense (benefit)',
+    aliases: [{ taxonomy: 'us-gaap', concept: 'IncomeTaxExpenseBenefit' }],
+  },
+  {
+    key: 'pretaxIncome',
+    kind: 'duration',
+    unit: 'USD',
+    basis: 'Income from continuing operations before income taxes',
+    aliases: [
+      { taxonomy: 'us-gaap', concept: 'IncomeLossFromContinuingOperationsBeforeIncomeTaxesExtraordinaryItemsNoncontrollingInterest' },
+      { taxonomy: 'us-gaap', concept: 'IncomeLossFromContinuingOperationsBeforeIncomeTaxesMinorityInterestAndIncomeLossFromEquityMethodInvestments' },
+    ],
+  },
+  {
+    key: 'totalAssets',
+    kind: 'instant',
+    unit: 'USD',
+    basis: 'Total assets',
+    nonNegative: true,
+    aliases: [{ taxonomy: 'us-gaap', concept: 'Assets' }],
+  },
+  {
+    key: 'currentAssets',
+    kind: 'instant',
+    unit: 'USD',
+    basis: 'Current assets',
+    nonNegative: true,
+    aliases: [{ taxonomy: 'us-gaap', concept: 'AssetsCurrent' }],
+  },
+  {
+    key: 'currentLiabilities',
+    kind: 'instant',
+    unit: 'USD',
+    basis: 'Current liabilities',
+    nonNegative: true,
+    aliases: [{ taxonomy: 'us-gaap', concept: 'LiabilitiesCurrent' }],
+  },
+  {
+    key: 'stockholdersEquity',
+    kind: 'instant',
+    unit: 'USD',
+    basis: 'Stockholders equity attributable to the parent',
+    aliases: [{ taxonomy: 'us-gaap', concept: 'StockholdersEquity' }],
+  },
+  {
+    key: 'inventoryNet',
+    kind: 'instant',
+    unit: 'USD',
+    basis: 'Net inventory',
+    nonNegative: true,
+    aliases: [{ taxonomy: 'us-gaap', concept: 'InventoryNet' }],
+  },
+  {
+    key: 'accountsReceivableNetCurrent',
+    kind: 'instant',
+    unit: 'USD',
+    basis: 'Current net accounts receivable',
+    nonNegative: true,
+    aliases: [
+      { taxonomy: 'us-gaap', concept: 'AccountsReceivableNetCurrent' },
+      { taxonomy: 'us-gaap', concept: 'ReceivablesNetCurrent' },
+    ],
+  },
+  {
+    key: 'accountsPayableCurrent',
+    kind: 'instant',
+    unit: 'USD',
+    basis: 'Current accounts payable',
+    nonNegative: true,
+    aliases: [
+      { taxonomy: 'us-gaap', concept: 'AccountsPayableCurrent' },
+      { taxonomy: 'us-gaap', concept: 'AccountsPayableTradeCurrent' },
+    ],
+  },
+  {
+    key: 'interestExpense',
+    kind: 'duration',
+    unit: 'USD',
+    basis: 'Interest expense',
+    nonNegative: true,
+    aliases: [
+      { taxonomy: 'us-gaap', concept: 'InterestExpense' },
+      { taxonomy: 'us-gaap', concept: 'InterestExpenseDebt' },
+      { taxonomy: 'us-gaap', concept: 'InterestAndDebtExpense' },
     ],
   },
   {
@@ -347,6 +522,51 @@ export function buildFundamentals(
   );
   metrics.push(
     toSeries('operatingMargin', 'ratio', 'Operating income ÷ revenue', operatingMargin, REASON_MARGIN, unavailable),
+  );
+
+  const ebitda = constructSum(
+    windowed.get('operatingIncome') ?? [],
+    windowed.get('depreciationAndAmortization') ?? [],
+  );
+  metrics.push(
+    toSeries(
+      'ebitda',
+      'USD',
+      'Operating income + depreciation and amortization',
+      ebitda,
+      REASON_EBITDA,
+      unavailable,
+    ),
+  );
+
+  const totalDebt = constructInstantSum(
+    windowed.get('debtCurrent') ?? [],
+    windowed.get('longTermDebtNoncurrent') ?? [],
+  );
+  metrics.push(
+    toSeries(
+      'totalDebt',
+      'USD',
+      'Current debt + noncurrent debt',
+      totalDebt,
+      REASON_NO_ANNUAL,
+      unavailable,
+    ),
+  );
+
+  const netDebt = constructInstantDifference(
+    totalDebt,
+    windowed.get('cashAndEquivalents') ?? [],
+  );
+  metrics.push(
+    toSeries(
+      'netDebt',
+      'USD',
+      'Total debt − cash and cash equivalents',
+      netDebt,
+      REASON_NET_DEBT,
+      unavailable,
+    ),
   );
 
   const freeCashFlow = constructFreeCashFlow(
@@ -601,6 +821,63 @@ function constructFreeCashFlow(
       periodEnd: ocf.periodEnd,
       value: ocf.value - capexObs.value,
       receipts: [...ocf.receipts, ...capexObs.receipts],
+    });
+  }
+  return out;
+}
+
+function constructSum(
+  left: SelectedObservation[],
+  right: SelectedObservation[],
+): SelectedObservation[] {
+  const rightByFy = indexByFiscalYear(right);
+  const out: SelectedObservation[] = [];
+  for (const leftObservation of left) {
+    const rightObservation = rightByFy.get(leftObservation.fiscalYear);
+    if (!rightObservation || !sameAnnualPeriod(leftObservation, rightObservation)) continue;
+    out.push({
+      fiscalYear: leftObservation.fiscalYear,
+      periodEnd: leftObservation.periodEnd,
+      value: leftObservation.value + rightObservation.value,
+      receipts: [...leftObservation.receipts, ...rightObservation.receipts],
+    });
+  }
+  return out;
+}
+
+function constructInstantDifference(
+  left: SelectedObservation[],
+  right: SelectedObservation[],
+): SelectedObservation[] {
+  const rightByFy = indexByFiscalYear(right);
+  const out: SelectedObservation[] = [];
+  for (const leftObservation of left) {
+    const rightObservation = rightByFy.get(leftObservation.fiscalYear);
+    if (!rightObservation || leftObservation.periodEnd !== rightObservation.periodEnd) continue;
+    out.push({
+      fiscalYear: leftObservation.fiscalYear,
+      periodEnd: leftObservation.periodEnd,
+      value: leftObservation.value - rightObservation.value,
+      receipts: [...leftObservation.receipts, ...rightObservation.receipts],
+    });
+  }
+  return out;
+}
+
+function constructInstantSum(
+  left: SelectedObservation[],
+  right: SelectedObservation[],
+): SelectedObservation[] {
+  const rightByFy = indexByFiscalYear(right);
+  const out: SelectedObservation[] = [];
+  for (const leftObservation of left) {
+    const rightObservation = rightByFy.get(leftObservation.fiscalYear);
+    if (!rightObservation || leftObservation.periodEnd !== rightObservation.periodEnd) continue;
+    out.push({
+      fiscalYear: leftObservation.fiscalYear,
+      periodEnd: leftObservation.periodEnd,
+      value: leftObservation.value + rightObservation.value,
+      receipts: [...leftObservation.receipts, ...rightObservation.receipts],
     });
   }
   return out;

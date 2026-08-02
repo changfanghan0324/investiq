@@ -6,8 +6,9 @@
 //   Share counts are fractional and then fixed forever: nothing is rebalanced, trimmed, topped up,
 //   or drifted back toward the target weights. A holding that doubles simply becomes a larger
 //   fraction of the portfolio, and that drift is reported rather than corrected.
-// - Only `close` is read, so every figure here is a price return: dividends are intentionally
-//   excluded and totals understate total return. Closes are expected to be split-adjusted.
+// - Only end-of-day close fields are read. Price-only market values remain separately auditable;
+//   when every input has adjusted-close coverage, performance and risk use one consistent vendor
+//   total-return proxy rather than mixing price and adjusted-return series.
 // - Every rate, return, weight, and drawdown is a decimal fraction (0.05 is +5%, -0.2 is a 20%
 //   drawdown). Nothing here converts to percent, rounds for display, or formats.
 // - Deterministic: no clock, no randomness, no I/O. The risk-free rate is always supplied by the
@@ -354,6 +355,14 @@ export interface PortfolioLabViewModel {
   finalValue: number;
   /** `finalValue - allocatedCapital`. */
   totalGain: number;
+  /**
+   * Ending value on `returnBasis`, rebased to the dollars actually allocated. Equals
+   * `finalValue` on the price basis; on the total-return basis it is a vendor-adjusted
+   * dividend-and-split proxy rather than audited dividend cash accounting.
+   */
+  performanceFinalValue: number;
+  /** `performanceFinalValue - allocatedCapital`, on the same basis as the risk figures. */
+  performanceGain: number;
   /** Price return (split-adjusted close) across the whole common window. */
   totalPriceReturn: number;
   /**
@@ -364,7 +373,9 @@ export interface PortfolioLabViewModel {
   totalReturn?: number;
   /** Portfolio dollar value on every common session, from the fixed share counts. */
   valueSeries: DatedValue[];
-  /** Cumulative portfolio price return rebased to 0 on the first common session. */
+  /** Rebased dollar path on `returnBasis`; the same path used by cumulative return and risk. */
+  performanceValueSeries: DatedValue[];
+  /** Cumulative portfolio return on `returnBasis`, rebased to 0 on the first common session. */
   cumulativeReturns: DatedValue[];
   /** Close-to-close portfolio returns; n sessions yield n-1 points. */
   dailyReturns: DatedValue[];
@@ -404,9 +415,10 @@ export interface PortfolioLabViewModel {
   /** Always false: share counts are fixed at the entry date and never adjusted. */
   rebalanced: false;
   /**
-   * The return basis for every daily/cumulative/risk figure. Dollar figures (values,
-   * allocations, attribution) stay on split-adjusted close regardless. `total` only when
-   * every holding (and the benchmark, if any) has complete adjusted-close coverage.
+   * The return basis for every daily/cumulative/risk figure and the performance-value path.
+   * Execution values, allocations, and holding attribution stay on split-adjusted close.
+   * `total` applies only when every holding (and the benchmark, if any) has complete
+   * adjusted-close coverage.
    */
   returnBasis: ReturnBasis;
   /** True when `returnBasis` is `price`, so dividends are excluded from every figure. */
@@ -430,7 +442,7 @@ export function buildPortfolioLab(request: PortfolioLabRequest): PortfolioLabVie
 
   const supplied = normalizeHoldings(holdings);
   // One basis for every risk figure: total return only when every holding and the
-  // benchmark all carry complete adjusted-close coverage. Dollar figures stay on close.
+  // benchmark all carry complete adjusted-close coverage. Execution and attribution stay on close.
   const returnBasis = resolveReturnBasis([
     ...supplied.map((entry) => entry.marketData.provenance.totalReturnCoverage),
     ...(benchmark ? [benchmark.provenance.totalReturnCoverage] : []),
@@ -475,6 +487,7 @@ export function buildPortfolioLab(request: PortfolioLabRequest): PortfolioLabVie
   }));
   const allocatedCapital = valueSeries[0].value;
   const finalValue = valueSeries[valueSeries.length - 1].value;
+  const performanceFinalValue = basisValueSeries[basisValueSeries.length - 1].value;
 
   const measured = supplied.map((entry, index) =>
     measureHolding(entry, alignedBars[index], alignedBasisBars[index], shares[index], allocatedCapital, finalValue),
@@ -500,15 +513,20 @@ export function buildPortfolioLab(request: PortfolioLabRequest): PortfolioLabVie
     allocatedCapital,
     finalValue,
     totalGain: finalValue - allocatedCapital,
+    performanceFinalValue,
+    performanceGain: performanceFinalValue - allocatedCapital,
     totalPriceReturn,
     totalReturn:
       returnBasis === 'total'
         ? basisValueSeries[basisValueSeries.length - 1].value / basisValueSeries[0].value - 1
         : undefined,
     valueSeries,
+    performanceValueSeries: basisValueSeries,
     cumulativeReturns: cumulativePriceReturns(bars),
     dailyReturns,
-    cagr: compoundAnnualGrowthRate(bars),
+    // A very short window can turn a small move into an absurd annualized headline. Use the
+    // same minimum sample gate as the risk statistics; total period return remains available.
+    cagr: riskSample.sufficient ? compoundAnnualGrowthRate(bars) : undefined,
     volatility,
     sharpeRatio: annualizedSharpeRatio(dailyReturns, annualRiskFreeRate),
     sortinoRatio: annualizedSortinoRatio(dailyReturns, annualRiskFreeRate),

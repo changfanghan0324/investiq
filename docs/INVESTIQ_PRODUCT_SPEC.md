@@ -32,6 +32,8 @@ Primary navigation contains exactly four destinations: Research, Compare, Portfo
 - `/company/[ticker]/financials` — detailed annual filing analysis and source receipts.
 - `/company/[ticker]/valuation` — DCF, sensitivities, scenario range, and user-sourced comparables.
 - `/company/[ticker]/memo` — one-page evidence-linked memo and print/PDF workflow.
+- `/company/[ticker]/report` — full bilingual Equity Research Report with financial history,
+  ratio diagnostics, DCF assumptions/scenarios, SEC filing register, limitations, and print pagination.
 - `/compare` — two to five securities on one common return calendar.
 - `/portfolio` — one to ten holdings, user/equal/inverse-volatility weights and portfolio risk.
 - `/tools` — secondary market and calculator tools.
@@ -84,7 +86,10 @@ Primary navigation contains exactly four destinations: Research, Compare, Portfo
   valuation range, conclusion, and filing receipt.
 - Reported facts, model assumptions, and user-authored interpretation remain visually distinct.
 - Saves notes and the last valuation snapshot only in the browser; no account or analytics tracking.
-- Print stylesheet supports browser Save as PDF without sending memo contents to another service.
+- A dedicated print stylesheet supports CJK-safe browser Save as PDF without sending report contents
+  to another service; Chromium print output is visually and text-extraction tested in both languages.
+  Print typography stays at the stable report baseline across the four screen text-size preferences;
+  PDF-reader zoom remains available without repaginating the research artifact.
 
 ## Data and model governance
 
