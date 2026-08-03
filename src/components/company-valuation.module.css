@@ -18,6 +18,13 @@
 .anchor span, .bridge span { display: block; color: #777f8b; font-size: calc(8px * var(--ui-font-scale, 1)); }
 .anchor strong { display: block; margin-top: 7px; color: #e5e9f0; font-family: var(--font-geist-mono), monospace; font-size: calc(14px * var(--ui-font-scale, 1)); font-weight: 500; }
 .anchor small { display: block; margin-top: 3px; color: #606873; font-size: calc(7px * var(--ui-font-scale, 1)); }
+.priceAnchor { display: grid; align-content: center; gap: 6px; }
+.priceInputs { display: grid; grid-template-columns: minmax(74px, .75fr) minmax(118px, 1fr); gap: 6px; }
+.priceInputs > div, .priceInputs > input { min-width: 0; height: 30px; border: 1px solid #343a47; border-radius: 2px; color: #e3e7ed; background: #0d1118; font-family: var(--font-geist-mono), monospace; font-size: calc(8px * var(--ui-font-scale, 1)); }
+.priceInputs > div { display: flex; align-items: center; }
+.priceInputs b { padding-left: 7px; color: #6e7682; font-weight: 500; }
+.priceInputs input { min-width: 0; width: 100%; padding: 0 7px; border: 0; outline: 0; color: inherit; background: transparent; font: inherit; }
+.priceInputs > input { padding: 0 7px; }
 .fieldGrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; padding: 14px; }
 .field { display: grid; gap: 5px; }
 .field > span { color: #9ca3ae; font-size: calc(8px * var(--ui-font-scale, 1)); }

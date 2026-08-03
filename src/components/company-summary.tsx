@@ -14,11 +14,12 @@ import {
 } from "lucide-react";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
+import { classifyCompanyCoverage } from "@/domain/company-coverage";
 import type { FundamentalsMetricKey, FundamentalsResult, FundamentalsSeries } from "@/domain/fundamentals";
 import { buildStockAnalysis, type StockAnalysisViewModel } from "@/domain/stock-analysis";
 import { useLanguage, type Translate, type TranslationKey } from "@/i18n/language";
+import { loadAnalysisMarketData } from "@/services/analysis-market-data";
 import { loadCompanyFundamentals } from "@/services/fundamentals-api";
-import { loadMarketData } from "@/services/market-data-api";
 import { addYearsClamped, todayDateString } from "@/utils/date";
 
 import styles from "./company-summary.module.css";
@@ -30,6 +31,7 @@ export function CompanySummary({ rawTicker }: { rawTicker: string }) {
   const ticker = safeTicker(rawTicker);
   const [fundamentals, setFundamentals] = useState<FundamentalsResult>();
   const [priceContext, setPriceContext] = useState<StockAnalysisViewModel>();
+  const [priceIsDemo, setPriceIsDemo] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -42,14 +44,17 @@ export function CompanySummary({ rawTicker }: { rawTicker: string }) {
       .catch(() => undefined)
       .finally(() => { if (active) setLoading(false); });
 
-    loadMarketData({
+    loadAnalysisMarketData({
       ticker,
       from: addYearsClamped(today, -5),
       to: today,
       requiredStart: addYearsClamped(today, -5),
-      mode: "analysis",
     })
-      .then((marketData) => { if (active) setPriceContext(buildStockAnalysis({ marketData, annualRiskFreeRate: 0 })); })
+      .then((marketData) => {
+        if (!active) return;
+        setPriceIsDemo(marketData.source === "demo");
+        setPriceContext(buildStockAnalysis({ marketData, annualRiskFreeRate: 0 }));
+      })
       .catch(() => undefined);
 
     return () => { active = false; };
@@ -59,6 +64,10 @@ export function CompanySummary({ rawTicker }: { rawTicker: string }) {
   const operatingMargin = metric(fundamentals, "operatingMargin");
   const freeCashFlow = metric(fundamentals, "freeCashFlow");
   const latestReceipt = useMemo(() => latestSourceReceipt(fundamentals), [fundamentals]);
+  const coverage = useMemo(
+    () => fundamentals ? classifyCompanyCoverage(fundamentals) : undefined,
+    [fundamentals],
+  );
 
   if (!ticker) {
     return <StateView icon={<TriangleAlert />} title={t("company.errorTitle")} text={t("company.invalidTicker")} />;
@@ -93,11 +102,19 @@ export function CompanySummary({ rawTicker }: { rawTicker: string }) {
           <section className={styles.pricePanel}>
             <header><h2>4. {t("company.priceRiskTitle")}</h2><span>{t("company.priceRiskBasis")}</span></header>
             {priceContext ? (
-              <div className={styles.priceMetrics}>
-                <Metric label={priceContext.returnBasis === "total" ? t("company.trailingTotalReturn") : t("company.trailingPriceReturn")} value={pct(priceContext.totalReturn ?? priceContext.priceReturn)} />
-                <Metric label={t("company.annualizedVolatility")} value={priceContext.volatility === undefined ? "—" : pct(priceContext.volatility, false)} />
-                <Metric label={t("company.priceAsOf")} value={priceContext.latestDate} />
-              </div>
+              <>
+                {priceIsDemo ? (
+                  <div className={styles.priceDemoNotice}>
+                    <TriangleAlert size={15} />
+                    <div><strong>{t("company.priceDemoTitle")}</strong><p>{t("company.priceDemoBody", { ticker })}</p></div>
+                  </div>
+                ) : null}
+                <div className={styles.priceMetrics}>
+                  <Metric label={priceContext.returnBasis === "total" ? t("company.trailingTotalReturn") : t("company.trailingPriceReturn")} value={pct(priceContext.totalReturn ?? priceContext.priceReturn)} />
+                  <Metric label={t("company.annualizedVolatility")} value={priceContext.volatility === undefined ? "—" : pct(priceContext.volatility, false)} />
+                  <Metric label={t("company.priceAsOf")} value={priceContext.latestDate} />
+                </div>
+              </>
             ) : (
               <Unavailable text={t("company.priceUnavailable")} />
             )}
@@ -127,10 +144,15 @@ export function CompanySummary({ rawTicker }: { rawTicker: string }) {
 
           <section>
             <header><CheckCircle2 size={15} /><h2>{t("company.coverageTitle")}</h2></header>
-            <p>{t("company.coverageAvailable", { count: fundamentals.metrics.filter((item) => item.available).length })}</p>
-            {fundamentals.coverage.unavailable.length ? (
-              <details><summary>{t("company.coverageUnavailable", { count: fundamentals.coverage.unavailable.length })}</summary>
-                <ul>{fundamentals.coverage.unavailable.map((item) => <li key={item.metric}>{labelMetric(item.metric, t)} — {t("company.metricUnavailable")}</li>)}</ul>
+            <p>{t("company.coverageAvailable", { count: coverage?.availableCount ?? 0 })}</p>
+            {coverage?.notApplicable.length ? (
+              <details><summary>{t("company.coverageNotApplicable", { count: coverage.notApplicable.length })}</summary>
+                <ul>{coverage.notApplicable.map((item) => <li key={item.metric}>{labelMetric(item.metric, t)} — {t("company.metricNotApplicableFinancial")}</li>)}</ul>
+              </details>
+            ) : null}
+            {coverage?.notReported.length ? (
+              <details><summary>{t("company.coverageNotReported", { count: coverage.notReported.length })}</summary>
+                <ul>{coverage.notReported.map((item) => <li key={item.metric}>{labelMetric(item.metric, t)} — {t("company.metricNotReported")}</li>)}</ul>
               </details>
             ) : null}
           </section>

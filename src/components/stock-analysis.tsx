@@ -47,7 +47,8 @@ import {
   describeDrawdownScenario,
   type StockAnalysisViewModel,
 } from "@/domain/stock-analysis";
-import { MarketDataError, loadMarketData } from "@/services/market-data-api";
+import { loadAnalysisMarketData } from "@/services/analysis-market-data";
+import { MarketDataError } from "@/services/market-data-api";
 import { type Translate, type TranslationKey, useLanguage } from "@/i18n/language";
 import type { DateString, DividendEvent, MarketData, SplitEvent } from "@/types/backtest";
 import { daysBetween } from "@/utils/date";
@@ -241,12 +242,11 @@ async function loadSymbol(
 ): Promise<{ data?: MarketData; error?: string; errorKey?: TranslationKey }> {
   try {
     return {
-      data: await loadMarketData({
+      data: await loadAnalysisMarketData({
         ticker,
         from: startDate,
         to: endDate,
         requiredStart: startDate,
-        mode: "analysis",
       }),
     };
   } catch (error) {
@@ -563,6 +563,13 @@ export function StockAnalysis() {
           <h1>{t("stock.title")}</h1>
           <p className={styles.subtitle}>{t("stock.subtitle")}</p>
         </div>
+
+        {result?.marketData.source === "demo" ? (
+          <section className={styles.demoNotice} aria-label={t("analysisDemo.title")}>
+            <strong>{t("analysisDemo.title")}</strong>
+            <p>{t("analysisDemo.body")}</p>
+          </section>
+        ) : null}
 
         <form className={styles.controls} onSubmit={handleSubmit} aria-label={t("stock.controlsTitle")}>
           <div className={styles.controlField}>

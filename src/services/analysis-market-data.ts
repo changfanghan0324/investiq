@@ -2,7 +2,7 @@
 // explicitly synthetic browser demo without weakening the server-side license gate.
 
 import { createDemoMarketData } from '@/data/demo-market-data';
-import { loadMarketData } from '@/services/market-data-api';
+import { loadMarketData, MarketDataError } from '@/services/market-data-api';
 import type { DateString, MarketData } from '@/types/backtest';
 
 const CAPABILITY_TTL_MS = 60_000;
@@ -38,10 +38,26 @@ export async function loadAnalysisMarketData(
   dependencies: AnalysisMarketDataDependencies = defaultDependencies,
 ): Promise<MarketData> {
   if (await dependencies.liveCapability()) {
-    return dependencies.loadLive({ ...options, mode: 'analysis' });
+    try {
+      return await dependencies.loadLive({ ...options, mode: 'analysis' });
+    } catch (error) {
+      // Invalid input and a confirmed missing instrument remain user-visible.
+      // Transient provider, quota, timeout, or network failures fall through to
+      // the same explicitly-labelled demo used when live capability is disabled.
+      if (error instanceof MarketDataError && [400, 404, 422].includes(error.status ?? 0)) {
+        throw error;
+      }
+    }
   }
 
-  const demo = dependencies.createDemo(options.ticker, stableDemoSeed(options.ticker));
+  return createRequestedWindowDemo(options, dependencies.createDemo);
+}
+
+function createRequestedWindowDemo(
+  options: AnalysisMarketDataOptions,
+  createDemo: typeof createDemoMarketData,
+): MarketData {
+  const demo = createDemo(options.ticker, stableDemoSeed(options.ticker));
   return {
     ...demo,
     prices: demo.prices.filter((bar) => bar.date >= options.from && bar.date <= options.to),

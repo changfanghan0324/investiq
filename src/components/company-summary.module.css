@@ -45,6 +45,10 @@
 .financialNote { border-top: 1px solid #252a35; color: #d4ad67 !important; }
 .unavailable { min-height: 120px; display: flex; align-items: center; justify-content: center; gap: 8px; padding: 18px; color: #8b919d; font-size: calc(9px * var(--ui-font-scale, 1)); line-height: 1.45; text-align: center; }
 .unavailable svg { flex: 0 0 auto; color: #a98246; }
+.priceDemoNotice { display: flex; gap: 9px; padding: 11px 14px; border-bottom: 1px solid rgba(242, 182, 54, .22); color: #aeb4bf; background: rgba(84, 61, 19, .17); }
+.priceDemoNotice > svg { flex: 0 0 auto; margin-top: 2px; color: #e7b547; }
+.priceDemoNotice strong { color: #e7bd67; font-size: calc(8px * var(--ui-font-scale, 1)); font-weight: 600; }
+.priceDemoNotice p { margin-top: 3px; max-width: 100ch; font-size: calc(8px * var(--ui-font-scale, 1)); line-height: 1.55; }
 .state { min-height: 430px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; border: 1px solid #2a2e39; border-radius: 3px; color: #7095e9; background: #11151e; text-align: center; }
 .state h1 { color: #e4e7ee; font-size: calc(18px * var(--ui-font-scale, 1)); font-weight: 500; }
 .state p { max-width: 560px; color: #838a96; font-size: calc(11px * var(--ui-font-scale, 1)); line-height: 1.5; }

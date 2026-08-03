@@ -3,9 +3,12 @@
 import type { DateString, MarketData, MarketDataMode } from '@/types/backtest';
 
 export class MarketDataError extends Error {
-  constructor(message: string) {
+  readonly status?: number;
+
+  constructor(message: string, status?: number) {
     super(message);
     this.name = 'MarketDataError';
+    this.status = status;
   }
 }
 
@@ -38,12 +41,12 @@ export async function loadMarketData(options: {
     if (!response.ok) {
       const message = getApiMessage(payload);
       if (response.status === 400 || response.status === 404 || response.status === 422) {
-        throw new MarketDataError(message ?? 'Please review the ticker and selected dates.');
+        throw new MarketDataError(message ?? 'Please review the ticker and selected dates.', response.status);
       }
       if (response.status === 429) {
-        throw new MarketDataError('The market-data service is busy. Please wait briefly and try again.');
+        throw new MarketDataError('The market-data service is busy. Please wait briefly and try again.', 429);
       }
-      throw new MarketDataError(message ?? 'Market data is temporarily unavailable. Please try again later.');
+      throw new MarketDataError(message ?? 'Market data is temporarily unavailable. Please try again later.', response.status);
     }
 
     if (!isMarketData(payload)) {

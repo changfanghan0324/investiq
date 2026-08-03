@@ -141,6 +141,29 @@ describe('concept alias precedence', () => {
     assert.equal(series(output, 'accountsReceivableNetCurrent').observations[0].value, 125);
     assert.equal(series(output, 'accountsReceivableNetCurrent').observations[0].receipts[0].concept, 'AccountsReceivableNetCurrent');
   });
+
+  it('accepts the standard nonoperating-interest tag without overriding a reported total', () => {
+    const fallbackFacts = companyFacts({
+      'us-gaap': {
+        Revenues: { units: { USD: [annual(2025, 100)] } },
+        InterestExpenseNonoperating: { units: { USD: [annual(2025, 7)] } },
+      },
+    });
+    const fallback = series(buildFundamentals(fallbackFacts, identity()), 'interestExpense');
+    assert.equal(fallback.observations[0].value, 7);
+    assert.equal(fallback.observations[0].receipts[0].concept, 'InterestExpenseNonoperating');
+
+    const precedenceFacts = companyFacts({
+      'us-gaap': {
+        Revenues: { units: { USD: [annual(2025, 100)] } },
+        InterestExpense: { units: { USD: [annual(2025, 8)] } },
+        InterestExpenseNonoperating: { units: { USD: [annual(2025, 7)] } },
+      },
+    });
+    const precedence = series(buildFundamentals(precedenceFacts, identity()), 'interestExpense');
+    assert.equal(precedence.observations[0].value, 8);
+    assert.equal(precedence.observations[0].receipts[0].concept, 'InterestExpense');
+  });
 });
 
 describe('annual duration and form filters', () => {
