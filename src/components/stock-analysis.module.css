@@ -126,6 +126,22 @@
   line-height: 1.6;
 }
 
+.demoNotice {
+  display: grid;
+  margin-top: 14px;
+  padding: 11px 13px;
+  border: 1px solid rgba(242, 182, 54, 0.34);
+  border-left: 3px solid #f2b636;
+  border-radius: 4px;
+  color: #c9ccd5;
+  background: rgba(77, 56, 18, 0.22);
+  font-size: calc(11px * var(--ui-font-scale, 1));
+  line-height: 1.55;
+  gap: 3px;
+}
+
+.demoNotice strong { color: #f4c567; font-weight: 600; }
+
 /* Analysis form. One compact horizontal row on the desktop: four inputs, then the run button.
    The hint always occupies its own full-width row so it can never squeeze a control. */
 

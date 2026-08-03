@@ -7,6 +7,7 @@ import {
   stableDemoSeed,
   type AnalysisMarketDataDependencies,
 } from '@/services/analysis-market-data';
+import { MarketDataError } from '@/services/market-data-api';
 import type { MarketData } from '@/types/backtest';
 
 const options = {
@@ -56,7 +57,7 @@ describe('analysis market-data resolution', () => {
         { executionDate: '2020-08-31' },
         { executionDate: '2021-08-30' },
       ],
-    } as MarketData;
+    } as unknown as MarketData;
     const dependencies: AnalysisMarketDataDependencies = {
       liveCapability: vi.fn().mockResolvedValue(false),
       loadLive: vi.fn(),
@@ -70,6 +71,36 @@ describe('analysis market-data resolution', () => {
     expect(result.dividends).toEqual([]);
     expect(result.splits.map((event) => event.executionDate)).toEqual(['2021-08-30']);
     expect(dependencies.loadLive).not.toHaveBeenCalled();
+  });
+
+  it('falls back to labelled demo data when a previously-ready live provider fails transiently', async () => {
+    const demo = {
+      ticker: 'AAPL',
+      source: 'demo',
+      prices: [{ date: '2021-06-01' }],
+      dividends: [],
+      splits: [],
+    } as unknown as MarketData;
+    const dependencies: AnalysisMarketDataDependencies = {
+      liveCapability: vi.fn().mockResolvedValue(true),
+      loadLive: vi.fn().mockRejectedValue(new MarketDataError('busy', 429)),
+      createDemo: vi.fn().mockReturnValue(demo),
+    };
+
+    await expect(loadAnalysisMarketData(options, dependencies)).resolves.toMatchObject({ source: 'demo' });
+    expect(dependencies.createDemo).toHaveBeenCalledOnce();
+  });
+
+  it.each([400, 404, 422])('does not disguise a confirmed input error (%s) as demo data', async (status) => {
+    const error = new MarketDataError('invalid request', status);
+    const dependencies: AnalysisMarketDataDependencies = {
+      liveCapability: vi.fn().mockResolvedValue(true),
+      loadLive: vi.fn().mockRejectedValue(error),
+      createDemo: vi.fn(),
+    };
+
+    await expect(loadAnalysisMarketData(options, dependencies)).rejects.toBe(error);
+    expect(dependencies.createDemo).not.toHaveBeenCalled();
   });
 
   it('fails to demo through the default path when the health request is unreachable', async () => {

@@ -46,9 +46,10 @@ import {
   type WatchlistRejection,
 } from "@/domain/market-overview";
 import type { ReturnBasis } from "@/domain/analytics";
-import { MarketDataError, loadMarketData } from "@/services/market-data-api";
+import { loadAnalysisMarketData } from "@/services/analysis-market-data";
+import { MarketDataError } from "@/services/market-data-api";
 import { type Translate, type TranslationKey, useLanguage } from "@/i18n/language";
-import type { DateString, PriceBar } from "@/types/backtest";
+import type { DateString, MarketData, PriceBar } from "@/types/backtest";
 
 import styles from "./market-overview.module.css";
 
@@ -106,6 +107,7 @@ interface SymbolRow {
   name?: string;
   bars?: PriceBar[];
   summary?: PriceWindowSummary;
+  source?: MarketData["source"];
   /** Message produced by the service; already human-readable. */
   error?: string;
   /** Locally generated failure, translated at render time. */
@@ -121,6 +123,7 @@ interface LoadOutcome {
   name?: string;
   bars?: PriceBar[];
   summary?: PriceWindowSummary;
+  source?: MarketData["source"];
   error?: string;
   errorKey?: TranslationKey;
 }
@@ -134,16 +137,15 @@ function trailingYearRange(now: Date): DateRange {
 
 async function loadSymbolWindow(symbol: string, range: DateRange): Promise<LoadOutcome> {
   try {
-    const data = await loadMarketData({
+    const data = await loadAnalysisMarketData({
       ticker: symbol,
       from: range.from,
       to: range.to,
       requiredStart: range.from,
-      mode: "analysis",
     });
     const bars = trailingWindow(data.prices, range.from);
     if (bars.length === 0) return { errorKey: "market.errorEmptyWindow" };
-    return { name: data.name, bars, summary: summarizePriceWindow(bars) };
+    return { name: data.name, bars, summary: summarizePriceWindow(bars), source: data.source };
   } catch (error) {
     if (error instanceof MarketDataError) return { error: error.message };
     if (error instanceof AnalyticsError) return { errorKey: "market.errorEmptyWindow" };
@@ -160,6 +162,7 @@ function applyOutcome(row: SymbolRow, outcome: LoadOutcome): SymbolRow {
       name: outcome.name,
       bars: outcome.bars,
       summary: outcome.summary,
+      source: outcome.source,
     };
   }
   return {
@@ -265,6 +268,7 @@ export function MarketOverview() {
   const watchlistRows = useMemo(() => rows.filter((row) => row.kind === "watchlist"), [rows]);
   const failedRows = useMemo(() => rows.filter((row) => row.status === "error"), [rows]);
   const readyRows = useMemo(() => rows.filter((row) => row.status === "ready"), [rows]);
+  const isDemo = readyRows.some((row) => row.source === "demo");
 
   const colorBySymbol = useMemo(() => {
     const map = new Map<string, string>();
@@ -384,6 +388,13 @@ export function MarketOverview() {
             {range ? t("market.window", { from: formatDate(range.from, locale), to: formatDate(range.to, locale) }) : t("market.windowPending")}
           </p>
         </div>
+
+        {isDemo ? (
+          <section className={styles.demoNotice} aria-label={t("analysisDemo.title")}>
+            <strong>{t("analysisDemo.title")}</strong>
+            <p>{t("analysisDemo.body")}</p>
+          </section>
+        ) : null}
 
         <div className={styles.explainers}>
           <Explainer titleKey="market.etfProxyTitle" bodyKey="market.etfProxy" />

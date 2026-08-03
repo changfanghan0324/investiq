@@ -223,6 +223,10 @@ These hold across Market Context, Company price-risk context, Stock Comparison, 
 - SEC SIC 6000–6999 activates a financial-issuer gate for revenue-margin, conventional debt,
   liquidity, interest-coverage, and manufacturing-style efficiency ratios. A missing SIC also
   withholds issuer-sensitive ratios. Every available ratio retains all component filing receipts.
+- The company-summary coverage rail separates three states: available standardized facts,
+  manufacturing/debt fields that are not applicable to a financial issuer, and facts that the issuer
+  did not report separately. None of the latter two are described as a provider outage or filled with
+  an invented zero.
 - This latest-reported view is display-only and is never fed into a historical backtest.
 
 ### Valuation contract
@@ -877,11 +881,18 @@ service-unavailable response before any provider work, and the browser keeps its
 mode. Local and preview deployments are ungated, so personal credentials can be used for private
 testing.
 
-Portfolio Lab and Stock Comparison probe `/api/health` before loading a symbol. When price analysis
-is unavailable, they do not issue doomed live-data requests: they run the analytics locally on
-generated series whose source, on-screen notice, asset names, and CSV disclosure all say **synthetic
-demo — not market history**. This keeps the public portfolio demonstration usable without weakening
-the server gate or presenting generated figures as AAPL, MSFT, SPY, or any other real security.
+Portfolio Lab, Stock Comparison, Market Overview, Stock Analysis, and the company-summary price-risk
+panel probe `/api/health` before loading a symbol. When price analysis is unavailable, they do not
+issue doomed live-data requests: they run the analytics locally on generated series whose source and
+on-screen notice say **synthetic demo — not market history**. Company fundamentals remain real SEC
+facts and are labelled separately from the synthetic price context. This keeps the public portfolio
+demonstration usable without weakening the server gate or presenting generated prices as real market
+history.
+
+Valuation is intentionally stricter: synthetic demo prices are never prefilled as a current market
+price. A user may enter a positive price only together with its non-future observation date, or a
+licensed provider may supply both. The dated price is used solely for the separate upside/downside and
+observed-multiple comparison; it never enters DCF cash-flow mathematics.
 
 The flag confers **no rights of any kind** — setting it only records that the operator has confirmed
 they already hold them. Enable it only after securing written rights that cover public end-user display

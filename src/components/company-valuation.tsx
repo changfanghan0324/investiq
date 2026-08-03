@@ -21,8 +21,8 @@ import {
   type SensitivityTable,
 } from "@/domain/valuation";
 import { useLanguage, type Translate } from "@/i18n/language";
+import { loadAnalysisMarketData } from "@/services/analysis-market-data";
 import { loadCompanyFundamentals } from "@/services/fundamentals-api";
-import { loadMarketData } from "@/services/market-data-api";
 import { saveValuationSnapshot } from "@/services/valuation-snapshot";
 import { addYearsClamped, todayDateString } from "@/utils/date";
 
@@ -30,7 +30,7 @@ import styles from "./company-valuation.module.css";
 
 const TICKER_PATTERN = /^[A-Z0-9.-]{1,12}$/;
 
-type FieldKey = "growth" | "margin" | "tax" | "da" | "capex" | "nwc" | "wacc" | "terminal" | "netDebt";
+type FieldKey = "growth" | "margin" | "tax" | "da" | "capex" | "nwc" | "wacc" | "terminal" | "netDebt" | "currentPrice" | "currentPriceDate";
 type FormState = Record<FieldKey, string>;
 
 interface ValuationView {
@@ -51,6 +51,8 @@ const STARTER: FormState = {
   wacc: "9.0",
   terminal: "2.5",
   netDebt: "",
+  currentPrice: "",
+  currentPriceDate: "",
 };
 
 export function CompanyValuation({ rawTicker }: { rawTicker: string }) {
@@ -58,7 +60,7 @@ export function CompanyValuation({ rawTicker }: { rawTicker: string }) {
   const ticker = safeTicker(rawTicker);
   const [fundamentals, setFundamentals] = useState<FundamentalsResult>();
   const [form, setForm] = useState<FormState>(STARTER);
-  const [price, setPrice] = useState<{ value: number; date: string }>();
+  const [priceFromProvider, setPriceFromProvider] = useState(false);
   const [settled, setSettled] = useState(false);
   const [view, setView] = useState<ValuationView>();
   const [comparableMetric, setComparableMetric] = useState<ComparableMetric>("pe");
@@ -79,10 +81,12 @@ export function CompanyValuation({ rawTicker }: { rawTicker: string }) {
       })
       .catch(() => undefined)
       .finally(() => { if (active) setSettled(true); });
-    loadMarketData({ ticker, from: addYearsClamped(today, -1), to: today, requiredStart: addYearsClamped(today, -1), mode: "analysis" })
+    loadAnalysisMarketData({ ticker, from: addYearsClamped(today, -1), to: today, requiredStart: addYearsClamped(today, -1) })
       .then((marketData) => {
         const latest = marketData.prices.at(-1);
-        if (active && latest) setPrice({ value: latest.close, date: latest.date });
+        if (!active || !latest || marketData.source === "demo") return;
+        setForm((current) => ({ ...current, currentPrice: String(latest.close), currentPriceDate: latest.date }));
+        setPriceFromProvider(true);
       })
       .catch(() => undefined);
     return () => { active = false; };
@@ -90,6 +94,8 @@ export function CompanyValuation({ rawTicker }: { rawTicker: string }) {
 
   const anchors = useMemo(() => fundamentals ? dcfAnchors(fundamentals) : undefined, [fundamentals]);
   const comparableBasis = useMemo(() => fundamentals && anchors ? comparableValues(fundamentals, anchors) : undefined, [fundamentals, anchors]);
+  const currentPrice = optionalPositiveFinite(form.currentPrice);
+  const datedCurrentPrice = currentPrice !== undefined && isValidQuoteDate(form.currentPriceDate, todayDateString()) ? currentPrice : undefined;
 
   function submit(event: FormEvent) {
     event.preventDefault();
@@ -112,10 +118,11 @@ export function CompanyValuation({ rawTicker }: { rawTicker: string }) {
         around(numberRate(form.growth), 0.02),
         around(numberRate(form.margin), 0.02),
       );
-      const current = price ? compareToCurrentPrice({ impliedSharePrice: base.impliedSharePrice, currentPrice: price.value, valuationDate: todayDateString(), quoteDate: price.date }) : undefined;
+      const quoteDate = currentPrice === undefined ? undefined : requiredQuoteDate(form.currentPriceDate, todayDateString(), t);
+      const current = currentPrice !== undefined && quoteDate ? compareToCurrentPrice({ impliedSharePrice: base.impliedSharePrice, currentPrice, valuationDate: todayDateString(), quoteDate }) : undefined;
       setView({ base, scenarios, waccTerminal, growthMargin, current });
       const byId = Object.fromEntries(scenarios.scenarios.map((item) => [item.id, item.valuation.impliedSharePrice]));
-      saveValuationSnapshot({ version: 1, ticker, generatedAt: new Date().toISOString(), fiscalYear: anchors.fiscalYear, assumptions, values: { bear: byId.bear, base: byId.base, bull: byId.bull, low: scenarios.lowImpliedSharePrice, high: scenarios.highImpliedSharePrice, enterpriseValue: base.bridge.enterpriseValue, equityValue: base.bridge.equityValue, ...(price ? { currentPrice: price.value, quoteDate: price.date } : {}), ...(current ? { upsideDownside: current.upsideDownside } : {}) } });
+      saveValuationSnapshot({ version: 1, ticker, generatedAt: new Date().toISOString(), fiscalYear: anchors.fiscalYear, assumptions, values: { bear: byId.bear, base: byId.base, bull: byId.bull, low: scenarios.lowImpliedSharePrice, high: scenarios.highImpliedSharePrice, enterpriseValue: base.bridge.enterpriseValue, equityValue: base.bridge.equityValue, ...(currentPrice !== undefined && quoteDate ? { currentPrice, quoteDate } : {}), ...(current ? { upsideDownside: current.upsideDownside } : {}) } });
       setError(undefined);
     } catch (caught) {
       setView(undefined);
@@ -154,7 +161,14 @@ export function CompanyValuation({ rawTicker }: { rawTicker: string }) {
           <div className={styles.anchorGrid}>
             <Anchor label={t("valuation.baseRevenue")} value={money(anchors.baseRevenue, language)} detail={`FY${anchors.fiscalYear}`} />
             <Anchor label={t("valuation.dilutedShares")} value={compact(anchors.dilutedShares, language)} detail={`FY${anchors.fiscalYear}`} />
-            <Anchor label={t("valuation.currentPrice")} value={price ? usd(price.value) : "—"} detail={price?.date ?? t("valuation.unavailable")} />
+            <label className={`${styles.anchor} ${styles.priceAnchor}`}>
+              <span>{t("valuation.currentPrice")}</span>
+              <div className={styles.priceInputs}>
+                <div><b>$</b><input value={form.currentPrice} inputMode="decimal" placeholder={t("valuation.currentPricePlaceholder")} onChange={(event) => { setForm({ ...form, currentPrice: event.target.value }); setPriceFromProvider(false); }} /></div>
+                <input type="date" value={form.currentPriceDate} max={todayDateString()} aria-label={t("valuation.currentPriceDate")} onChange={(event) => { setForm({ ...form, currentPriceDate: event.target.value }); setPriceFromProvider(false); }} />
+              </div>
+              <small>{priceFromProvider ? t("valuation.currentPriceProvider") : t("valuation.currentPriceManual")}</small>
+            </label>
           </div>
           <div className={styles.fieldGrid}>
             <PercentField field="growth" label={t("valuation.revenueGrowth")} form={form} setForm={setForm} source={t("valuation.historicalStarter")} />
@@ -193,10 +207,10 @@ export function CompanyValuation({ rawTicker }: { rawTicker: string }) {
               <div className={styles.marketMultiples}>
                 <h3>{t("valuation.observedMultiples")}</h3>
                 <div className={styles.multipleGrid}>
-                  <Bridge label="P/E" value={comparableBasis.pe && price ? formatMultiple(price.value / comparableBasis.pe) : "—"} />
+                  <Bridge label="P/E" value={comparableBasis.pe && datedCurrentPrice ? formatMultiple(datedCurrentPrice / comparableBasis.pe) : "—"} />
                   <Bridge label="Forward P/E" value="—" />
-                  <Bridge label="EV / Revenue" value={price && optionalFinite(form.netDebt) !== undefined ? formatMultiple((price.value * anchors.dilutedShares + optionalFinite(form.netDebt)!) / anchors.baseRevenue) : "—"} />
-                  <Bridge label="EV / EBITDA" value={price && comparableBasis["ev-ebitda"] && optionalFinite(form.netDebt) !== undefined ? formatMultiple((price.value * anchors.dilutedShares + optionalFinite(form.netDebt)!) / comparableBasis["ev-ebitda"]!) : "—"} />
+                  <Bridge label="EV / Revenue" value={datedCurrentPrice && optionalFinite(form.netDebt) !== undefined ? formatMultiple((datedCurrentPrice * anchors.dilutedShares + optionalFinite(form.netDebt)!) / anchors.baseRevenue) : "—"} />
+                  <Bridge label="EV / EBITDA" value={datedCurrentPrice && comparableBasis["ev-ebitda"] && optionalFinite(form.netDebt) !== undefined ? formatMultiple((datedCurrentPrice * anchors.dilutedShares + optionalFinite(form.netDebt)!) / comparableBasis["ev-ebitda"]!) : "—"} />
                   <Bridge label="Price / Book" value="—" />
                   <Bridge label="PEG" value="—" />
                 </div>
@@ -318,6 +332,9 @@ function median(values: number[]) { const sorted = [...values].sort((a, b) => a 
 function safeTicker(raw: string) { try { const value = decodeURIComponent(raw).trim().toUpperCase(); return TICKER_PATTERN.test(value) ? value : ""; } catch { return ""; } }
 function clamp(value: number, min: number, max: number) { return Math.min(max, Math.max(min, value)); }
 function optionalFinite(value: string) { if (value.trim() === "") return undefined; const parsed = Number(value); return Number.isFinite(parsed) ? parsed : undefined; }
+function optionalPositiveFinite(value: string) { const parsed = optionalFinite(value); return parsed !== undefined && parsed > 0 ? parsed : undefined; }
+function isValidQuoteDate(value: string, today: string) { return /^\d{4}-\d{2}-\d{2}$/.test(value) && value <= today; }
+function requiredQuoteDate(value: string, today: string, t: Translate) { if (!isValidQuoteDate(value, today)) throw new ValuationError(t("valuation.currentPriceDateError")); return value; }
 function formatMultiple(value: number) { return Number.isFinite(value) && value > 0 ? `${value.toFixed(1)}×` : "—"; }
 function axis(label: string) { return label === "wacc" ? "WACC" : label === "terminalGrowth" ? "g" : label === "revenueGrowth" ? "Growth" : "Margin"; }
 function usd(value: number) { const sign = value < 0 ? "−" : ""; return `${sign}$${Math.abs(value).toLocaleString("en-US", { maximumFractionDigits: 2 })}`; }

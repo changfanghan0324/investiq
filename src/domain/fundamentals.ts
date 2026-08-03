@@ -424,6 +424,7 @@ const DIRECT_METRICS: DirectMetricSpec[] = [
     nonNegative: true,
     aliases: [
       { taxonomy: 'us-gaap', concept: 'InterestExpense' },
+      { taxonomy: 'us-gaap', concept: 'InterestExpenseNonoperating' },
       { taxonomy: 'us-gaap', concept: 'InterestExpenseDebt' },
       { taxonomy: 'us-gaap', concept: 'InterestAndDebtExpense' },
     ],
