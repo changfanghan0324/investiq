@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { IBM_Plex_Mono, IBM_Plex_Sans } from "next/font/google";
+import { ReadinessProvider } from "@/components/readiness-provider";
 import { LanguageProvider } from "@/i18n/language";
 import "./globals.css";
 
@@ -43,7 +44,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={`${uiSans.variable} ${uiMono.variable}`} data-scroll-behavior="smooth">
-      <body><LanguageProvider>{children}</LanguageProvider></body>
+      <body>
+        <LanguageProvider>
+          <ReadinessProvider>{children}</ReadinessProvider>
+        </LanguageProvider>
+      </body>
     </html>
   );
 }

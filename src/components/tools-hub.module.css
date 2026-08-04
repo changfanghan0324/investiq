@@ -3,7 +3,7 @@
 .heading > span { display: inline-flex; align-items: center; gap: 7px; color: #7597e8; font-size: calc(11px * var(--ui-font-scale, 1)); text-transform: uppercase; letter-spacing: .09em; }
 .heading h1 { margin-top: 10px; color: #eef1f7; font-size: calc(clamp(26px, 3vw, 36px) * var(--ui-font-scale, 1)); font-weight: 550; letter-spacing: -.03em; }
 .heading p { margin-top: 9px; color: #8b919d; font-size: calc(13px * var(--ui-font-scale, 1)); line-height: 1.55; }
-.grid { max-width: 960px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 0 auto; }
+.grid { max-width: 760px; display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin: 0 auto; }
 .tool { min-height: 230px; display: flex; flex-direction: column; align-items: flex-start; padding: 22px; border: 1px solid #2a2e39; border-radius: 3px; color: #7597e8; background: #11151e; transition: border-color 150ms ease, transform 150ms ease; }
 a.tool:hover { border-color: #46516a; transform: translateY(-2px); }
 .tool div { margin-top: 30px; }

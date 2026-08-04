@@ -7,8 +7,11 @@ import { afterEach, describe, it } from 'vitest';
 
 import { PublicServerError } from '@/server/errors';
 import {
+  MIN_SEC_TICKER_DIRECTORY_ENTRIES,
+  MIN_SEC_TICKER_DIRECTORY_PARSE_RATIO,
   SEC_MIN_REQUEST_INTERVAL_MS,
   SerialRateGate,
+  assertCredibleTickerDirectory,
   buildCikMap,
   loadFundamentals,
   resetSecCachesForTests,
@@ -19,10 +22,18 @@ import {
 
 const USER_AGENT = 'InvestIQ-test/1.0 (test@example.com)';
 
-const TICKERS = {
-  '0': { cik_str: 320193, ticker: 'AAPL', title: 'Apple Inc.' },
-  '1': { cik_str: 1067983, ticker: 'BRK-B', title: 'Berkshire Hathaway Inc.' },
-};
+function tickerDirectory(size = MIN_SEC_TICKER_DIRECTORY_ENTRIES) {
+  return Object.fromEntries([
+    ['0', { cik_str: 320193, ticker: 'AAPL', title: 'Apple Inc.' }],
+    ['1', { cik_str: 1067983, ticker: 'BRK-B', title: 'Berkshire Hathaway Inc.' }],
+    ...Array.from({ length: Math.max(0, size - 2) }, (_, index) => [
+      String(index + 2),
+      { cik_str: 2_000_000 + index, ticker: `T${index}`, title: `Test issuer ${index}` },
+    ] as const),
+  ]);
+}
+
+const TICKERS = tickerDirectory();
 
 const APPLE_FACTS = {
   cik: 320193,
@@ -155,6 +166,55 @@ describe('CIK resolution', () => {
     assert.equal(map.has('NOCIK'), false);
   });
 
+  it('rejects implausible ticker directories before they can support a false 404', () => {
+    assert.throws(
+      () => assertCredibleTickerDirectory({}),
+      (error: unknown) => error instanceof PublicServerError && error.status === 503,
+    );
+    assert.throws(
+      () => assertCredibleTickerDirectory(tickerDirectory(MIN_SEC_TICKER_DIRECTORY_ENTRIES - 1)),
+      (error: unknown) => error instanceof PublicServerError && error.status === 503,
+    );
+
+    const invalidRows = Math.ceil(
+      MIN_SEC_TICKER_DIRECTORY_ENTRIES * (1 / MIN_SEC_TICKER_DIRECTORY_PARSE_RATIO - 1),
+    ) + 1;
+    const lowYield = {
+      ...tickerDirectory(MIN_SEC_TICKER_DIRECTORY_ENTRIES),
+      ...Object.fromEntries(Array.from({ length: invalidRows }, (_, index) => [
+        `bad-${index}`,
+        { ticker: `BAD${index}` },
+      ])),
+    };
+    assert.throws(
+      () => assertCredibleTickerDirectory(lowYield),
+      (error: unknown) => error instanceof PublicServerError && error.status === 503,
+    );
+    assert.doesNotThrow(() => assertCredibleTickerDirectory(TICKERS));
+
+    const withDuplicateRows = {
+      ...TICKERS,
+      ...Object.fromEntries(Array.from({ length: 500 }, (_, index) => [
+        `duplicate-${index}`,
+        { cik_str: 320193, ticker: 'AAPL', title: 'Apple Inc.' },
+      ])),
+    };
+    assert.doesNotThrow(() => assertCredibleTickerDirectory(withDuplicateRows));
+
+    const insufficientUnique = {
+      ...TICKERS,
+      [String(MIN_SEC_TICKER_DIRECTORY_ENTRIES - 1)]: {
+        cik_str: 320193,
+        ticker: 'AAPL',
+        title: 'Apple Inc.',
+      },
+    };
+    assert.throws(
+      () => assertCredibleTickerDirectory(insufficientUnique),
+      (error: unknown) => error instanceof PublicServerError && error.status === 503,
+    );
+  });
+
   it('resolves a dotted class share against the SEC dash form', () => {
     const map = buildCikMap(TICKERS);
     assert.equal(resolveTickerCik(map, 'BRK.B')?.cikNumber, 1067983);
@@ -202,6 +262,20 @@ describe('loadFundamentals — happy path', () => {
 });
 
 describe('loadFundamentals — input and upstream failures', () => {
+  it('does not cache an implausible ticker directory', async () => {
+    let directoryAttempts = 0;
+    const { impl, calls } = makeFetch(happyHandlers({
+      tickers: () => {
+        directoryAttempts += 1;
+        return json(directoryAttempts === 1 ? {} : TICKERS);
+      },
+    }));
+
+    await expectStatus(() => loadFundamentals('AAPL', options(impl)), 503);
+    await loadFundamentals('AAPL', options(impl));
+    assert.equal(calls.filter((call) => call.url.includes('company_tickers.json')).length, 2);
+  });
+
   it('returns 404 for a ticker absent from the SEC directory', async () => {
     const { impl } = makeFetch(happyHandlers());
     await expectStatus(() => loadFundamentals('ZZZZ', options(impl)), 404);

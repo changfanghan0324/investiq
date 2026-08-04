@@ -25,6 +25,13 @@ const SEC_DATA_ORIGIN = 'https://data.sec.gov';
 
 /** Serialized minimum spacing between SEC requests. 150ms ⇒ ≤ ~6.7 req/s, safely < 10. */
 export const SEC_MIN_REQUEST_INTERVAL_MS = 150;
+/**
+ * Corruption guard. The official SEC directory contained 10,412 valid, unique
+ * rows when verified on 2026-08-03; 5,000 keeps wide headroom while rejecting a
+ * response missing more than half of the observed issuer universe.
+ */
+export const MIN_SEC_TICKER_DIRECTORY_ENTRIES = 5_000;
+export const MIN_SEC_TICKER_DIRECTORY_PARSE_RATIO = 0.9;
 const SEC_TIMEOUT_MS = 20_000;
 
 // Hard response-size ceilings. `companyfacts` for the largest issuers is tens of MB;
@@ -135,6 +142,20 @@ interface CikMatch {
   title: string;
 }
 
+function parseTickerRow(row: SecTickerRow | null | undefined): [string, CikMatch] | undefined {
+  if (!row || typeof row !== 'object') return undefined;
+  const ticker = typeof row.ticker === 'string' ? row.ticker.trim().toUpperCase() : '';
+  const cikNumber = row.cik_str;
+  if (!ticker || typeof cikNumber !== 'number' || !Number.isInteger(cikNumber) || cikNumber <= 0) {
+    return undefined;
+  }
+  return [ticker, {
+    cikNumber,
+    paddedCik: String(cikNumber).padStart(10, '0'),
+    title: typeof row.title === 'string' && row.title ? row.title : ticker,
+  }];
+}
+
 /**
  * Builds a ticker→CIK lookup from SEC's `company_tickers.json` payload. Keys are
  * upper-cased; malformed rows are skipped. Exported for deterministic testing.
@@ -143,17 +164,8 @@ export function buildCikMap(payload: unknown): Map<string, CikMatch> {
   const map = new Map<string, CikMatch>();
   if (!payload || typeof payload !== 'object') return map;
   for (const row of Object.values(payload as Record<string, SecTickerRow>)) {
-    if (!row || typeof row !== 'object') continue;
-    const ticker = typeof row.ticker === 'string' ? row.ticker.trim().toUpperCase() : '';
-    const cikNumber = row.cik_str;
-    if (!ticker || typeof cikNumber !== 'number' || !Number.isInteger(cikNumber) || cikNumber <= 0) {
-      continue;
-    }
-    map.set(ticker, {
-      cikNumber,
-      paddedCik: String(cikNumber).padStart(10, '0'),
-      title: typeof row.title === 'string' && row.title ? row.title : ticker,
-    });
+    const parsed = parseTickerRow(row);
+    if (parsed) map.set(parsed[0], parsed[1]);
   }
   return map;
 }
@@ -184,9 +196,14 @@ export async function loadFundamentals(
   const deps = resolveDeps(options);
   const ticker = validateFundamentalsTicker(rawTicker);
 
-  const cikMap = buildCikMap(
-    await cachedSecFetch(SEC_TICKERS_URL, TICKERS_TTL_MS, MAX_TICKERS_BYTES, 'ticker directory', deps, true),
-  );
+  const cikMap = buildCikMap(await cachedSecFetch(
+    SEC_TICKERS_URL,
+    TICKERS_TTL_MS,
+    MAX_TICKERS_BYTES,
+    'ticker directory',
+    deps,
+    false,
+  ));
   const match = resolveTickerCik(cikMap, ticker);
   if (!match) {
     throw publicError(404, `We could not find a US-listed company with the ticker ${ticker}.`);
@@ -338,5 +355,36 @@ async function fetchSecJson<T>(
     throw publicError(502, `The SEC ${context} service returned an unexpected format.`);
   }
 
-  return readJsonFromResponse<T>(response, { maxBytes, context: `SEC ${context}` });
+  const value = await readJsonFromResponse<T>(response, { maxBytes, context: `SEC ${context}` });
+  if (url === SEC_TICKERS_URL) assertCredibleTickerDirectory(value);
+  return value;
+}
+
+/**
+ * Rejects syntactically valid but implausibly empty/partial SEC ticker directories.
+ * The upstream fetch is deliberately no-store; this check therefore runs before
+ * the validated value enters the process cache, preventing a transient proxy
+ * truncation or schema change from fabricating a definitive ticker 404.
+ */
+export function assertCredibleTickerDirectory(payload: unknown): void {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    throw publicError(503, 'The SEC ticker directory failed its plausibility check.');
+  }
+  const rows = Object.values(payload as Record<string, SecTickerRow>);
+  const uniqueTickers = new Set<string>();
+  let parsedRows = 0;
+  for (const row of rows) {
+    const parsed = parseTickerRow(row);
+    if (!parsed) continue;
+    parsedRows += 1;
+    uniqueTickers.add(parsed[0]);
+  }
+  const parseRatio = rows.length > 0 ? parsedRows / rows.length : 0;
+  if (
+    rows.length < MIN_SEC_TICKER_DIRECTORY_ENTRIES
+    || uniqueTickers.size < MIN_SEC_TICKER_DIRECTORY_ENTRIES
+    || parseRatio < MIN_SEC_TICKER_DIRECTORY_PARSE_RATIO
+  ) {
+    throw publicError(503, 'The SEC ticker directory failed its plausibility check.');
+  }
 }

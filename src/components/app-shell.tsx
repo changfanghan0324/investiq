@@ -113,12 +113,13 @@ function LanguageControl() {
 
 function FontScaleControl() {
   const { fontScale, setFontScale, t } = useLanguage();
+  const active = fontScaleOptions.find((option) => option.value === fontScale) ?? fontScaleOptions[0];
   return (
     <label className={styles.selectControl} title={t("display.fontSize")}>
       <span className={styles.visuallyHidden}>{t("display.fontSize")}</span>
       <span className={styles.controlValue} aria-hidden="true">
         <Type size={13} />
-        <b className={styles.mono}>{fontScale}%</b>
+        <b className={styles.mono}>{active.label}</b>
       </span>
       <select
         value={fontScale}

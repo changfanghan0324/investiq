@@ -1,18 +1,23 @@
 "use client";
 
-import { type FormEvent, useEffect, useState } from "react";
+import { type FormEvent, type ReactNode, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   ArrowRight,
-  BarChart3,
-  BriefcaseBusiness,
-  Clock3,
-  FileSearch,
+  Calculator,
+  Check,
+  ExternalLink,
+  FileCheck2,
+  FileQuestion,
   FileText,
+  Code2,
+  Landmark,
+  PieChart,
+  ReceiptText,
   Search,
   ShieldCheck,
-  Sigma,
+  SlidersHorizontal,
 } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
 
@@ -37,7 +42,9 @@ export function ResearchHome() {
       try {
         const parsed: unknown = JSON.parse(window.localStorage.getItem(RECENT_RESEARCH_KEY) ?? "[]");
         if (Array.isArray(parsed)) {
-          setRecent(parsed.filter((item): item is string => typeof item === "string" && TICKER_PATTERN.test(item)).slice(0, 4));
+          setRecent(parsed.filter((item): item is string => (
+            typeof item === "string" && TICKER_PATTERN.test(item)
+          )).slice(0, 4));
         }
       } catch {
         setRecent([]);
@@ -59,7 +66,7 @@ export function ResearchHome() {
     try {
       window.localStorage.setItem(RECENT_RESEARCH_KEY, JSON.stringify(nextRecent));
     } catch {
-      // Storage is a convenience only; research remains usable when it is blocked.
+      // Recent research is optional; navigation remains available without storage.
     }
     router.push(`/company/${encodeURIComponent(ticker)}`);
   }
@@ -68,14 +75,74 @@ export function ResearchHome() {
     <AppShell>
       <div className={styles.page}>
         <motion.section
-          className={styles.command}
+          className={styles.hero}
           initial={reducedMotion ? false : { opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.32, ease: "easeOut" }}
+          transition={{ duration: 0.34, ease: "easeOut" }}
           aria-labelledby="research-heading"
         >
-          <h1 id="research-heading">{t("research.title")}</h1>
-          <p>{t("research.subtitle")}</p>
+          <div className={styles.heroCopy}>
+            <h1 id="research-heading" aria-label={t("research.auditTitle")}>
+              {t("research.auditTitleLead")}<em>{t("research.auditTitleAccent")}</em>{t("research.auditTitleTail")}
+            </h1>
+            <p>{t("research.auditSubtitle")}</p>
+            <div className={styles.heroActions}>
+              <Link className={styles.primaryAction} href="/case-study/aapl">
+                <FileText size={18} aria-hidden="true" />
+                {t("research.caseStudyAction")}
+                <ArrowRight size={18} aria-hidden="true" />
+              </Link>
+              <a className={styles.secondaryAction} href="#company-search">
+                <Search size={18} aria-hidden="true" />
+                {t("research.openCompanyAction")}
+                <ArrowRight size={18} aria-hidden="true" />
+              </a>
+            </div>
+          </div>
+
+          <div className={styles.evidencePreview} aria-label={t("research.evidencePreviewAria")}>
+            <h2>{t("research.evidencePreviewTitle")}</h2>
+            <div className={styles.evidenceFlow}>
+              <EvidenceStep icon={<FileCheck2 />} title={t("research.filedFact")} detail={t("research.filedFactText")} />
+              <EvidenceStep icon={<ReceiptText />} title={t("research.sourceReceipt")} detail={t("research.sourceReceiptText")} />
+              <EvidenceStep icon={<SlidersHorizontal />} title={t("research.modelAssumption")} detail={t("research.modelAssumptionText")} />
+              <EvidenceStep icon={<Calculator />} title={t("research.calculatedOutput")} detail={t("research.calculatedOutputText")} />
+              <EvidenceStep unavailable icon={<FileQuestion />} title={t("research.unavailableStays")} detail={t("research.unavailableStaysText")} />
+            </div>
+            <p className={styles.evidencePromise}>
+              <ShieldCheck size={18} aria-hidden="true" />
+              {t("research.evidencePromise")}
+            </p>
+          </div>
+        </motion.section>
+
+        <section className={styles.truthBand} aria-labelledby="truth-heading">
+          <div className={styles.truthTitle}>
+            <ShieldCheck size={46} aria-hidden="true" />
+            <h2 id="truth-heading">{t("research.truthTitle")}</h2>
+          </div>
+          <ul>
+            <TruthRow>{t("research.truthSec")}</TruthRow>
+            <TruthRow>{t("research.truthSynthetic")}</TruthRow>
+            <TruthRow>{t("research.truthUnavailable")}</TruthRow>
+          </ul>
+        </section>
+
+        <section className={styles.workflow} aria-labelledby="workflow-heading">
+          <h2 id="workflow-heading">{t("research.workflowTitle")}</h2>
+          <div className={styles.workflowRail}>
+            <WorkflowStep number="1" icon={<Landmark />} title={t("research.workflowFundamentals")} detail={t("research.workflowFundamentalsText")} />
+            <WorkflowStep number="2" icon={<Calculator />} title={t("research.workflowValuation")} detail={t("research.workflowValuationText")} />
+            <WorkflowStep number="3" icon={<PieChart />} title={t("research.workflowRisk")} detail={t("research.workflowRiskText")} />
+            <WorkflowStep number="4" icon={<FileText />} title={t("research.workflowMemo")} detail={t("research.workflowMemoText")} />
+          </div>
+        </section>
+
+        <section className={styles.companySearch} id="company-search" aria-labelledby="company-search-heading">
+          <div>
+            <h2 id="company-search-heading">{t("research.companySearchTitle")}</h2>
+            <p>{t("research.companySearchText")}</p>
+          </div>
           <form className={styles.searchForm} onSubmit={openResearch} noValidate>
             <label className={styles.searchField}>
               <span className={styles.visuallyHidden}>{t("research.searchLabel")}</span>
@@ -94,87 +161,73 @@ export function ResearchHome() {
                 }}
               />
             </label>
-            <motion.button type="submit" whileTap={reducedMotion ? undefined : { scale: 0.985 }}>
-              {t("research.searchAction")}
-              <ArrowRight size={16} aria-hidden="true" />
-            </motion.button>
-            <Link className={styles.secondaryAction} href="/portfolio">
-              {t("research.openPortfolio")}
-            </Link>
+            <button type="submit">
+              {t("research.searchAction")}<ArrowRight size={16} aria-hidden="true" />
+            </button>
           </form>
           {error ? <p className={styles.formError} id="research-error" role="alert">{error}</p> : null}
-        </motion.section>
-
-        <section className={styles.workspace} aria-label={t("research.workspaceAria")}>
-          <article className={styles.panel}>
-            <header><Clock3 size={17} /><h2>{t("research.recentTitle")}</h2></header>
-            {recent.length === 0 ? (
-              <div className={styles.emptyState}>
-                <FileSearch size={31} aria-hidden="true" />
-                <strong>{t("research.recentEmpty")}</strong>
-                <p>{t("research.recentHint")}</p>
-              </div>
-            ) : (
-              <div className={styles.recentList}>
-                {recent.map((ticker) => (
-                  <Link key={ticker} href={`/company/${encodeURIComponent(ticker)}`}>
-                    <span className={styles.recentTicker}>{ticker.slice(0, 1)}</span>
-                    <span><strong>{ticker}</strong><small>{t("research.recentBasis")}</small></span>
-                    <ArrowRight size={15} aria-hidden="true" />
-                  </Link>
-                ))}
-              </div>
-            )}
-          </article>
-
-          <article className={styles.panel}>
-            <header><Sigma size={17} /><h2>{t("research.demoTitle")}</h2></header>
-            <div className={styles.demoCard}>
-              <div className={styles.demoIdentity}>
-                <span className={styles.tickerMark}>A</span>
-                <div><strong>AAPL</strong><span>Apple Inc.</span></div>
-                <span className={styles.demoLabel}>{t("research.demoLabel")}</span>
-              </div>
-              <dl>
-                <div><dt>{t("research.demoSource")}</dt><dd>SEC EDGAR</dd></div>
-                <div><dt>{t("research.demoBasis")}</dt><dd>{t("research.latestReported")}</dd></div>
-              </dl>
-              <Link className={styles.panelAction} href="/company/AAPL">
-                {t("research.viewDemo")}<ArrowRight size={15} />
-              </Link>
-            </div>
-          </article>
+          {recent.length > 0 ? (
+            <nav className={styles.recentList} aria-label={t("research.recentTitle")}>
+              <span>{t("research.recentTitle")}</span>
+              {recent.map((ticker) => <Link key={ticker} href={`/company/${encodeURIComponent(ticker)}`}>{ticker}</Link>)}
+            </nav>
+          ) : null}
         </section>
 
-        <section className={styles.capabilities} aria-labelledby="capabilities-heading">
-          <h2 id="capabilities-heading">{t("research.capabilitiesTitle")}</h2>
-          <div className={styles.capabilityRows}>
-            <Capability icon={<BarChart3 />} title={t("research.financialsTitle")} detail={t("research.financialsText")} />
-            <Capability icon={<Sigma />} title={t("research.valuationTitle")} detail={t("research.valuationText")} />
-            <Capability icon={<BriefcaseBusiness />} title={t("research.portfolioTitle")} detail={t("research.portfolioText")} />
-            <Capability icon={<FileText />} title={t("research.memoTitle")} detail={t("research.memoText")} />
+        <section className={styles.owner} aria-labelledby="owner-heading">
+          <div>
+            <h2 id="owner-heading">{t("research.ownerTitle")}</h2>
+            <p>{t("research.ownerText")}</p>
           </div>
-          <div className={styles.contextLinks}>
-            <Link href="/market">{t("research.marketContext")}<ArrowRight size={14} /></Link>
-            <Link href="/methodology">{t("research.methodology")}<ArrowRight size={14} /></Link>
-          </div>
+          <Link href="/about">{t("research.aboutAction")}<ArrowRight size={15} aria-hidden="true" /></Link>
         </section>
 
-        <footer className={styles.disclaimer}>
-          <ShieldCheck size={15} aria-hidden="true" />
-          <span>{t("research.disclaimer")}</span>
+        <footer className={styles.footer}>
+          <strong>Invest<span>IQ</span></strong>
+          <nav aria-label={t("research.footerLinksAria")}>
+            <a href="https://github.com/changfanghan0324/investiq" target="_blank" rel="noreferrer">
+              <Code2 size={14} aria-hidden="true" />GitHub<ExternalLink size={12} aria-hidden="true" />
+            </a>
+            <Link href="/methodology">{t("research.methodology")}<ArrowRight size={12} aria-hidden="true" /></Link>
+            <Link href="/about">{t("research.projectBrief")}<ArrowRight size={12} aria-hidden="true" /></Link>
+          </nav>
         </footer>
       </div>
     </AppShell>
   );
 }
 
-function Capability({ icon, title, detail }: { icon: React.ReactNode; title: string; detail: string }) {
+function EvidenceStep({
+  icon,
+  title,
+  detail,
+  unavailable = false,
+}: {
+  icon: ReactNode;
+  title: string;
+  detail: string;
+  unavailable?: boolean;
+}) {
   return (
-    <div className={styles.capability}>
-      <span className={styles.capabilityIcon} aria-hidden="true">{icon}</span>
+    <div className={unavailable ? styles.evidenceStepUnavailable : styles.evidenceStep}>
+      <span aria-hidden="true">{icon}</span>
       <strong>{title}</strong>
       <p>{detail}</p>
     </div>
+  );
+}
+
+function TruthRow({ children }: { children: ReactNode }) {
+  return <li><Check size={17} aria-hidden="true" /><span>{children}</span></li>;
+}
+
+function WorkflowStep({ number, icon, title, detail }: { number: string; icon: ReactNode; title: string; detail: string }) {
+  return (
+    <article className={styles.workflowStep}>
+      <span className={styles.workflowIcon} aria-hidden="true">{icon}</span>
+      <b>{number}</b>
+      <h3>{title}</h3>
+      <p>{detail}</p>
+    </article>
   );
 }

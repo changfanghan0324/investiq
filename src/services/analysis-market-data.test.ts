@@ -2,7 +2,6 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   loadAnalysisMarketData,
-  readsPriceAnalysisReady,
   resetAnalysisCapabilityCache,
   stableDemoSeed,
   type AnalysisMarketDataDependencies,
@@ -23,13 +22,6 @@ afterEach(() => {
 });
 
 describe('analysis market-data resolution', () => {
-  it('reads the actual priceAnalysis health contract and fails closed on malformed payloads', () => {
-    expect(readsPriceAnalysisReady({ services: { priceAnalysis: 'ready' } })).toBe(true);
-    expect(readsPriceAnalysisReady({ services: { priceAnalysis: 'unavailable' } })).toBe(false);
-    expect(readsPriceAnalysisReady({ services: { marketData: 'ready' } })).toBe(false);
-    expect(readsPriceAnalysisReady(undefined)).toBe(false);
-  });
-
   it('uses live analysis only when the capability is ready', async () => {
     const live = { ticker: 'AAPL', source: 'yahoo' } as MarketData;
     const dependencies: AnalysisMarketDataDependencies = {
@@ -105,13 +97,29 @@ describe('analysis market-data resolution', () => {
 
   it('fails to demo through the default path when the health request is unreachable', async () => {
     const fetchMock = vi.fn().mockRejectedValue(new Error('network unavailable'));
+    vi.stubGlobal('window', {});
     vi.stubGlobal('fetch', fetchMock);
 
     const result = await loadAnalysisMarketData(options);
 
     expect(result.source).toBe('demo');
     expect(fetchMock).toHaveBeenCalledOnce();
-    expect(fetchMock).toHaveBeenCalledWith('/api/health', { cache: 'no-store' });
+    expect(fetchMock).toHaveBeenCalledWith('/api/health', expect.objectContaining({
+      cache: 'no-store',
+      signal: expect.any(AbortSignal),
+    }));
+  });
+
+  it('falls back to demo when health returns a malformed successful response', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response('<html>proxy error</html>', {
+      status: 200,
+      headers: { 'content-type': 'text/html' },
+    }));
+    vi.stubGlobal('window', {});
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(loadAnalysisMarketData(options)).resolves.toMatchObject({ source: 'demo' });
+    expect(fetchMock).toHaveBeenCalledOnce();
   });
 
   it('derives a stable bounded seed from the ticker', () => {
