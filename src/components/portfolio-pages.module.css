@@ -1,0 +1,56 @@
+.page { min-height: calc(100vh - var(--iq-header-height)); padding: clamp(50px, 7vw, 94px) clamp(18px, 5vw, 74px) calc(var(--iq-bottom-nav-height) + 54px); color: #e9eef6; background: #020b17; }
+.page > * { max-width: 1120px; margin-right: auto; margin-left: auto; }
+.hero { padding-bottom: 48px; border-bottom: 1px solid #2b3b50; }
+.hero h1 { max-width: 850px; color: #f5f7fb; font-size: calc(clamp(40px, 5.2vw, 70px) * var(--ui-font-scale, 1)); font-weight: 650; letter-spacing: -.055em; line-height: 1.06; }
+.hero > p { max-width: 760px; margin-top: 22px; color: #a7b2c2; font-size: calc(17px * var(--ui-font-scale, 1)); line-height: 1.65; }
+.actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 29px; }
+.actions a { min-height: 44px; display: inline-flex; align-items: center; gap: 8px; padding: 0 16px; border: 1px solid #36577f; border-radius: 4px; color: #9ac0ff; background: #071525; font-size: calc(12px * var(--ui-font-scale, 1)); }
+.actions a:first-child { border-color: #2e74ff; color: #fff; background: #1264ee; }
+.leadSection { padding: 48px 0; }
+.leadSection h2,
+.split h2,
+.principles > h2,
+.evidenceTable > h2,
+.journey > h2,
+.note h2 { color: #f1f5fa; font-size: calc(23px * var(--ui-font-scale, 1)); font-weight: 620; }
+.leadSection p { max-width: 900px; margin-top: 14px; color: #aeb8c7; font-size: calc(15px * var(--ui-font-scale, 1)); line-height: 1.75; }
+.split { display: grid; grid-template-columns: 1fr 1fr; border: 1px solid #304158; border-radius: 5px; }
+.split > div { padding: 31px; }
+.split > div + div { border-left: 1px solid #304158; }
+.split p { margin-top: 13px; color: #97a4b7; font-size: calc(13px * var(--ui-font-scale, 1)); line-height: 1.7; }
+.principles,
+.evidenceTable,
+.journey { padding: 50px 0; }
+.principles > div { display: grid; grid-template-columns: 1fr 1fr; gap: 0; margin-top: 24px; border: 1px solid #304158; border-radius: 5px; }
+.principles article { padding: 27px 30px; }
+.principles article:nth-child(even) { border-left: 1px solid #304158; }
+.principles article:nth-child(n + 3) { border-top: 1px solid #304158; }
+.principles h3 { color: #dfe7f2; font-size: calc(15px * var(--ui-font-scale, 1)); font-weight: 600; }
+.principles p { margin-top: 9px; color: #96a3b6; font-size: calc(12px * var(--ui-font-scale, 1)); line-height: 1.65; }
+.note { display: flex; align-items: flex-start; gap: 20px; padding: 28px 30px; border: 1px solid #1264ee; border-radius: 5px; background: #06111f; }
+.note > svg { flex: 0 0 auto; color: #1980ff; }
+.note p { margin-top: 8px; color: #9eabbd; font-size: calc(13px * var(--ui-font-scale, 1)); line-height: 1.65; }
+.evidenceTable dl { margin-top: 24px; border: 1px solid #304158; border-radius: 5px; }
+.evidenceTable dl > div { display: grid; grid-template-columns: minmax(260px, .7fr) 1fr; gap: 30px; padding: 24px 26px; }
+.evidenceTable dl > div + div { border-top: 1px solid #304158; }
+.evidenceTable dt { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 9px; color: #e5ebf4; font-size: calc(13px * var(--ui-font-scale, 1)); }
+.evidenceTable dt svg { color: #1980ff; }
+.evidenceTable dt b { grid-column: 2; color: #7da9ee; font-size: calc(10px * var(--ui-font-scale, 1)); font-weight: 500; text-transform: uppercase; letter-spacing: .07em; }
+.evidenceTable dd { color: #96a3b6; font-size: calc(12px * var(--ui-font-scale, 1)); line-height: 1.65; }
+.journey > div { display: grid; margin-top: 24px; border: 1px solid #304158; border-radius: 5px; }
+.journey a { min-height: 88px; display: grid; grid-template-columns: 34px 1fr auto; align-items: center; gap: 18px; padding: 17px 22px; }
+.journey a + a { border-top: 1px solid #304158; }
+.journey a:hover { background: #06111f; }
+.journey a > b { color: #1980ff; font-family: var(--font-geist-mono); }
+.journey a > span { display: grid; gap: 6px; }
+.journey strong { color: #e4eaf3; font-size: calc(14px * var(--ui-font-scale, 1)); font-weight: 600; }
+.journey small { color: #8e9caf; font-size: calc(11px * var(--ui-font-scale, 1)); line-height: 1.45; }
+.journey a > svg { color: #6899e8; }
+@media (max-width: 720px) {
+  .split,
+  .principles > div { grid-template-columns: 1fr; }
+  .split > div + div { border-top: 1px solid #304158; border-left: 0; }
+  .principles article:nth-child(even) { border-left: 0; }
+  .principles article + article { border-top: 1px solid #304158; }
+  .evidenceTable dl > div { grid-template-columns: 1fr; gap: 12px; }
+}

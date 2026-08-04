@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, Calculator, ChartNoAxesCombined, Clock3, LineChart } from "lucide-react";
+import { ArrowRight, Calculator, ChartNoAxesCombined, Clock3 } from "lucide-react";
 
 import { AppShell } from "@/components/app-shell";
 import { useLanguage } from "@/i18n/language";
@@ -29,11 +29,6 @@ export function ToolsHub() {
             <div><h2>{t("tools.marketTitle")}</h2><p>{t("tools.marketText")}</p></div>
             <span>{t("tools.open")}<ArrowRight size={14} /></span>
           </Link>
-          <article className={`${styles.tool} ${styles.planned}`}>
-            <LineChart size={22} />
-            <div><h2>{t("tools.growthTitle")}</h2><p>{t("tools.growthText")}</p></div>
-            <span>{t("tools.planned")}</span>
-          </article>
         </section>
       </div>
     </AppShell>

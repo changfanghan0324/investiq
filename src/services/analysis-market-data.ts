@@ -2,10 +2,9 @@
 // explicitly synthetic browser demo without weakening the server-side license gate.
 
 import { createDemoMarketData } from '@/data/demo-market-data';
+import { loadServiceReadiness, resetReadinessCache } from '@/services/readiness-loader';
 import { loadMarketData, MarketDataError } from '@/services/market-data-api';
 import type { DateString, MarketData } from '@/types/backtest';
-
-const CAPABILITY_TTL_MS = 60_000;
 
 export interface AnalysisMarketDataOptions {
   ticker: string;
@@ -19,9 +18,6 @@ export interface AnalysisMarketDataDependencies {
   loadLive: typeof loadMarketData;
   createDemo: typeof createDemoMarketData;
 }
-
-let capabilityCache: { expiresAt: number; live: boolean } | undefined;
-let capabilityInFlight: Promise<boolean> | undefined;
 
 const defaultDependencies: AnalysisMarketDataDependencies = {
   liveCapability: getLiveAnalysisCapability,
@@ -81,36 +77,11 @@ export function stableDemoSeed(ticker: string): number {
  * cause a public browser to attempt live data that production has not enabled.
  */
 async function getLiveAnalysisCapability(): Promise<boolean> {
-  const now = Date.now();
-  if (capabilityCache && capabilityCache.expiresAt > now) return capabilityCache.live;
-  if (capabilityInFlight) return capabilityInFlight;
-
-  capabilityInFlight = fetch('/api/health', { cache: 'no-store' })
-    .then(async (response) => {
-      const payload: unknown = await response.json().catch(() => undefined);
-      return readsPriceAnalysisReady(payload);
-    })
-    .catch(() => false)
-    .then((live) => {
-      capabilityCache = { live, expiresAt: Date.now() + CAPABILITY_TTL_MS };
-      return live;
-    })
-    .finally(() => {
-      capabilityInFlight = undefined;
-    });
-
-  return capabilityInFlight;
-}
-
-export function readsPriceAnalysisReady(payload: unknown): boolean {
-  if (!payload || typeof payload !== 'object') return false;
-  const services = (payload as { services?: unknown }).services;
-  if (!services || typeof services !== 'object') return false;
-  return (services as { priceAnalysis?: unknown }).priceAnalysis === 'ready';
+  const readiness = await loadServiceReadiness();
+  return readiness.priceAnalysis === 'ready';
 }
 
 /** Test-only cache reset; production callers never need to mutate capability state. */
 export function resetAnalysisCapabilityCache(): void {
-  capabilityCache = undefined;
-  capabilityInFlight = undefined;
+  resetReadinessCache();
 }

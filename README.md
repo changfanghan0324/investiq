@@ -40,10 +40,12 @@ detail routes only after a ticker is selected.
 | `/company/[ticker]/valuation` | Valuation | Five-year unlevered FCFF DCF, bear/base/bull range, two 5×5 sensitivities, EV→equity bridge, and a user-sourced comparable-multiple method. |
 | `/company/[ticker]/memo` | Investment Memo | One-page evidence record separating reported facts, model assumptions, thesis, catalysts, risks, and interpretation; printable to PDF. |
 | `/company/[ticker]/report` | Equity Research Report | Bilingual, print-ready A4 report with five-year SEC evidence, ratio diagnostics, DCF assumptions and scenarios, filing register, limitations, and page numbers. |
+| `/case-study/aapl` | AAPL Case Study | Stable recruiter-facing guide to the evidence modes and complete company-research workflow, without frozen market values. |
+| `/about` | About | Verified project-owner context, product boundaries, and evidence-first design principles. |
 | `/compare` | Stock Comparison | Two to five symbols aligned to common trading dates: cumulative return, risk table, correlation matrix, neutral narrative, and CSV. |
 | `/portfolio` | Portfolio Lab | One to ten long-only holdings: return, volatility, Sharpe, Sortino, beta, alpha, historical VaR, drawdown, attribution, concentration, correlation, equal/user/inverse-volatility weights. |
 | `/tools` | Research Tools | Secondary calculators and market context. |
-| `/tools/dca` | Historical DCA | Completed-session recurring contributions with dividends, fees, tax scenarios, audit ledger, and multi-page PDF. Future scenarios are disabled. |
+| `/tools/dca` | Historical DCA | One to ten unique holdings with completed-session recurring contributions, dividends, fees, tax scenarios, audit ledger, and multi-page PDF. Future scenarios are disabled. |
 | `/market` | Market Context | ETF benchmark proxies and a browser-local watchlist. |
 | `/methodology` | Methodology | Calculation rules, data contracts, limitations, and sources. |
 

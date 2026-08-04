@@ -1,6 +1,7 @@
 // Purpose: Loads and calculates every holding, then produces portfolio-level historical and simulation results.
 
 import { demoProvenance } from '@/data/demo-market-data';
+import { assertValidDcaHoldingSet } from '@/domain/dca-limits';
 import { aggregateBacktestResults, type PortfolioTaxContext } from '@/domain/portfolio-aggregate';
 import { createReport } from '@/services/create-report';
 import type {
@@ -19,10 +20,11 @@ export async function createPortfolioReport(options: {
   input: PortfolioInput;
   demo: boolean;
 }): Promise<PortfolioReport> {
+  assertValidDcaHoldingSet(options.input.positions);
   const holdings: PortfolioHoldingReport[] = [];
 
   // Live market-data plans are quota constrained. Loading sequentially lets a
-  // portfolio contain any number of holdings without creating a request burst.
+  // portfolio use up to the documented limit without creating a request burst.
   for (const [index, position] of options.input.positions.entries()) {
     const input: BacktestInput = {
       ticker: position.ticker,

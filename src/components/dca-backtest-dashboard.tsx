@@ -39,7 +39,9 @@ import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { AppShell } from "@/components/app-shell";
 import { brokerPresets, getBrokerPreset } from "@/constants/broker-presets";
 import { PortfolioPerformanceChart } from "@/components/portfolio-performance-chart";
+import { MAX_DCA_HOLDINGS } from "@/domain/dca-limits";
 import { type Translate, type TranslationKey, useLanguage } from "@/i18n/language";
+import { useServiceReadiness } from "@/components/readiness-provider";
 import { createPortfolioReport } from "@/services/create-portfolio-report";
 import {
   askPortfolioAssistant,
@@ -60,6 +62,7 @@ import type {
   ProjectionScenarioId,
   TimeWeightedReturn,
 } from "@/types/backtest";
+import type { ServiceStatus } from "@/types/evidence";
 import { addYearsClamped, todayDateString } from "@/utils/date";
 import { formatCurrency, formatPercent } from "@/utils/format";
 
@@ -67,7 +70,6 @@ import styles from "./dca-backtest-dashboard.module.css";
 
 type LoadingMode = "live" | "demo";
 type ResultMode = ProjectionScenarioId | "historical";
-type HealthState = "checking" | "ready" | "degraded";
 type FieldErrors = Record<string, string>;
 
 /** Browser-local portfolio label, stored under the shared `investiq-` key namespace. */
@@ -82,6 +84,8 @@ const intervalOptions: Array<{ labelKey: TranslationKey; value: IntervalUnit }> 
 
 export function DcaBacktestDashboard() {
   const { t } = useLanguage();
+  const { readiness } = useServiceReadiness();
+  const health = readiness.dca;
   const [input, setInput] = useState<PortfolioInput>(createDefaultInput);
   const [portfolioName, setPortfolioName] = useState("Portfolio 01");
   const [report, setReport] = useState<PortfolioReport>();
@@ -90,7 +94,6 @@ export function DcaBacktestDashboard() {
   const [error, setError] = useState("");
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [advancedFees, setAdvancedFees] = useState(false);
-  const [health, setHealth] = useState<HealthState>("checking");
   const [assistantOpen, setAssistantOpen] = useState(false);
   const [showAllTransactions, setShowAllTransactions] = useState(false);
   const [setupCollapsed, setSetupCollapsed] = useState(false);
@@ -99,23 +102,18 @@ export function DcaBacktestDashboard() {
 
   useEffect(() => {
     const restoreName = window.setTimeout(() => {
-      const savedName = window.localStorage.getItem(PORTFOLIO_NAME_STORAGE_KEY)?.trim();
-      if (savedName) setPortfolioName(savedName);
+      try {
+        const savedName = window.localStorage.getItem(PORTFOLIO_NAME_STORAGE_KEY)?.trim();
+        if (savedName) setPortfolioName(savedName);
+      } catch {
+        // The portfolio remains usable when browser storage is blocked.
+      }
     });
     return () => window.clearTimeout(restoreName);
   }, []);
 
   useEffect(() => {
     let active = true;
-    fetch("/api/health", { cache: "no-store" })
-      .then((response) => response.json())
-      .then((payload) => {
-        if (active) setHealth(payload.services?.dca === "ready" ? "ready" : "degraded");
-      })
-      .catch(() => {
-        if (active) setHealth("degraded");
-      });
-
     const previewRevision = inputRevisionRef.current;
     createPortfolioReport({ input: createDefaultInput(), demo: true })
       .then((preview) => {
@@ -157,11 +155,19 @@ export function DcaBacktestDashboard() {
   function renamePortfolio(name: string) {
     const nextName = name.trim() || "Portfolio 01";
     setPortfolioName(nextName);
-    window.localStorage.setItem(PORTFOLIO_NAME_STORAGE_KEY, nextName);
+    try {
+      window.localStorage.setItem(PORTFOLIO_NAME_STORAGE_KEY, nextName);
+    } catch {
+      // The label still works for this session when persistence is unavailable.
+    }
   }
 
   function addHolding() {
     setError("");
+    if (input.positions.length >= MAX_DCA_HOLDINGS) {
+      setError(t("validation.holdingLimit", { count: MAX_DCA_HOLDINGS }));
+      return;
+    }
     const template = input.positions.at(-1)?.investment ?? {
       mode: "amount" as const,
       value: 100,
@@ -179,6 +185,10 @@ export function DcaBacktestDashboard() {
 
   async function run(demo = false) {
     setError("");
+    if (!demo && health !== "ready") {
+      setError(t("run.liveUnavailable"));
+      return;
+    }
     const validation = validatePortfolio(input, t);
     setFieldErrors(validation.fields);
     if (validation.summary) {
@@ -244,6 +254,7 @@ export function DcaBacktestDashboard() {
       actions={
         <HeaderActions
           reportReady={Boolean(report && selected)}
+          assistantReady={readiness.assistant === "ready"}
           onAssistant={() => setAssistantOpen(true)}
           onExport={exportPdf}
         />
@@ -283,14 +294,15 @@ export function DcaBacktestDashboard() {
             <motion.button
               type="button"
               className={styles.addHolding}
+              disabled={input.positions.length >= MAX_DCA_HOLDINGS}
               onClick={addHolding}
-              whileTap={{ scale: 0.975 }}
-              whileHover={{ scale: 1.006 }}
+              whileTap={input.positions.length < MAX_DCA_HOLDINGS ? { scale: 0.975 } : undefined}
+              whileHover={input.positions.length < MAX_DCA_HOLDINGS ? { scale: 1.006 } : undefined}
               transition={{ type: "spring", stiffness: 450, damping: 28 }}
             >
               <Plus size={15} /> {t("holding.add")}
             </motion.button>
-            <p className={styles.sequentialHint}>{t("holding.unlimited")}</p>
+            <p className={styles.sequentialHint}>{t("holding.limit", { count: MAX_DCA_HOLDINGS })}</p>
 
             <div className={styles.builderDivider} />
             <SectionLabel icon={<CalendarDays size={14} />} title={t("date.window")} />
@@ -469,15 +481,15 @@ export function DcaBacktestDashboard() {
             <motion.button
               type="button"
               className={styles.runButton}
-              disabled={Boolean(loadingMode)}
+              disabled={Boolean(loadingMode) || health !== "ready"}
               onClick={() => void run(false)}
-              whileTap={loadingMode ? undefined : { scale: 0.975 }}
+              whileTap={loadingMode || health !== "ready" ? undefined : { scale: 0.975 }}
               transition={{ type: "spring", stiffness: 460, damping: 28 }}
             >
               <span className={styles.runIcon}>
                 {loadingMode === "live" ? <LoaderCircle size={17} className={styles.spin} /> : <Play size={15} fill="currentColor" />}
               </span>
-              <span className={styles.runLabel}>{loadingMode === "live" ? t("run.calculatingExact") : t("run.liveBacktest")}</span>
+              <span className={styles.runLabel}>{loadingMode === "live" ? t("run.calculatingExact") : health === "ready" ? t("run.liveBacktest") : t("run.liveUnavailableShort")}</span>
               <span className={styles.runTrailing}>{loadingMode ? null : <ArrowRight size={15} />}</span>
             </motion.button>
             <motion.button
@@ -539,9 +551,9 @@ export function DcaBacktestDashboard() {
           <strong>{t(input.positions.length === 1 ? "run.holding" : "run.holdings", { count: input.positions.length })}</strong>
           <span>{input.startDate.slice(0, 4)}–{input.endDate.slice(0, 4)}</span>
         </div>
-        <button type="button" disabled={Boolean(loadingMode)} onClick={() => void run(false)}>
-          {loadingMode === "live" ? <LoaderCircle size={15} className={styles.spin} /> : <Play size={14} fill="currentColor" />}
-          {loadingMode === "live" ? t("run.calculating") : t("run.live")}
+        <button type="button" disabled={Boolean(loadingMode)} onClick={() => void run(health !== "ready")}>
+          {loadingMode ? <LoaderCircle size={15} className={styles.spin} /> : health === "ready" ? <Play size={14} fill="currentColor" /> : <RefreshCw size={14} />}
+          {loadingMode ? t("run.calculating") : health === "ready" ? t("run.live") : t("run.demoShort")}
         </button>
       </div>
 
@@ -559,7 +571,7 @@ export function DcaBacktestDashboard() {
   );
 }
 
-function ServiceStatus({ health }: { health: HealthState }) {
+function ServiceStatus({ health }: { health: ServiceStatus }) {
   const { t } = useLanguage();
   return (
     <>
@@ -574,10 +586,12 @@ function ServiceStatus({ health }: { health: HealthState }) {
 
 function HeaderActions({
   reportReady,
+  assistantReady,
   onAssistant,
   onExport,
 }: {
   reportReady: boolean;
+  assistantReady: boolean;
   onAssistant: () => void;
   onExport: () => void;
 }) {
@@ -590,10 +604,10 @@ function HeaderActions({
       <motion.button
         type="button"
         className={styles.secondaryAction}
-        disabled={!reportReady}
+        disabled={!reportReady || !assistantReady}
         onClick={onAssistant}
         aria-label={t("header.aiAnalyst")}
-        whileTap={reportReady ? { scale: 0.96 } : undefined}
+        whileTap={reportReady && assistantReady ? { scale: 0.96 } : undefined}
       >
         <Sparkles size={15} /> <span>{t("header.aiAnalyst")}</span>
       </motion.button>
@@ -1416,6 +1430,9 @@ function validatePortfolio(input: PortfolioInput, t: Translate): { summary?: str
   let formError: string | undefined;
 
   if (input.positions.length === 0) formError = t("validation.addHolding");
+  if (input.positions.length > MAX_DCA_HOLDINGS) {
+    formError = t("validation.holdingLimit", { count: MAX_DCA_HOLDINGS });
+  }
 
   const tickers = input.positions.map((position) => position.ticker.trim().toUpperCase());
   input.positions.forEach((position, index) => {

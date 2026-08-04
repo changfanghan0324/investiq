@@ -801,6 +801,7 @@
 .runButton:hover:not(:disabled) { background: #1e53e5; transform: translateY(-2px); box-shadow: 0 16px 40px rgba(41, 98, 255, 0.3); }
 .runButton:disabled,
 .demoButton:disabled { cursor: wait; opacity: 0.65; }
+.runButton:disabled:not(:has(.spin)) { cursor: not-allowed; border-color: #354152; color: #8c98aa; background: #18212c; box-shadow: none; opacity: 1; }
 
 .demoButton {
   min-height: 32px;

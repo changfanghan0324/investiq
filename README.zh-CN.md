@@ -32,11 +32,13 @@ InvestIQ 不执行交易，不推荐证券，也不提供投资、法律或税�
 | `/company/[ticker]/valuation` | Valuation | 五年 FCFF DCF、Bear/Base/Bull 情景、两组敏感性矩阵和可比公司估值。 |
 | `/company/[ticker]/memo` | Investment Memo | 将公司概况、论点、催化剂、风险和估值结论整理成一页备忘录。 |
 | `/company/[ticker]/report` | Equity Research Report | 可打印的中英文 A4 股票研究报告。 |
+| `/case-study/aapl` | AAPL Case Study | 面向招聘审阅的稳定指南，说明证据模式与完整公司研究流程，不冻结市场数值。 |
+| `/about` | About | 已核实的项目作者背景、产品边界与以证据为先的设计原则。 |
 | `/compare` | Stock Comparison | 比较 2–5 只股票的累计回报、风险、Beta 和相关性，并导出 CSV。 |
 | `/portfolio` | Portfolio Lab | 分析 1–10 只多头持仓的回报、风险、归因、集中度、相关性和再平衡情景。 |
 | `/market` | Market Context | 市场 ETF 代理指标和仅保存在浏览器中的 watchlist。 |
 | `/tools` | Research Tools | 辅助计算工具入口。 |
-| `/tools/dca` | Historical DCA | 定期投入、股息、费用、税务情景、交易流水和 PDF 报告。 |
+| `/tools/dca` | Historical DCA | 支持 1–10 个唯一持仓的定期投入、股息、费用、税务情景、交易流水和 PDF 报告。 |
 | `/methodology` | Methodology | 数据口径、公式、假设、限制与来源。 |
 
 旧路径 `/stock` 会跳转到 `/company/AAPL`，`/dca` 会跳转到 `/tools/dca`。
