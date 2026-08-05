@@ -55,6 +55,7 @@ import {
 } from "recharts";
 
 import { AppShell, ShellDisclaimer } from "@/components/app-shell";
+import { useServiceReadiness } from "@/components/readiness-provider";
 import { AnalyticsError, HOLDING_CONCENTRATION_THRESHOLD, cumulativePriceReturns, globalMinimumVarianceWeights, inverseVolatilityWeights, toReturnBasisBars } from "@/domain/analytics";
 import { computeEfficientFrontier, type EfficientFrontier } from "@/domain/efficient-frontier";
 import { isValidSymbol, normalizeSymbol } from "@/domain/market-overview";
@@ -579,6 +580,8 @@ function assemble(run: RunState): Assembled | undefined {
 
 export function PortfolioLab() {
   const { locale, t } = useLanguage();
+  const { readiness } = useServiceReadiness();
+  const analysisReadiness = readiness.priceAnalysis;
   const reduceMotion = useReducedMotion();
 
   const [slots, setSlots] = useState<HoldingSlot[]>(() =>
@@ -698,6 +701,7 @@ export function PortfolioLab() {
   // The example window depends on today's date, so it is filled in after mount: the server and the
   // client render the same empty date inputs, and the first run starts once hydration is done.
   useEffect(() => {
+    if (analysisReadiness === "checking") return;
     const timer = setTimeout(() => {
       const range = trailingRange(new Date(), EXAMPLE_YEARS);
       const example: FormState = {
@@ -711,7 +715,7 @@ export function PortfolioLab() {
       if (input) void runPortfolio(input);
     }, 0);
     return () => clearTimeout(timer);
-  }, [runPortfolio]);
+  }, [analysisReadiness, runPortfolio]);
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -961,10 +965,18 @@ export function PortfolioLab() {
           onClick={() => {
             if (run) void runPortfolio(run.input);
           }}
-          disabled={running || !run}
+          disabled={running || !run || analysisReadiness === "checking"}
         >
           <RefreshCw size={13} aria-hidden="true" className={running ? styles.spin : undefined} />
-          <span>{running ? t("portfolioLab.rerunning") : t("portfolioLab.rerun")}</span>
+          <span>
+            {running
+              ? t("portfolioLab.rerunning")
+              : analysisReadiness === "checking"
+                ? t("analysisDemo.checking")
+                : analysisReadiness === "unavailable"
+                  ? t("analysisDemo.rerun")
+                  : t("portfolioLab.rerun")}
+          </span>
         </button>
       }
     >
@@ -1204,9 +1216,21 @@ export function PortfolioLab() {
               </p>
             </div>
 
-            <button type="submit" className={styles.runButton} disabled={running}>
+            <button
+              type="submit"
+              className={styles.runButton}
+              disabled={running || analysisReadiness === "checking"}
+            >
               <Play size={13} aria-hidden="true" />
-              <span>{running ? t("portfolioLab.running") : t("portfolioLab.run")}</span>
+              <span>
+                {running
+                  ? t("portfolioLab.running")
+                  : analysisReadiness === "checking"
+                    ? t("analysisDemo.checking")
+                    : analysisReadiness === "unavailable"
+                      ? t("analysisDemo.run")
+                      : t("portfolioLab.run")}
+              </span>
             </button>
           </div>
         </form>

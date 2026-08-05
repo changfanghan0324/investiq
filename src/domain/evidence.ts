@@ -1,8 +1,4 @@
-import type {
-  EvidenceDataMode,
-  HealthReport,
-  ServiceReadiness,
-} from '@/types/evidence';
+import type { HealthReport, ServiceReadiness } from '@/types/evidence';
 
 export const checkingServiceReadiness: ServiceReadiness = Object.freeze({
   overall: 'checking',
@@ -70,19 +66,6 @@ export function deriveHealthOverall(
     && services.database === 'configured'
     ? 'ready'
     : 'degraded';
-}
-
-export function marketEvidenceMode(options: {
-  readiness: ServiceReadiness['priceAnalysis'];
-  rendered: 'live' | 'synthetic' | 'none';
-}): EvidenceDataMode {
-  if (options.rendered === 'synthetic') return 'synthetic-market';
-  if (options.rendered === 'live' && options.readiness === 'ready') return 'live-market';
-  return 'unavailable';
-}
-
-export function secEvidenceMode(hasFiledReceipt: boolean): EvidenceDataMode {
-  return hasFiledReceipt ? 'real-sec' : 'unavailable';
 }
 
 function isServiceStatus(value: unknown): value is 'ready' | 'unavailable' {

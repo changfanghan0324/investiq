@@ -1,10 +1,3 @@
-/** Evidence labels are attached to individual rendered sections, never an entire page. */
-export type EvidenceDataMode =
-  | 'real-sec'
-  | 'live-market'
-  | 'synthetic-market'
-  | 'unavailable';
-
 export type ReadinessStatus = 'checking' | 'ready' | 'degraded' | 'unavailable';
 export type ServiceStatus = 'checking' | 'ready' | 'unavailable';
 export type DatabaseReadiness = 'checking' | 'configured' | 'unavailable';
