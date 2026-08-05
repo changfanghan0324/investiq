@@ -4,6 +4,7 @@ import Link from "next/link";
 import { ArrowRight, Code2, ExternalLink, ShieldCheck } from "lucide-react";
 
 import { AppShell } from "@/components/app-shell";
+import { publicProfile } from "@/config/public-profile";
 import { useLanguage } from "@/i18n/language";
 
 import styles from "./portfolio-pages.module.css";
@@ -18,7 +19,8 @@ export function AboutPage() {
           <p>{t("about.subtitle")}</p>
           <div className={styles.actions}>
             <Link href="/case-study/aapl">{t("about.caseStudyAction")}<ArrowRight size={15} aria-hidden="true" /></Link>
-            <a href="https://github.com/changfanghan0324/investiq" target="_blank" rel="noreferrer">
+            <Link href="/methodology">{t("research.methodology")}<ArrowRight size={15} aria-hidden="true" /></Link>
+            <a href={publicProfile.repository} target="_blank" rel="noreferrer">
               <Code2 size={15} aria-hidden="true" />GitHub<ExternalLink size={12} aria-hidden="true" />
             </a>
           </div>
