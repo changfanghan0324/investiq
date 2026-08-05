@@ -20,9 +20,10 @@ never incorporates market price. Tests cover financial definitions, data lineage
 accessibility, exports, and isolated browser workflows.
 
 Local release validation at source commit `b2da093` passed 33 Vitest files / 643 tests, TypeScript,
-ESLint, production build, and isolated Playwright with 21 passed / 11 project-specific skips / 0
+ESLint, production build, and isolated Playwright with 24 passed / 14 project-specific skips / 0
 failures. Axe reported no critical/serious violations in tested home, case, and DCA flows; 320 px,
-145% text, English/Chinese, print overflow, capability states, and synthetic flows passed. `npm audit`
+145% text, English/Chinese, blocked storage, print overflow, capability states, and CSV/PDF synthetic
+provenance passed. `npm audit`
 reported 0 vulnerabilities after the patched PostCSS override. Preview URL/SHA and CI are recorded in
 the pull request. Known limitations are maintained in [KNOWN_LIMITATIONS.md](KNOWN_LIMITATIONS.md).
 

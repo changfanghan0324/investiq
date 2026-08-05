@@ -3531,15 +3531,31 @@ export function isFontScale(value: string | null): value is FontScale {
   return value === "25" || value === "50" || value === "75" || value === "100";
 }
 
+function readPreference(key: string): string | null {
+  try {
+    return window.localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function writePreference(key: string, value: string): void {
+  try {
+    window.localStorage.setItem(key, value);
+  } catch {
+    // Storage is optional. Private/blocked browsers keep the in-memory choice.
+  }
+}
+
 export function LanguageProvider({ children }: { children: ReactNode }) {
   const [language, setLanguageState] = useState<Language>(defaultLanguage);
   const [fontScale, setFontScaleState] = useState<FontScale>(defaultFontScale);
 
   useEffect(() => {
     const restoreLanguage = window.setTimeout(() => {
-      const saved = window.localStorage.getItem(STORAGE_KEY);
+      const saved = readPreference(STORAGE_KEY);
       if (isLanguage(saved)) setLanguageState(saved);
-      const savedFontScale = window.localStorage.getItem(FONT_SCALE_STORAGE_KEY);
+      const savedFontScale = readPreference(FONT_SCALE_STORAGE_KEY);
       if (isFontScale(savedFontScale)) setFontScaleState(savedFontScale);
     });
     return () => window.clearTimeout(restoreLanguage);
@@ -3547,12 +3563,12 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
 
   const setLanguage = useCallback((next: Language) => {
     setLanguageState(next);
-    window.localStorage.setItem(STORAGE_KEY, next);
+    writePreference(STORAGE_KEY, next);
   }, []);
 
   const setFontScale = useCallback((next: FontScale) => {
     setFontScaleState(next);
-    window.localStorage.setItem(FONT_SCALE_STORAGE_KEY, next);
+    writePreference(FONT_SCALE_STORAGE_KEY, next);
   }, []);
 
   useEffect(() => {

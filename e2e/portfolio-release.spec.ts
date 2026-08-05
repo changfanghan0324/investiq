@@ -1,5 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
+import { readFileSync } from "node:fs";
 
 test("recruiter flow exposes evidence modes and the stable case study", async ({ page }) => {
   await page.goto("/");
@@ -178,6 +179,64 @@ test("language, text scale, and print surfaces retain provenance without overflo
     ).toBeLessThanOrEqual(1);
     await page.emulateMedia({ media: "screen" });
   }
+});
+
+test("390, 768, and 1440px layouts remain usable at 145% text", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "chromium", "single responsive matrix contract check");
+  test.setTimeout(60_000);
+  await page.route("**/api/health", (route) => route.fulfill({
+    status: 503,
+    contentType: "application/json",
+    body: JSON.stringify({ status: "unavailable", services: { priceAnalysis: "unavailable", dca: "unavailable", assistant: "ready", database: "configured" } }),
+  }));
+
+  for (const width of [390, 768, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    for (const route of ["/", "/case-study/aapl", "/portfolio", "/tools/dca"]) {
+      await page.goto(route);
+      await page.locator("header select").nth(1).selectOption("100");
+      await expect.poll(
+        () => page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth),
+        { message: `${route} at ${width}px / 145% should not overflow`, timeout: 5_000 },
+      ).toBeLessThanOrEqual(1);
+    }
+  }
+});
+
+test("blocked browser storage does not block the public research flow", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "chromium", "single storage-failure contract check");
+  const pageErrors: string[] = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+  await page.addInitScript(() => {
+    Object.defineProperty(window, "localStorage", { configurable: true, get: () => { throw new Error("storage blocked"); } });
+  });
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: "Investment research you can audit." })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Public demo mode" })).toBeVisible();
+  expect(pageErrors).toEqual([]);
+});
+
+test("synthetic CSV and PDF downloads retain public-demo provenance", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "chromium", "single export contract check");
+  await page.route("**/api/health", (route) => route.fulfill({
+    status: 503,
+    contentType: "application/json",
+    body: JSON.stringify({ status: "unavailable", services: { priceAnalysis: "unavailable", dca: "unavailable", assistant: "ready", database: "configured" } }),
+  }));
+
+  await page.goto("/compare");
+  const csvEvent = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Download CSV" }).click();
+  const csv = await csvEvent;
+  expect(readFileSync(await csv.path(), "utf8")).toContain("Data source,Synthetic public-demo series\r\n,Not actual market history");
+
+  await page.goto("/tools/dca");
+  await page.getByRole("button", { name: /Load.*demo/i }).first().click();
+  await expect(page.getByRole("heading", { name: "Portfolio performance" })).toBeVisible();
+  const pdfEvent = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Export PDF" }).click();
+  const pdf = await pdfEvent;
+  expect(pdf.suggestedFilename()).toMatch(/^investiq-dca-synthetic-/);
 });
 
 test("mobile DCA waits for readiness before offering the demo fallback", async ({ page }, testInfo) => {

@@ -6,9 +6,9 @@ This checklist prepares a release; it does not authorize merge, tag, deployment,
 
 - [x] Clean install (`npm ci`)
 - [x] Typecheck, lint, 33 files / 643 unit-contract tests, production build
-- [x] Isolated Playwright: 21 passed / 11 project-specific skipped / 0 failed; axe checks pass
+- [x] Isolated Playwright: 24 passed / 14 project-specific skipped / 0 failed; axe checks pass
 - [x] 320/390/768/1440 px screenshot/browser coverage and 100%/145% text QA
-- [x] English/Simplified Chinese, readiness unavailable, SEC unavailable, invalid ticker
+- [x] English/Simplified Chinese, blocked browser storage, readiness unavailable, SEC unavailable, invalid ticker
 - [x] CSV/PDF contracts, print, console, local links, forbidden copy, audit (0 vulnerabilities), and secret checks
 - [ ] Preview SHA equals branch SHA; production remains unchanged
 - [ ] After merge, verify the case CTA's generated written sample now resolves to updated `main`
