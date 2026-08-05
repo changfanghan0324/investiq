@@ -475,6 +475,108 @@ describe('view shape and windowing', () => {
 });
 
 describe('valuation balance-sheet anchors', () => {
+  it('adds separately reported commercial paper to current term debt on the same balance-sheet date', () => {
+    const facts = companyFacts({
+      'us-gaap': {
+        Revenues: { units: { USD: [annual(2025, 416_161)] } },
+        CommercialPaper: { units: { USD: [instant(2025, 7_979)] } },
+        LongTermDebtCurrent: { units: { USD: [instant(2025, 12_350)] } },
+        LongTermDebtNoncurrent: { units: { USD: [instant(2025, 78_328)] } },
+        CashAndCashEquivalentsAtCarryingValue: { units: { USD: [instant(2025, 35_934)] } },
+      },
+    });
+
+    const result = buildFundamentals(facts, identity({ ticker: 'AAPL', name: 'Apple Inc.' }));
+    const currentDebt = series(result, 'debtCurrent');
+    const netDebt = series(result, 'netDebt');
+
+    assert.equal(currentDebt.observations[0].value, 20_329);
+    assert.deepEqual(
+      currentDebt.observations[0].receipts.map((receipt) => receipt.concept),
+      ['LongTermDebtCurrent', 'CommercialPaper'],
+    );
+    assert.equal(netDebt.observations[0].value, 62_723);
+    assert.deepEqual(
+      netDebt.observations[0].receipts.map((receipt) => receipt.concept),
+      ['LongTermDebtCurrent', 'CommercialPaper', 'LongTermDebtNoncurrent', 'CashAndCashEquivalentsAtCarryingValue'],
+    );
+  });
+
+  it('does not double-count commercial paper when comprehensive current debt is reported', () => {
+    const facts = companyFacts({
+      'us-gaap': {
+        Revenues: { units: { USD: [annual(2025, 1_000)] } },
+        DebtCurrent: { units: { USD: [instant(2025, 100)] } },
+        CommercialPaper: { units: { USD: [instant(2025, 20)] } },
+        LongTermDebtNoncurrent: { units: { USD: [instant(2025, 400)] } },
+        CashAndCashEquivalentsAtCarryingValue: { units: { USD: [instant(2025, 120)] } },
+      },
+    });
+
+    const result = buildFundamentals(facts, identity());
+    assert.equal(series(result, 'debtCurrent').observations[0].value, 100);
+    assert.equal(series(result, 'netDebt').observations[0].value, 380);
+    assert.deepEqual(
+      series(result, 'debtCurrent').observations[0].receipts.map((receipt) => receipt.concept),
+      ['DebtCurrent'],
+    );
+  });
+
+  it('keeps current debt available and unchanged when commercial paper is not reported', () => {
+    const facts = companyFacts({
+      'us-gaap': {
+        Revenues: { units: { USD: [annual(2025, 1_000)] } },
+        LongTermDebtCurrent: { units: { USD: [instant(2025, 100)] } },
+        LongTermDebtNoncurrent: { units: { USD: [instant(2025, 400)] } },
+        CashAndCashEquivalentsAtCarryingValue: { units: { USD: [instant(2025, 120)] } },
+      },
+    });
+
+    const result = buildFundamentals(facts, identity());
+    assert.equal(series(result, 'debtCurrent').observations[0].value, 100);
+    assert.equal(series(result, 'netDebt').observations[0].value, 380);
+  });
+
+  it('does not combine commercial paper from a different balance-sheet date', () => {
+    const facts = companyFacts({
+      'us-gaap': {
+        Revenues: { units: { USD: [annual(2025, 1_000)] } },
+        LongTermDebtCurrent: { units: { USD: [instant(2025, 100)] } },
+        CommercialPaper: { units: { USD: [instant(2024, 20)] } },
+        LongTermDebtNoncurrent: { units: { USD: [instant(2025, 400)] } },
+        CashAndCashEquivalentsAtCarryingValue: { units: { USD: [instant(2025, 120)] } },
+      },
+    });
+
+    const result = buildFundamentals(facts, identity());
+    assert.equal(series(result, 'debtCurrent').observations[0].value, 100);
+    assert.equal(series(result, 'netDebt').observations[0].value, 380);
+    assert.deepEqual(
+      series(result, 'debtCurrent').observations[0].receipts.map((receipt) => receipt.concept),
+      ['LongTermDebtCurrent'],
+    );
+  });
+
+  it('does not combine commercial paper from a different date in the same fiscal year', () => {
+    const facts = companyFacts({
+      'us-gaap': {
+        Revenues: { units: { USD: [annual(2025, 1_000)] } },
+        LongTermDebtCurrent: { units: { USD: [instant(2025, 100)] } },
+        CommercialPaper: { units: { USD: [instant(2025, 20, { end: '2025-09-29' })] } },
+        LongTermDebtNoncurrent: { units: { USD: [instant(2025, 400)] } },
+        CashAndCashEquivalentsAtCarryingValue: { units: { USD: [instant(2025, 120)] } },
+      },
+    });
+
+    const result = buildFundamentals(facts, identity());
+    assert.equal(series(result, 'debtCurrent').observations[0].value, 100);
+    assert.equal(series(result, 'netDebt').observations[0].value, 380);
+    assert.deepEqual(
+      series(result, 'debtCurrent').observations[0].receipts.map((receipt) => receipt.concept),
+      ['LongTermDebtCurrent'],
+    );
+  });
+
   it('constructs reported EBITDA and net debt only from aligned SEC periods', () => {
     const facts = companyFacts({
       'us-gaap': {

@@ -221,4 +221,48 @@ Proceed with the reviewed architecture. First land the four-case failing commerc
 
 ## Final implementation and verification
 
-Pending.
+Claude Opus 5 performed a separate post-implementation review in session
+`af0272b2-564f-4709-b9a8-602d61876b8b` (max effort, 2026-08-04). It returned
+**Conditional Go** and independently recomputed the $20.329B current-debt sum,
+$62.723B stated-scope DCF net debt, $96.486B marketable-securities context,
+$6.430386 per-share alternative-liquidity consequence, historical observations,
+all three scenario outputs, terminal-value shares, and the sensitivity extrema.
+It confirmed that the existing DCF engine is unchanged and market price is absent.
+
+### Accepted post-implementation findings
+
+- Reclassified the hero scenario outputs, sensitivity, and conditional thesis as
+  analyst-owned instead of constructed evidence.
+- Reworded provenance to disclose that the frozen numeric snapshot, as well as
+  narrative evidence, is manually transcribed while retaining XBRL receipts.
+- Removed a prohibited `aria-label` from a role-less tag container.
+- Made both horizontally scrollable case tables named, keyboard-focusable regions.
+- Added AAPL axe, keyboard, reduced-motion, 145% text, mobile overflow, English/Chinese,
+  and `html lang` E2E contracts.
+- Added same-fiscal-year/different-date commercial-paper coverage; missing debt/cash
+  fail-closed coverage; unavailable-sensitivity coverage; translation-placeholder,
+  disclaimer-equality, and Chinese recommendation-language contracts.
+- Narrowed valuation starter copy to `aligned historical median`, made the current-debt
+  basis alias-aware, and declared the Markdown generator's `tsx` dependency directly.
+- The README debt-scope update is accepted and scheduled in the documentation phase.
+
+### Rejected or bounded findings
+
+- A separate positive label on every catalyst/risk card was not added. The grouped
+  eyebrow now says `Official-source monitoring`, each card links its official source,
+  and the data model preserves a distinct manually transcribed narrative citation tier.
+  Adding repeated tier badges would reduce scanability without changing provenance.
+- Literal technical notation (`WACC`) remains untranslated; it is a finance acronym,
+  while the surrounding axis and interpretation are localized.
+
+### Verification evidence at this checkpoint
+
+- TypeScript: passed.
+- Targeted ESLint: passed.
+- Vitest: 30 files, 626 tests passed before the post-review additions.
+- Next.js production build: passed.
+- Isolated Playwright baseline: 19 passed, 9 project-specific skips, 0 failed.
+
+The complete suite is rerun after integration; the later release report is the source
+of truth for final counts. A human source tick remains an explicit manual QA item even
+though receipts, selector parity, and independent recomputation are automated.

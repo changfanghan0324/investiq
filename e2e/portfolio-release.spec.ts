@@ -29,6 +29,41 @@ test("homepage primary flow is keyboard reachable and has no serious axe violati
   expect(results.incomplete.filter((check) => check.id === "aria-prohibited-attr")).toEqual([]);
 });
 
+test("AAPL case keeps analyst ownership, accessibility, localization, and scale contracts", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "chromium", "single desktop contract check");
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto("/case-study/aapl");
+
+  await expect(page.getByRole("heading", { name: "AAPL research case study" })).toBeVisible();
+  await expect(page.getByText("Analyst scenario", { exact: true }).first()).toBeVisible();
+  await expect(page.getByText("$62.723B", { exact: true }).first()).toBeVisible();
+  await expect(page.getByText(/marketable securities.*\$96\.486B/i).first()).toBeVisible();
+  await expect(page.locator("body")).not.toContainText("$333.43");
+  await expect(page.locator("body")).not.toContainText("unverified placeholder");
+
+  const scenarioRegion = page.locator('[role="region"][tabindex="0"][aria-label="Bear, base, and bull assumption sets"]');
+  const sensitivityRegion = page.locator('[role="region"][tabindex="0"][aria-label="Base-set discount-rate sensitivity"]');
+  await expect(scenarioRegion).toHaveAttribute("tabindex", "0");
+  await expect(sensitivityRegion).toHaveAttribute("tabindex", "0");
+  await sensitivityRegion.focus();
+  await expect(sensitivityRegion).toBeFocused();
+
+  await page.getByLabel("Text size").selectOption("100");
+  await expect.poll(() => page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--ui-font-scale").trim())).toBe("1.45");
+  await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBe(0);
+
+  await page.getByLabel("Language").selectOption("zh-CN");
+  await expect(page.locator("html")).toHaveAttribute("lang", "zh-CN");
+  await expect(page.getByRole("heading", { name: "AAPL 研究案例" })).toBeVisible();
+  await expect(page.getByText("US$62.723B", { exact: true }).first()).toBeVisible();
+
+  const results = await new AxeBuilder({ page }).analyze();
+  expect(results.violations.filter((violation) => (
+    violation.impact === "critical" || violation.impact === "serious"
+  ))).toEqual([]);
+  expect(results.incomplete.filter((check) => check.id === "aria-prohibited-attr")).toEqual([]);
+});
+
 test("invalid ticker input returns an accessible validation message", async ({ page }) => {
   await page.goto("/");
   await page.getByPlaceholder("Search by ticker, such as AAPL").fill("not a ticker!");
