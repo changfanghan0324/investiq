@@ -13,7 +13,7 @@ InvestIQ 在一个可复现的研究流程中连接 SEC 官方申报证据、明
 
 ![带有公开演示说明的 InvestIQ 首页](docs/assets/home-mobile.png)
 
-_移动端截图 · 2026-08-04 · 分支提交 SHA 记录于 release PR。_
+_移动端截图 · 2026-08-04 · 来源快照 `99c1222`。_
 
 ## 数据事实
 

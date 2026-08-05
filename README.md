@@ -14,7 +14,7 @@ analytics in one reproducible research workflow.
 
 ![InvestIQ home with public-demo disclosure](docs/assets/home-desktop.png)
 
-_English desktop capture · 2026-08-04 · branch commit recorded in the release PR._
+_English desktop capture · 2026-08-04 · source snapshot `99c1222`._
 
 ## Data truth
 
@@ -61,7 +61,7 @@ no public market-price comparison and no recommendation.
 
 ![AAPL evidence and valuation case](docs/assets/aapl-case-study.png)
 
-_English desktop capture · 2026-08-04 · branch commit recorded in the release PR._
+_English desktop capture · 2026-08-04 · source snapshot `99c1222`._
 
 ## Finance capabilities
 
@@ -159,8 +159,8 @@ npm run test:e2e
 [AAPL valuation](docs/assets/aapl-valuation.png) · [Portfolio demo](docs/assets/portfolio-demo.png) ·
 [DCA demo](docs/assets/dca-demo.png)
 
-All analytics captures visibly identify synthetic public-demo data. Captures are dated 2026-08-04;
-the exact capture SHA is recorded by the screenshot script and release PR.
+All analytics captures visibly identify synthetic public-demo data. Captures are dated 2026-08-04
+from source snapshot `99c1222`; the release PR records later verification commits separately.
 
 ## Author
 
