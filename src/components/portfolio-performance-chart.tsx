@@ -40,7 +40,7 @@ export function PortfolioPerformanceChart({ result }: { result: PortfolioAggrega
   return (
     <div className={styles.chartShell}>
       <div className={styles.chartToolbar}>
-        <div className={styles.chartTabs} aria-label={t("chart.metric")}>
+        <div className={styles.chartTabs} role="group" aria-label={t("chart.metric")}>
           {(["value", "return", "drawdown"] as const).map((item) => (
             <button
               type="button"
@@ -52,7 +52,7 @@ export function PortfolioPerformanceChart({ result }: { result: PortfolioAggrega
             </button>
           ))}
         </div>
-        <div className={styles.rangeTabs} aria-label={t("chart.range")}>
+        <div className={styles.rangeTabs} role="group" aria-label={t("chart.range")}>
           {(["ytd", "1y", "3y", "all"] as const).map((item) => (
             <button
               type="button"
@@ -71,7 +71,7 @@ export function PortfolioPerformanceChart({ result }: { result: PortfolioAggrega
         {mode === "value" ? <span><i className={styles.legendSlate} />{t("chart.contributedCapital")}</span> : null}
       </div>
 
-      <div className={styles.chartCanvas} aria-label={t("chart.aria", { mode: t(mode === "value" ? "chart.value" : mode === "return" ? "chart.return" : "chart.drawdown") })}>
+      <div className={styles.chartCanvas} role="img" aria-label={t("chart.aria", { mode: t(mode === "value" ? "chart.value" : mode === "return" ? "chart.return" : "chart.drawdown") })}>
         {range === "all" ? (
           <div className={styles.chartEventBands} aria-hidden="true">
             <span>{t("chart.covid")}</span>

@@ -48,10 +48,6 @@ export function tryParseHealthReport(payload: unknown): ServiceReadiness | undef
   };
 }
 
-export function parseHealthReport(payload: unknown): ServiceReadiness {
-  return tryParseHealthReport(payload) ?? unavailableServiceReadiness;
-}
-
 /** Compile-time helper for API routes returning the public readiness contract. */
 export function healthReport(report: HealthReport): HealthReport {
   return report;

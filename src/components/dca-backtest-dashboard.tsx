@@ -489,7 +489,15 @@ export function DcaBacktestDashboard() {
               <span className={styles.runIcon}>
                 {loadingMode === "live" ? <LoaderCircle size={17} className={styles.spin} /> : <Play size={15} fill="currentColor" />}
               </span>
-              <span className={styles.runLabel}>{loadingMode === "live" ? t("run.calculatingExact") : health === "ready" ? t("run.liveBacktest") : t("run.liveUnavailableShort")}</span>
+              <span className={styles.runLabel}>
+                {loadingMode === "live"
+                  ? t("run.calculatingExact")
+                  : health === "checking"
+                    ? t("run.checking")
+                    : health === "ready"
+                      ? t("run.liveBacktest")
+                      : t("run.liveUnavailableShort")}
+              </span>
               <span className={styles.runTrailing}>{loadingMode ? null : <ArrowRight size={15} />}</span>
             </motion.button>
             <motion.button
@@ -898,7 +906,7 @@ function ResultsWorkspace({
               <i /> {report.source === "demo" ? t("result.synthetic") : t("result.verified")}
             </span>
           </div>
-          <div className={styles.scenarioTabs} aria-label={t("result.scenario")}>
+          <div className={styles.scenarioTabs} role="group" aria-label={t("result.scenario")}>
             <button
               type="button"
               className={resultMode === "historical" ? styles.scenarioActive : undefined}
@@ -928,7 +936,7 @@ function ResultsWorkspace({
         <div className={styles.simulationBanner}>
           <Zap size={15} />
           <span><strong>{t("result.simulationTitle")}</strong> {t("result.simulationText")}</span>
-          <div className={styles.projectionScenarioTabs} aria-label={t("result.projectionAssumption")}>
+          <div className={styles.projectionScenarioTabs} role="group" aria-label={t("result.projectionAssumption")}>
             {projectionOptions.map((scenario) => (
               <button type="button" key={scenario.id} className={resultMode === scenario.id ? styles.projectionScenarioActive : undefined} onClick={() => onResultMode(scenario.id)}>{labelScenario(scenario.id, t)}</button>
             ))}
@@ -969,7 +977,12 @@ function ResultsWorkspace({
 
         <motion.section className={styles.panel} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.42, delay: 0.06 }}>
           <PanelHeader title={t("result.recentTransactions")} meta={t("result.totalCount", { count: result.transactions.length })} />
-          <div className={styles.transactionScroller}>
+          <div
+            className={styles.transactionScroller}
+            role="region"
+            aria-label={t("result.recentTransactions")}
+            tabIndex={0}
+          >
             <div className={styles.transactionHeader}>
               <span>{t("result.date")}</span><span>{t("result.ticker")}</span><span>{t("result.action")}</span><span>{t("holding.shares")}</span><span>{t("result.price")}</span>
             </div>

@@ -63,15 +63,52 @@ test("analysis workspaces expose unavailable live data as synthetic mode", async
 test("320px contract has no horizontal overflow on primary release routes", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "mobile-320", "320px-only contract check");
 
-  for (const route of ["/", "/about", "/case-study/aapl", "/tools/dca"]) {
+  for (const route of [
+    "/",
+    "/about",
+    "/case-study/aapl",
+    "/compare",
+    "/portfolio",
+    "/market",
+    "/tools",
+    "/tools/dca",
+    "/company/AAPL",
+  ]) {
     await page.goto(route);
-    await page.waitForTimeout(400);
-    const viewport = await page.evaluate(() => ({
-      clientWidth: document.documentElement.clientWidth,
-      scrollWidth: document.documentElement.scrollWidth,
-    }));
-    expect(viewport.scrollWidth, `${route} should not overflow horizontally`).toBe(viewport.clientWidth);
+    await expect.poll(
+      () => page.evaluate(() => (
+        document.documentElement.scrollWidth - document.documentElement.clientWidth
+      )),
+      { message: `${route} should settle without horizontal overflow`, timeout: 5_000 },
+    ).toBe(0);
   }
+});
+
+test("DCA result workspace has no prohibited ARIA attributes", async ({ page }) => {
+  await page.route("**/api/health", (route) => route.fulfill({
+    status: 503,
+    contentType: "application/json",
+    body: JSON.stringify({
+      status: "unavailable",
+      services: {
+        priceAnalysis: "unavailable",
+        dca: "unavailable",
+        assistant: "ready",
+        database: "configured",
+      },
+    }),
+  }));
+
+  await page.goto("/tools/dca");
+  await page.getByRole("button", { name: /Load.*demo/i }).first().click();
+  await expect(page.getByRole("heading", { name: "Portfolio performance" })).toBeVisible();
+  await page.waitForTimeout(400);
+
+  const results = await new AxeBuilder({ page }).analyze();
+  expect(results.violations.filter((violation) => (
+    violation.impact === "critical" || violation.impact === "serious"
+  ))).toEqual([]);
+  expect(results.incomplete.filter((check) => check.id === "aria-prohibited-attr")).toEqual([]);
 });
 
 test("mobile DCA waits for readiness before offering the demo fallback", async ({ page }, testInfo) => {
