@@ -856,9 +856,10 @@ describe('market-data capabilities and licensing gate', () => {
     });
   });
 
-  it('is ungated outside hard production', () => {
+  it('keeps local development ungated but treats public Vercel previews as licensed surfaces', () => {
     assert.equal(isLiveMarketDataLicensed({ NODE_ENV: 'development' }), true);
-    assert.equal(isLiveMarketDataLicensed({ VERCEL_ENV: 'preview', NODE_ENV: 'production' }), true);
+    assert.equal(isLiveMarketDataLicensed({ VERCEL_ENV: 'development', NODE_ENV: 'development' }), true);
+    assert.equal(isLiveMarketDataLicensed({ VERCEL_ENV: 'preview', NODE_ENV: 'production' }), false);
   });
 
   it('fails closed in production until the public-display license is confirmed', () => {

@@ -263,26 +263,25 @@ export function isMarketDataConfigured(env: MarketDataEnv = process.env): boolea
   return Boolean(env.MASSIVE_API_KEY?.trim());
 }
 
-function isProductionRuntime(env: MarketDataEnv): boolean {
-  // Mirror the rate-limiter's notion of "hard production": on Vercel, VERCEL_ENV
-  // is 'production' | 'preview' | 'development'; preview/development are not gated
-  // so local and personal testing keep working.
-  if (env.VERCEL_ENV) return env.VERCEL_ENV === 'production';
+function isPublicDeployment(env: MarketDataEnv): boolean {
+  // Production and preview URLs are both remotely accessible public-display
+  // surfaces. Only Vercel development/local runtimes may remain ungated.
+  if (env.VERCEL_ENV) return env.VERCEL_ENV === 'production' || env.VERCEL_ENV === 'preview';
   return env.NODE_ENV === 'production';
 }
 
 /**
- * Production licensing gate. The current live sources (Yahoo Finance, Massive)
+ * Public-deployment licensing gate. The current live sources (Yahoo Finance, Massive)
  * carry redistribution/public-display restrictions, so a public production
  * deployment must not serve live or derived market data to end users unless the
  * operator has explicitly acknowledged — server-side only — that written rights
  * cover public end-user display and derived analytics for EVERY source. The flag
  * itself grants no rights; it only records that the operator confirmed they hold
- * them. Local and preview development are ungated so personal credentials can be
- * used for private testing.
+ * them. Local development is ungated so personal credentials can be used for
+ * private testing; remotely accessible Vercel previews fail closed too.
  */
 export function isLiveMarketDataLicensed(env: MarketDataEnv = process.env): boolean {
-  if (!isProductionRuntime(env)) return true;
+  if (!isPublicDeployment(env)) return true;
   return env.MARKET_DATA_PUBLIC_DISPLAY_LICENSE_CONFIRMED === 'true';
 }
 

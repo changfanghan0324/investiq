@@ -36,8 +36,8 @@ assistant context must say that the series is synthetic and not actual market hi
 
 ## Provider and licensing boundary
 
-Production market endpoints fail closed unless provider credentials, public-display confirmation,
-and configured controls are present. Per-client rate limiting does not replace a durable shared
+Production and remotely accessible preview market endpoints fail closed unless provider credentials,
+public-display confirmation, and configured controls are present. Per-client rate limiting does not replace a durable shared
 provider quota. Public live-market mode must not be enabled until both licensing and deployment-wide
 quota ownership are approved. Vendor data rights are not granted by this repository.
 
@@ -53,4 +53,3 @@ only when an external monitor actually requires them.
 Portfolio inputs, Risk Context answers, and downloads remain local to the browser except for the
 minimum provider/API requests needed by an enabled workflow. No authentication or cloud save exists.
 Public profile links render only after owner verification; null values are not shown.
-

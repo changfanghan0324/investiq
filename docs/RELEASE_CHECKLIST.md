@@ -18,6 +18,7 @@ This checklist prepares a release; it does not authorize merge, tag, deployment,
 - [x] AAPL case uses aligned SEC receipts, verified net debt, owned assumptions, and no market price
 - [x] Public synthetic disclosure is visible across UI and exports
 - [x] Multi-security evidence mode is pinned per run
+- [x] Vercel production and preview deployments both enforce the public-display licensing gate
 - [x] README scope and metadata match the product
 - [ ] If public live-data rights are enabled, replace deployment-level synthetic homepage copy and
   verify provider attribution, snapshot/staleness policy, and durable quota controls
