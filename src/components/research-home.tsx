@@ -18,10 +18,13 @@ import {
   Search,
   ShieldCheck,
   SlidersHorizontal,
+  TriangleAlert,
 } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
 
 import { AppShell } from "@/components/app-shell";
+import { EvidenceModeNotice } from "@/components/evidence-mode-notice";
+import { publicProfile } from "@/config/public-profile";
 import { useLanguage } from "@/i18n/language";
 
 import styles from "./research-home.module.css";
@@ -116,6 +119,8 @@ export function ResearchHome() {
           </section>
         </motion.section>
 
+        <EvidenceModeNotice id="public-demo-mode" homepage />
+
         <section className={styles.truthBand} aria-labelledby="truth-heading">
           <div className={styles.truthTitle}>
             <ShieldCheck size={46} aria-hidden="true" />
@@ -123,7 +128,7 @@ export function ResearchHome() {
           </div>
           <ul>
             <TruthRow>{t("research.truthSec")}</TruthRow>
-            <TruthRow>{t("research.truthSynthetic")}</TruthRow>
+            <TruthRow warning>{t("research.truthSynthetic")}</TruthRow>
             <TruthRow>{t("research.truthUnavailable")}</TruthRow>
           </ul>
         </section>
@@ -185,10 +190,11 @@ export function ResearchHome() {
         <footer className={styles.footer}>
           <strong>Invest<span>IQ</span></strong>
           <nav aria-label={t("research.footerLinksAria")}>
-            <a href="https://github.com/changfanghan0324/investiq" target="_blank" rel="noreferrer">
+            <a href={publicProfile.repository} target="_blank" rel="noreferrer">
               <Code2 size={14} aria-hidden="true" />GitHub<ExternalLink size={12} aria-hidden="true" />
             </a>
             <Link href="/methodology">{t("research.methodology")}<ArrowRight size={12} aria-hidden="true" /></Link>
+            <Link href="/case-study/aapl">{t("research.caseStudyAction")}<ArrowRight size={12} aria-hidden="true" /></Link>
             <Link href="/about">{t("research.projectBrief")}<ArrowRight size={12} aria-hidden="true" /></Link>
           </nav>
         </footer>
@@ -217,8 +223,8 @@ function EvidenceStep({
   );
 }
 
-function TruthRow({ children }: { children: ReactNode }) {
-  return <li><Check size={17} aria-hidden="true" /><span>{children}</span></li>;
+function TruthRow({ children, warning = false }: { children: ReactNode; warning?: boolean }) {
+  return <li>{warning ? <TriangleAlert size={17} aria-hidden="true" /> : <Check size={17} aria-hidden="true" />}<span>{children}</span></li>;
 }
 
 function WorkflowStep({ number, icon, title, detail }: { number: string; icon: ReactNode; title: string; detail: string }) {

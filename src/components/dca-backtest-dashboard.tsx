@@ -37,6 +37,7 @@ import {
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 
 import { AppShell } from "@/components/app-shell";
+import { EvidenceModeNotice } from "@/components/evidence-mode-notice";
 import { brokerPresets, getBrokerPreset } from "@/constants/broker-presets";
 import { PortfolioPerformanceChart } from "@/components/portfolio-performance-chart";
 import { MAX_DCA_HOLDINGS } from "@/domain/dca-limits";
@@ -525,6 +526,7 @@ export function DcaBacktestDashboard() {
         </aside>
 
         <section className={styles.workspace} ref={workspaceRef} id="portfolio-lab">
+          {report?.source === "demo" ? <EvidenceModeNotice id="dca-demo-title" /> : null}
           {selected && report ? (
             <ResultsWorkspace
               report={report}
@@ -600,7 +602,10 @@ function ServiceStatus({ health }: { health: ServiceStatus }) {
       <HeaderMarketPulse />
       <div className={styles.marketStatus} title={t("header.serviceStatus")}>
         <span className={health === "ready" ? styles.statusReady : health === "checking" ? styles.statusChecking : styles.statusMuted} />
-        <div><strong>{health === "ready" ? t("header.dataReady") : health === "checking" ? t("header.checkingData") : t("header.dataDegraded")}</strong><small>{t("header.serverVerified")}</small></div>
+        <div>
+          <strong>{health === "ready" ? t("header.liveCapability") : health === "checking" ? t("header.checkingReadiness") : t("header.publicDemoAvailable")}</strong>
+          <small>{health === "ready" ? t("header.readinessConfirmed") : health === "checking" ? t("header.waitingCapability") : t("header.liveNotEnabled")}</small>
+        </div>
       </div>
     </>
   );
@@ -913,7 +918,7 @@ function ResultsWorkspace({
               disabled={!report.historical}
               onClick={() => onResultMode("historical")}
             >
-              {t("result.historical")}
+              {t(report.source === "demo" ? "result.syntheticSeries" : "result.historical")}
             </button>
             <button
               type="button"

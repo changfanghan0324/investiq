@@ -27,24 +27,41 @@ export function exportPortfolioPdf({ report, result, holdings, scenarioLabel }: 
   const doc = new jsPDF({ unit: "pt", format: "letter", compress: true });
   const margin = 42;
   const width = doc.internal.pageSize.getWidth();
-  const mode = scenarioLabel ? `${scenarioLabel} simulated estimate` : "Historical backtest";
+  const synthetic = report.source === "demo";
+  const mode = synthetic
+    ? `Synthetic public-demo series — ${scenarioLabel ? `${scenarioLabel} simulated estimate` : "historical calculation path"}`
+    : scenarioLabel ? `${scenarioLabel} simulated estimate` : "Historical backtest";
 
   doc.setFillColor(5, 20, 31);
-  doc.rect(0, 0, width, 116, "F");
+  doc.rect(0, 0, width, synthetic ? 130 : 116, "F");
   doc.setTextColor(40, 201, 244);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(11);
-  doc.text("INVESTIQ  /  DCA BACKTEST", margin, 34);
+  doc.text(synthetic ? "INVESTIQ  /  DCA PUBLIC DEMO" : "INVESTIQ  /  DCA BACKTEST", margin, 34);
   doc.setTextColor(245, 250, 252);
   doc.setFontSize(23);
-  doc.text("Portfolio Backtest Report", margin, 64);
+  doc.text(synthetic ? "Synthetic Series Report" : "Portfolio Backtest Report", margin, 64);
   doc.setTextColor(160, 181, 194);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
   doc.text(`${mode}  |  ${result.startDate} to ${result.endDate}  |  Generated ${new Date().toLocaleString("en-US")}`, margin, 88);
-  doc.text("For research and education only. Simulated estimates are not forecasts or guaranteed returns.", margin, 104);
+  doc.text(
+    synthetic
+      ? "Data source: Synthetic public-demo series. Not actual market history."
+      : "For research and education only. Simulated estimates are not forecasts or guaranteed returns.",
+    margin,
+    104,
+  );
 
-  let y = 140;
+  if (synthetic) {
+    doc.text(
+      "For research and education only. Simulated estimates are not forecasts or guaranteed returns.",
+      margin,
+      118,
+    );
+  }
+
+  let y = synthetic ? 154 : 140;
   sectionTitle(doc, "Portfolio overview", y);
   y += 13;
   autoTable(doc, {
@@ -248,7 +265,7 @@ export function exportPortfolioPdf({ report, result, holdings, scenarioLabel }: 
   doc.text(assumptionLines.flatMap((line) => doc.splitTextToSize(line, width - margin * 2)), margin, y, { lineHeightFactor: 1.45 });
 
   doc.addPage();
-  sectionTitle(doc, `Complete transaction ledger (${result.transactions.length})`, 48);
+  sectionTitle(doc, `${synthetic ? "Synthetic" : "Complete"} transaction ledger (${result.transactions.length})`, 48);
   autoTable(doc, {
     startY: 64,
     margin: { left: margin, right: margin, bottom: 38 },
@@ -276,7 +293,9 @@ export function exportPortfolioPdf({ report, result, holdings, scenarioLabel }: 
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9.5);
   const paragraphs = [
-    "Historical execution. Each recurring order is moved to the next available market session when its scheduled date is not a trading day. Purchases use that day's split-adjusted high. Period-end holdings are valued at the split-adjusted close unless liquidation is enabled.",
+    synthetic
+      ? "Synthetic execution path. Dates, ticker labels, generated prices, and transactions demonstrate the calculation workflow only. They are not actual security history or performance."
+      : "Historical execution. Each recurring order is moved to the next available market session when its scheduled date is not a trading day. Purchases use that day's split-adjusted high. Period-end holdings are valued at the split-adjusted close unless liquidation is enabled.",
     "Corporate actions. Prices reflect splits and reverse splits without embedding dividend reinvestment. Ordinary dividends are modeled separately. If InvestIQ detects an unsupported or unreliable company action, calculation stops instead of silently producing a result.",
     "Drawdown. Maximum drawdown uses a cash-flow-neutral portfolio unit value, so new contributions do not appear as investment performance.",
     "Future periods. Any future figures are labeled simulated estimates and remain separate from historical results. Scenarios use the security's available history beginning no earlier than 1990 and no earlier than its actual listing data. They are not predictions, forecasts, advice, or guaranteed returns.",
@@ -296,20 +315,20 @@ export function exportPortfolioPdf({ report, result, holdings, scenarioLabel }: 
     doc.setFontSize(8);
     doc.setTextColor(110, 126, 138);
     doc.text(
-      `InvestIQ DCA backtest report  |  Page ${pageNumber} of ${pageCount}`,
+      `${synthetic ? "Synthetic public-demo series · Not actual market history" : "InvestIQ DCA backtest report"}  |  Page ${pageNumber} of ${pageCount}`,
       margin,
       doc.internal.pageSize.getHeight() - 20,
     );
   }
 
   const tickerPart = holdings.map((item) => item.ticker).join("-").slice(0, 40) || "portfolio";
-  doc.save(`investiq-dca-${tickerPart}-${result.endDate}.pdf`);
+  doc.save(`investiq-dca-${synthetic ? "synthetic-" : ""}${tickerPart}-${result.endDate}.pdf`);
 }
 
 function provenanceLine(report: PortfolioReport): string {
   const provenance = report.provenance;
   if (report.source === "demo") {
-    return "Data provenance: clearly labelled synthetic demo data — not market data.";
+    return "Data source: Synthetic public-demo series. Not actual market history.";
   }
   const coverage = (value: string) =>
     value === "cross-checked" ? "cross-checked" : value === "none-reported" ? "none reported" : value;

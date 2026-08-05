@@ -43,6 +43,7 @@ import {
 } from "recharts";
 
 import { AppShell, ShellDisclaimer } from "@/components/app-shell";
+import { EvidenceModeNotice } from "@/components/evidence-mode-notice";
 import { useServiceReadiness } from "@/components/readiness-provider";
 import { isValidSymbol, normalizeSymbol } from "@/domain/market-overview";
 import {
@@ -56,7 +57,11 @@ import {
   type ComparisonNoteCode,
   type StockComparisonViewModel,
 } from "@/domain/stock-comparison";
-import { loadAnalysisMarketData } from "@/services/analysis-market-data";
+import {
+  loadAnalysisMarketData,
+  resolveAnalysisDataMode,
+  type AnalysisDataMode,
+} from "@/services/analysis-market-data";
 import { MarketDataError } from "@/services/market-data-api";
 import { type Translate, type TranslationKey, useLanguage } from "@/i18n/language";
 import type { DateString, MarketData } from "@/types/backtest";
@@ -156,6 +161,7 @@ interface ComparisonInput {
 /** Every load of one run, in the order the requests were issued. */
 interface RunState {
   input: ComparisonInput;
+  dataMode: AnalysisDataMode;
   securities: SymbolLoad[];
   benchmark: SymbolLoad;
 }
@@ -280,6 +286,7 @@ async function loadSymbol(
   symbol: string,
   startDate: DateString,
   endDate: DateString,
+  mode: AnalysisDataMode,
 ): Promise<FailureMessage & { data?: MarketData }> {
   try {
     return {
@@ -288,6 +295,7 @@ async function loadSymbol(
         from: startDate,
         to: endDate,
         requiredStart: startDate,
+        mode,
       }),
     };
   } catch (error) {
@@ -391,9 +399,9 @@ export function StockComparison() {
    * Loads SPY, which happens only after every selected security is on screen. Callers pass the
    * token of their own sequence so a superseded run cannot write a benchmark into a newer one.
    */
-  const loadBenchmarkLeg = useCallback(async (input: ComparisonInput, runId: number) => {
+  const loadBenchmarkLeg = useCallback(async (input: ComparisonInput, dataMode: AnalysisDataMode, runId: number) => {
     setRun((prev) => (prev ? { ...prev, benchmark: { ...prev.benchmark, status: "loading" } } : prev));
-    const outcome = await loadSymbol(BENCHMARK_SYMBOL, input.startDate, input.endDate);
+    const outcome = await loadSymbol(BENCHMARK_SYMBOL, input.startDate, input.endDate, dataMode);
     if (runIdRef.current !== runId) return;
     setRun((prev) => (prev ? { ...prev, benchmark: applyOutcome(prev.benchmark, outcome) } : prev));
   }, []);
@@ -405,8 +413,11 @@ export function StockComparison() {
 
       setRunning(true);
       setLoadedAt(undefined);
+      const dataMode = await resolveAnalysisDataMode();
+      if (runIdRef.current !== runId) return;
       setRun({
         input,
+        dataMode,
         securities: input.symbols.map((symbol) => ({ symbol, status: "pending" })),
         benchmark: { symbol: BENCHMARK_SYMBOL, status: benchmarkIsSelected ? "reused" : "pending" },
       });
@@ -416,7 +427,7 @@ export function StockComparison() {
       for (const symbol of input.symbols) {
         if (runIdRef.current !== runId) return;
         setRun((prev) => (prev ? replaceSecurity(prev, symbol, (load) => ({ ...load, status: "loading" })) : prev));
-        const outcome = await loadSymbol(symbol, input.startDate, input.endDate);
+        const outcome = await loadSymbol(symbol, input.startDate, input.endDate, dataMode);
         if (runIdRef.current !== runId) return;
         setRun((prev) => (prev ? replaceSecurity(prev, symbol, (load) => applyOutcome(load, outcome)) : prev));
         if (!outcome.data) allLoaded = false;
@@ -425,7 +436,7 @@ export function StockComparison() {
       // A blocked comparison cannot use a benchmark, so SPY is not requested at all — and the
       // queue says so rather than leaving a step that looks like it is still coming.
       if (allLoaded && !benchmarkIsSelected) {
-        await loadBenchmarkLeg(input, runId);
+        await loadBenchmarkLeg(input, dataMode, runId);
       } else if (!allLoaded && !benchmarkIsSelected) {
         setRun((prev) => (prev ? { ...prev, benchmark: { ...prev.benchmark, status: "skipped" } } : prev));
       }
@@ -446,7 +457,7 @@ export function StockComparison() {
       setRunning(true);
 
       setRun((prev) => (prev ? replaceSecurity(prev, symbol, (load) => ({ ...load, status: "loading" })) : prev));
-      const outcome = await loadSymbol(symbol, current.input.startDate, current.input.endDate);
+      const outcome = await loadSymbol(symbol, current.input.startDate, current.input.endDate, current.dataMode);
       if (runIdRef.current !== runId) return;
       setRun((prev) => (prev ? replaceSecurity(prev, symbol, (load) => applyOutcome(load, outcome)) : prev));
 
@@ -454,7 +465,7 @@ export function StockComparison() {
         outcome.data !== undefined &&
         current.securities.every((load) => load.symbol === symbol || load.data !== undefined);
       if (allLoaded && current.benchmark.status !== "reused" && !current.benchmark.data) {
-        await loadBenchmarkLeg(current.input, runId);
+        await loadBenchmarkLeg(current.input, current.dataMode, runId);
       }
 
       if (runIdRef.current !== runId) return;
@@ -470,7 +481,7 @@ export function StockComparison() {
     if (!current || current.benchmark.status === "reused") return;
     const runId = ++runIdRef.current;
     setRunning(true);
-    await loadBenchmarkLeg(current.input, runId);
+    await loadBenchmarkLeg(current.input, current.dataMode, runId);
     if (runIdRef.current !== runId) return;
     setRunning(false);
     setLoadedAt(new Date());
@@ -539,6 +550,7 @@ export function StockComparison() {
   const assembled = useMemo(() => (run ? assemble(run) : undefined), [run]);
   const view = assembled?.view;
   const isDemoRun = run?.securities.some((load) => load.data?.source === "demo") ?? false;
+  const showSyntheticNotice = analysisReadiness === "unavailable" || isDemoRun;
 
   const failedSecurities = useMemo(
     () => run?.securities.filter((load) => load.status === "error") ?? [],
@@ -639,15 +651,10 @@ export function StockComparison() {
       <div className={styles.page}>
         <div className={styles.pageHead}>
           <h1>{t("compare.title")}</h1>
-          <p className={styles.subtitle}>{t("compare.subtitle")}</p>
+          <p className={styles.subtitle}>{t(showSyntheticNotice ? "compare.subtitleSynthetic" : "compare.subtitle")}</p>
         </div>
 
-        {isDemoRun ? (
-          <section className={styles.demoNotice} aria-labelledby="comparison-demo-title">
-            <strong id="comparison-demo-title">{t("analysisDemo.title")}</strong>
-            <p>{t("analysisDemo.body")}</p>
-          </section>
-        ) : null}
+        {showSyntheticNotice ? <EvidenceModeNotice id="comparison-demo-title" /> : null}
 
         <form className={styles.controls} onSubmit={handleSubmit} aria-label={t("compare.controlsTitle")}>
           <fieldset className={styles.symbolFields}>
@@ -1717,7 +1724,9 @@ function ChartTooltip({
 function buildCsv(view: StockComparisonViewModel, input: ComparisonInput, t: Translate, demo: boolean): string {
   const rows: string[][] = [
     [t("compare.csvTitle")],
-    [t("analysisDemo.csvSource"), t(demo ? "analysisDemo.csvSynthetic" : "analysisDemo.csvLive")],
+    ...(demo
+      ? [[t("analysisDemo.csvSource"), t("analysisDemo.csvSyntheticSource")], ["", t("analysisDemo.csvSyntheticWarning")]]
+      : [[t("analysisDemo.csvSource"), t("analysisDemo.csvLive")]]),
     [t("compare.csvWindowStart"), view.commonWindow.startDate],
     [t("compare.csvWindowEnd"), view.commonWindow.endDate],
     [t("compare.csvSessions"), String(view.commonWindow.sessions)],

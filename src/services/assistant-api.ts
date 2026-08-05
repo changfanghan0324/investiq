@@ -89,7 +89,10 @@ export function buildAssistantSummary(
   });
 
   return {
-    mode: scenario === 'historical' ? 'historical backtest' : `${scenario} simulated estimate`,
+    mode: report.source === 'demo'
+      ? `synthetic public-demo series — ${scenario === 'historical' ? 'historical calculation path' : `${scenario} simulated estimate`}`
+      : scenario === 'historical' ? 'historical backtest' : `${scenario} simulated estimate`,
+    dataMode: report.source === 'demo' ? 'synthetic-market' : 'licensed-market',
     period: { start: aggregate.startDate, end: aggregate.endDate },
     portfolio: aggregateSummary(aggregate),
     holdings,

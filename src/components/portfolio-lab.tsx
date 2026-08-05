@@ -55,6 +55,7 @@ import {
 } from "recharts";
 
 import { AppShell, ShellDisclaimer } from "@/components/app-shell";
+import { EvidenceModeNotice } from "@/components/evidence-mode-notice";
 import { useServiceReadiness } from "@/components/readiness-provider";
 import { AnalyticsError, HOLDING_CONCENTRATION_THRESHOLD, cumulativePriceReturns, globalMinimumVarianceWeights, inverseVolatilityWeights, toReturnBasisBars } from "@/domain/analytics";
 import { computeEfficientFrontier, type EfficientFrontier } from "@/domain/efficient-frontier";
@@ -72,7 +73,11 @@ import {
 import { simulatePeriodicRebalancing, type RebalancingResult } from "@/domain/portfolio-rebalancing";
 import { buildRiskContext, type RiskContextAnswers } from "@/domain/risk-context";
 import { MIN_COMMON_CLOSES, commonTradingDates } from "@/domain/stock-comparison";
-import { loadAnalysisMarketData } from "@/services/analysis-market-data";
+import {
+  loadAnalysisMarketData,
+  resolveAnalysisDataMode,
+  type AnalysisDataMode,
+} from "@/services/analysis-market-data";
 import { MarketDataError } from "@/services/market-data-api";
 import { type Translate, type TranslationKey, useLanguage } from "@/i18n/language";
 import {
@@ -258,6 +263,7 @@ interface PortfolioInput {
 /** Every load of one run, in the order the requests were issued. */
 interface RunState {
   input: PortfolioInput;
+  dataMode: AnalysisDataMode;
   holdings: SymbolLoad[];
   benchmark: SymbolLoad;
 }
@@ -493,6 +499,7 @@ async function loadSymbol(
   symbol: string,
   startDate: DateString,
   endDate: DateString,
+  mode: AnalysisDataMode,
 ): Promise<FailureMessage & { data?: MarketData }> {
   try {
     return {
@@ -501,6 +508,7 @@ async function loadSymbol(
         from: startDate,
         to: endDate,
         requiredStart: startDate,
+        mode,
       }),
     };
   } catch (error) {
@@ -612,9 +620,9 @@ export function PortfolioLab() {
    * Loads SPY, which happens only after every holding is on screen. Callers pass the token of
    * their own sequence so a superseded run cannot write a benchmark into a newer one.
    */
-  const loadBenchmarkLeg = useCallback(async (input: PortfolioInput, runId: number) => {
+  const loadBenchmarkLeg = useCallback(async (input: PortfolioInput, dataMode: AnalysisDataMode, runId: number) => {
     setRun((prev) => (prev ? { ...prev, benchmark: { ...prev.benchmark, status: "loading" } } : prev));
-    const outcome = await loadSymbol(BENCHMARK_SYMBOL, input.startDate, input.endDate);
+    const outcome = await loadSymbol(BENCHMARK_SYMBOL, input.startDate, input.endDate, dataMode);
     if (runIdRef.current !== runId) return;
     setRun((prev) => (prev ? { ...prev, benchmark: applyOutcome(prev.benchmark, outcome) } : prev));
   }, []);
@@ -627,8 +635,11 @@ export function PortfolioLab() {
 
       setRunning(true);
       setLoadedAt(undefined);
+      const dataMode = await resolveAnalysisDataMode();
+      if (runIdRef.current !== runId) return;
       setRun({
         input,
+        dataMode,
         holdings: symbols.map((symbol) => ({ symbol, status: "pending" })),
         benchmark: { symbol: BENCHMARK_SYMBOL, status: benchmarkIsHolding ? "reused" : "pending" },
       });
@@ -638,7 +649,7 @@ export function PortfolioLab() {
       for (const symbol of symbols) {
         if (runIdRef.current !== runId) return;
         setRun((prev) => (prev ? replaceHolding(prev, symbol, (load) => ({ ...load, status: "loading" })) : prev));
-        const outcome = await loadSymbol(symbol, input.startDate, input.endDate);
+        const outcome = await loadSymbol(symbol, input.startDate, input.endDate, dataMode);
         if (runIdRef.current !== runId) return;
         setRun((prev) => (prev ? replaceHolding(prev, symbol, (load) => applyOutcome(load, outcome)) : prev));
         if (!outcome.data) allLoaded = false;
@@ -647,7 +658,7 @@ export function PortfolioLab() {
       // A blocked portfolio cannot use a benchmark, so SPY is not requested at all — and the queue
       // says so rather than leaving a step that looks like it is still coming.
       if (allLoaded && !benchmarkIsHolding) {
-        await loadBenchmarkLeg(input, runId);
+        await loadBenchmarkLeg(input, dataMode, runId);
       } else if (!allLoaded && !benchmarkIsHolding) {
         setRun((prev) => (prev ? { ...prev, benchmark: { ...prev.benchmark, status: "skipped" } } : prev));
       }
@@ -668,7 +679,7 @@ export function PortfolioLab() {
       setRunning(true);
 
       setRun((prev) => (prev ? replaceHolding(prev, symbol, (load) => ({ ...load, status: "loading" })) : prev));
-      const outcome = await loadSymbol(symbol, current.input.startDate, current.input.endDate);
+      const outcome = await loadSymbol(symbol, current.input.startDate, current.input.endDate, current.dataMode);
       if (runIdRef.current !== runId) return;
       setRun((prev) => (prev ? replaceHolding(prev, symbol, (load) => applyOutcome(load, outcome)) : prev));
 
@@ -676,7 +687,7 @@ export function PortfolioLab() {
         outcome.data !== undefined &&
         current.holdings.every((load) => load.symbol === symbol || load.data !== undefined);
       if (allLoaded && current.benchmark.status !== "reused" && !current.benchmark.data) {
-        await loadBenchmarkLeg(current.input, runId);
+        await loadBenchmarkLeg(current.input, current.dataMode, runId);
       }
 
       if (runIdRef.current !== runId) return;
@@ -692,7 +703,7 @@ export function PortfolioLab() {
     if (!current || current.benchmark.status === "reused") return;
     const runId = ++runIdRef.current;
     setRunning(true);
-    await loadBenchmarkLeg(current.input, runId);
+    await loadBenchmarkLeg(current.input, current.dataMode, runId);
     if (runIdRef.current !== runId) return;
     setRunning(false);
     setLoadedAt(new Date());
@@ -837,6 +848,7 @@ export function PortfolioLab() {
   const assembled = useMemo(() => (run ? assemble(run) : undefined), [run]);
   const view = assembled?.view;
   const isDemoRun = run?.holdings.some((load) => load.data?.source === "demo") ?? false;
+  const showSyntheticNotice = analysisReadiness === "unavailable" || isDemoRun;
   const rebalancingAnalysis = useMemo(() => {
     const currentView = assembled?.view;
     if (!currentView) return undefined;
@@ -983,15 +995,10 @@ export function PortfolioLab() {
       <div className={styles.page}>
         <div className={styles.pageHead}>
           <h1>{t("portfolioLab.title")}</h1>
-          <p className={styles.subtitle}>{t("portfolioLab.subtitle")}</p>
+          <p className={styles.subtitle}>{t(showSyntheticNotice ? "portfolioLab.subtitleSynthetic" : "portfolioLab.subtitle")}</p>
         </div>
 
-        {isDemoRun ? (
-          <section className={styles.demoNotice} aria-labelledby="portfolio-demo-title">
-            <strong id="portfolio-demo-title">{t("analysisDemo.title")}</strong>
-            <p>{t("analysisDemo.body")}</p>
-          </section>
-        ) : null}
+        {showSyntheticNotice ? <EvidenceModeNotice id="portfolio-demo-title" /> : null}
 
         <form className={styles.controls} onSubmit={handleSubmit} aria-label={t("portfolioLab.controlsTitle")}>
           <fieldset className={styles.holdingFields}>
@@ -2789,7 +2796,9 @@ function buildCsv(view: PortfolioLabViewModel, input: PortfolioInput, t: Transla
 
   const rows: string[][] = [
     [t("portfolioLab.csvTitle")],
-    [t("analysisDemo.csvSource"), t(demo ? "analysisDemo.csvSynthetic" : "analysisDemo.csvLive")],
+    ...(demo
+      ? [[t("analysisDemo.csvSource"), t("analysisDemo.csvSyntheticSource")], ["", t("analysisDemo.csvSyntheticWarning")]]
+      : [[t("analysisDemo.csvSource"), t("analysisDemo.csvLive")]]),
     [t("portfolioLab.csvBasis"), t("portfolioLab.csvBasisText")],
     [t("portfolioLab.csvEmptyCells"), t("portfolioLab.csvEmptyCellsText")],
     [t("portfolioLab.csvRequestedWindow"), `${input.startDate} / ${input.endDate}`],

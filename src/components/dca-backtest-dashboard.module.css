@@ -863,7 +863,7 @@
   height: 22px;
   padding: 0 8px;
   border-radius: 99px;
-  font-size: calc(7.5px * var(--ui-font-scale, 1));
+  font-size: calc(11px * var(--ui-font-scale, 1));
   font-weight: 500;
   letter-spacing: 0.045em;
   white-space: nowrap;
@@ -1204,7 +1204,7 @@
 .resultTitleRow { margin-top: 0; gap: 10px; }
 .resultTitleRow h1 { color: #f1f6f8; font-size: calc(17px * var(--ui-font-scale, 1)); font-weight: 500; letter-spacing: 0; }
 .demoPill,
-.livePill { height: 19px; font-size: calc(7px * var(--ui-font-scale, 1)); }
+.livePill { height: 22px; font-size: calc(11px * var(--ui-font-scale, 1)); }
 .resultHeader .scenarioTabs { margin-top: 5px; padding: 0; border: 0; background: transparent; gap: 20px; }
 .resultHeader .scenarioTabs button { position: relative; min-height: 34px; padding: 0 9px; color: #91a3ad; font-size: calc(11px * var(--ui-font-scale, 1)); }
 .resultHeader .scenarioTabs button:disabled { cursor: help; opacity: 0.58; }

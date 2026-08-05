@@ -3,7 +3,7 @@
 
 import { createDemoMarketData } from '@/data/demo-market-data';
 import { loadServiceReadiness, resetReadinessCache } from '@/services/readiness-loader';
-import { loadMarketData, MarketDataError } from '@/services/market-data-api';
+import { loadMarketData } from '@/services/market-data-api';
 import type { DateString, MarketData } from '@/types/backtest';
 
 export interface AnalysisMarketDataOptions {
@@ -11,7 +11,11 @@ export interface AnalysisMarketDataOptions {
   from: DateString;
   to: DateString;
   requiredStart: DateString;
+  /** Pins every leg of a multi-security run to one evidence mode. */
+  mode?: AnalysisDataMode;
 }
+
+export type AnalysisDataMode = 'licensed-live' | 'synthetic-demo';
 
 export interface AnalysisMarketDataDependencies {
   liveCapability: () => Promise<boolean>;
@@ -33,20 +37,21 @@ export async function loadAnalysisMarketData(
   options: AnalysisMarketDataOptions,
   dependencies: AnalysisMarketDataDependencies = defaultDependencies,
 ): Promise<MarketData> {
-  if (await dependencies.liveCapability()) {
-    try {
-      return await dependencies.loadLive({ ...options, mode: 'analysis' });
-    } catch (error) {
-      // Invalid input and a confirmed missing instrument remain user-visible.
-      // Transient provider, quota, timeout, or network failures fall through to
-      // the same explicitly-labelled demo used when live capability is disabled.
-      if (error instanceof MarketDataError && [400, 404, 422].includes(error.status ?? 0)) {
-        throw error;
-      }
-    }
+  const mode = options.mode ?? await resolveAnalysisDataMode(dependencies.liveCapability);
+  if (mode === 'licensed-live') {
+    // Once a workspace is in licensed-live mode, a failed security stays unavailable.
+    // Never mix a live series with a synthetic fallback in cross-security analytics.
+    return dependencies.loadLive({ ...options, mode: 'analysis' });
   }
 
   return createRequestedWindowDemo(options, dependencies.createDemo);
+}
+
+/** Resolves capability once so a run and all of its retries cannot mix evidence modes. */
+export async function resolveAnalysisDataMode(
+  liveCapability: () => Promise<boolean> = getLiveAnalysisCapability,
+): Promise<AnalysisDataMode> {
+  return await liveCapability() ? 'licensed-live' : 'synthetic-demo';
 }
 
 function createRequestedWindowDemo(

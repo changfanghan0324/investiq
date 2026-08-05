@@ -61,4 +61,23 @@ describe('GET /api/health', () => {
     });
     expect(stubs.checkDatabaseHealth).not.toHaveBeenCalled();
   });
+
+  it('returns an intentional, complete JSON 503 when price-analysis capability is unavailable', async () => {
+    stubs.marketDataCapabilities.mockReturnValue({ priceAnalysis: false, dca: false });
+
+    const response = await GET();
+    const payload = await response.json();
+
+    expect(response.status).toBe(503);
+    expect(response.headers.get('cache-control')).toContain('no-store');
+    expect(payload).toEqual({
+      status: 'unavailable',
+      services: {
+        priceAnalysis: 'unavailable',
+        dca: 'unavailable',
+        assistant: 'ready',
+        database: 'configured',
+      },
+    });
+  });
 });

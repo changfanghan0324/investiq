@@ -27,6 +27,7 @@ import {
 } from "recharts";
 
 import { AppShell, ShellDisclaimer } from "@/components/app-shell";
+import { EvidenceModeNotice } from "@/components/evidence-mode-notice";
 import { AnalyticsError } from "@/domain/analytics";
 import {
   BENCHMARK_SYMBOLS,
@@ -383,26 +384,21 @@ export function MarketOverview() {
       <div className={styles.page}>
         <div className={styles.pageHead}>
           <h1>{t("market.title")}</h1>
-          <p className={styles.subtitle}>{t("market.subtitle")}</p>
+          <p className={styles.subtitle}>{t(isDemo ? "market.subtitleSynthetic" : "market.subtitle")}</p>
           <p className={styles.windowLine}>
             {range ? t("market.window", { from: formatDate(range.from, locale), to: formatDate(range.to, locale) }) : t("market.windowPending")}
           </p>
         </div>
 
-        {isDemo ? (
-          <section className={styles.demoNotice} aria-label={t("analysisDemo.title")}>
-            <strong>{t("analysisDemo.title")}</strong>
-            <p>{t("analysisDemo.body")}</p>
-          </section>
-        ) : null}
+        {isDemo ? <EvidenceModeNotice id="market-demo-title" /> : null}
 
-        <div className={styles.explainers}>
+        {!isDemo ? <div className={styles.explainers}>
           <Explainer titleKey="market.etfProxyTitle" bodyKey="market.etfProxy" />
           <Explainer
             titleKey={returnBasis === "total" ? "market.totalReturnTitle" : "market.priceReturnTitle"}
             bodyKey={returnBasis === "total" ? "market.totalReturnBasis" : "market.priceReturnOnly"}
           />
-        </div>
+        </div> : null}
 
         {failedRows.length > 0 ? (
           <section className={styles.errorPanel} aria-labelledby="market-errors">
