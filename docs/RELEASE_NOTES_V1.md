@@ -19,10 +19,12 @@ synthetic demo series, not actual ticker history. DCF uses the documented unleve
 never incorporates market price. Tests cover financial definitions, data lineage, disclosure,
 accessibility, exports, and isolated browser workflows.
 
-Automated test/E2E counts, preview URL, preview commit SHA, axe result, security controls, website,
-and case-study links will be filled from final CI evidence in the pull request. Known limitations are
-maintained in [KNOWN_LIMITATIONS.md](KNOWN_LIMITATIONS.md).
+Local release validation at source commit `b2da093` passed 33 Vitest files / 643 tests, TypeScript,
+ESLint, production build, and isolated Playwright with 21 passed / 11 project-specific skips / 0
+failures. Axe reported no critical/serious violations in tested home, case, and DCA flows; 320 px,
+145% text, English/Chinese, print overflow, capability states, and synthetic flows passed. `npm audit`
+reported 0 vulnerabilities after the patched PostCSS override. Preview URL/SHA and CI are recorded in
+the pull request. Known limitations are maintained in [KNOWN_LIMITATIONS.md](KNOWN_LIMITATIONS.md).
 
 No tag or release may be published until license, CI/preview, real participant-testing decision,
 merge, and release approval are completed by the owner.
-

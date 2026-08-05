@@ -166,7 +166,7 @@ export function AaplCaseStudy() {
                 <ScenarioRow label="WACC" scenarios={scenarios} value={(item) => percent(item.assumptions.wacc, locale)} />
                 <ScenarioRow label={t("valuation.terminalGrowth")} scenarios={scenarios} value={(item) => percent(item.assumptions.terminalGrowth, locale)} />
                 <ScenarioRow label={t("caseStudy.scenarioOutput")} scenarios={scenarios} value={(item) => moneyPerShare(item.valuation.impliedSharePrice, locale)} strong />
-                <ScenarioRow label={t("caseStudy.terminalShare")} scenarios={scenarios} value={(item) => percent(item.valuation.terminalValuePercentOfEnterprise ?? 0, locale)} />
+                <ScenarioRow label={t("caseStudy.terminalShare")} scenarios={scenarios} value={(item) => item.valuation.terminalValuePercentOfEnterprise === null ? "—" : percent(item.valuation.terminalValuePercentOfEnterprise, locale)} />
               </tbody>
             </table>
           </div>

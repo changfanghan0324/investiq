@@ -53,3 +53,20 @@ order once README links were curated. The resolution was to retain them, avoid u
 state that the generated PDF can drift from Markdown/application dependencies. No remaining
 documentation disagreement blocks the release-candidate PR; license selection, real participant
 testing, and release approval remain intentionally owner-owned.
+
+## Post-implementation Claude product confirmation
+
+Claude Opus 5 reviewed the complete baseline-to-`b2da093` committed diff in session
+`7ebe93ea-df3c-47a7-a590-922b0b00eed8`. The first pass reached its tool-turn limit before answering;
+the same session was resumed without further tools and returned **Conditional Go — accept the
+implementation; open the PR non-draft**. Claude independently re-executed the AAPL builder and
+confirmed the $62.723B bridge, all scenario/sensitivity outputs, unchanged DCF domain calls,
+byte-identical generated Markdown, run-pinned live/synthetic mode across every leg/retry, and
+synthetic truth in UI/CSV/PDF/AI.
+
+Two requested corrections were accepted: both READMEs now require Node 24.x, and nullable terminal-
+value share renders unavailable instead of zero. One merge gate remains: the case page intentionally
+links to the generated sample on GitHub `main`; until this branch merges, that remote main file is the
+old sample. The owner must verify the CTA after merge. Claude's remaining notes—synthetic-series
+calibration, English-only PDF, SEC-path preview validation, and repository visibility—are documented
+limitations/actions, not PR blockers.

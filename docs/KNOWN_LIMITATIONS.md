@@ -5,7 +5,8 @@ Last reviewed: 2026-08-04
 - **Public live-market licensing:** public live history is disabled pending display-rights approval
   and durable deployment-wide provider quota controls.
 - **Synthetic market examples:** public price, comparison, portfolio, market-context, and DCA samples
-  are synthetic and do not describe actual ticker history.
+  are synthetic and do not describe actual ticker history. The generator demonstrates calculation
+  paths and is not calibrated to reproduce plausible security-level risk/return distributions.
 - **SEC availability:** EDGAR availability, taxonomy, amendments, and issuer reporting quality can
   make evidence unavailable; facts are not guessed.
 - **No investment advice:** outputs are research/education and are not recommendations, forecasts,
@@ -24,4 +25,3 @@ Last reviewed: 2026-08-04
 - `/api/health` reports capability readiness and intentionally may return 503 while the web app and
   synthetic demo remain available.
 - No open-source license has been selected; third-party/vendor rights are never included.
-

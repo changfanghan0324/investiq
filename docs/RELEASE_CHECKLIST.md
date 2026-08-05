@@ -4,13 +4,14 @@ This checklist prepares a release; it does not authorize merge, tag, deployment,
 
 ## Automated gates
 
-- [ ] Clean install (`npm ci`)
-- [ ] Typecheck, lint, unit/contract tests, production build
-- [ ] Isolated Playwright suite and axe checks
-- [ ] 320/390/768/1440 px and 100%/145% text QA
-- [ ] English/Simplified Chinese, storage blocked, readiness unavailable, SEC unavailable, invalid ticker
-- [ ] CSV, PDF, print, console, dead-link, forbidden-copy, audit, and secret checks
+- [x] Clean install (`npm ci`)
+- [x] Typecheck, lint, 33 files / 643 unit-contract tests, production build
+- [x] Isolated Playwright: 21 passed / 11 project-specific skipped / 0 failed; axe checks pass
+- [x] 320/390/768/1440 px screenshot/browser coverage and 100%/145% text QA
+- [x] English/Simplified Chinese, readiness unavailable, SEC unavailable, invalid ticker
+- [x] CSV/PDF contracts, print, console, local links, forbidden copy, audit (0 vulnerabilities), and secret checks
 - [ ] Preview SHA equals branch SHA; production remains unchanged
+- [ ] After merge, verify the case CTA's generated written sample now resolves to updated `main`
 
 ## Product/data gates
 
@@ -29,4 +30,3 @@ This checklist prepares a release; it does not authorize merge, tag, deployment,
 - [ ] Approve demo video, if created
 - [ ] Review preview and approve merge
 - [ ] Approve tag and GitHub Release
-

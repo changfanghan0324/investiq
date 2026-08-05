@@ -121,7 +121,7 @@ text-size settings of 100%, 115%, 130%, and 145%.
 
 ## Quick start
 
-Requirements: Node.js 20+ and npm.
+Requirements: Node.js 24.x and npm (matching `package.json` and `.nvmrc`).
 
 ```bash
 npm ci

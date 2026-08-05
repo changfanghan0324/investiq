@@ -94,7 +94,7 @@ holdings。文字大小为 100%、115%、130%、145%，支持 320 px 布局、�
 
 ## 本地运行与验证
 
-需要 Node.js 20+ 与 npm。
+需要 Node.js 24.x 与 npm（与 `package.json` 和 `.nvmrc` 一致）。
 
 ```bash
 npm ci
