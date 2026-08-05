@@ -15,7 +15,7 @@ Four primary workspaces, declared in `src/config/navigation.ts`:
 | `/` | Research launcher | functional |
 | `/compare` | Stock Comparison | functional price/risk analysis |
 | `/portfolio` | Portfolio Analytics | functional price/risk analysis |
-| `/tools` | Supporting calculators and context | functional hub |
+| `/tools` | Historical DCA and Market Context | functional hub |
 
 Company research uses nested routes: `/company/[ticker]`, `/financials`, `/valuation`,
 and `/memo`. Historical DCA lives at `/tools/dca`; `/dca` remains a compatibility redirect.
@@ -29,7 +29,8 @@ field stays unavailable and every research figure carries a source/date or formu
 - English (`en`) and Simplified Chinese (`zh-CN`) only. Do not add other locales.
 - Every user-visible string goes through `t()` in `src/i18n/language.tsx`. Both catalogs must
   stay complete; `zh-CN` is typed against the English catalog, so a missing key is a type error.
-- Font scale options are `25`, `50`, `75`, `100`, with `25` as the default.
+- User-facing text scales are 100%, 115%, 130%, and 145% (stored as `25`, `50`, `75`, `100`),
+  with 100% / `25` as the default.
 
 ## Visual concepts
 
@@ -39,8 +40,9 @@ Research launcher and Company Summary concepts created in the active Codex task.
 
 ## Change-controlled files
 
-These carry the calculation contract in `README.md`. No behavior change without accompanying
-regression tests:
+These carry calculation contracts documented in `docs/METHODOLOGY.md`,
+`docs/FINANCIAL_MODEL_CONTRACTS.md`, `docs/DATA_GOVERNANCE.md`, and
+`docs/SEC_SELECTION_RULES.md`. No behavior change without accompanying regression tests:
 
 - `src/domain/backtest-engine.ts`, `src/domain/schedule.ts`, `src/domain/fees.ts`,
   `src/domain/portfolio-aggregate.ts`, `src/domain/projection-engine.ts`
@@ -53,7 +55,7 @@ regression tests:
 - Keyboard reachable, visible focus, skip-to-content link, labelled landmarks and controls.
 - Every icon-only or ambiguous control carries an `aria-label` from the catalog.
 - Layout works from 320px up; mobile uses the compact bottom navigation.
-- Respect `prefers-reduced-motion`; text stays legible at font scale `100`.
+- Respect `prefers-reduced-motion`; text stays legible at 145% / stored font scale `100`.
 
 ## Workflow
 

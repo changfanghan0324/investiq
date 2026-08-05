@@ -1,47 +1,45 @@
-# InvestIQ — three-minute demo script
+# InvestIQ — three-minute public-demo script
 
-## 0:00–0:25 — Positioning
+## 0:00–0:25 — Positioning and data truth
 
-“InvestIQ is an investment research and portfolio analytics platform for finance students and early
-career analysts. It does not recommend securities. It connects official company facts, transparent
-valuation assumptions, portfolio risk, and an evidence-linked memo.”
+“InvestIQ connects official SEC evidence, explicit valuation assumptions, and portfolio risk in a
+reproducible research workflow. It does not recommend securities.”
 
-Show the Research home. Point out the ticker-first entry, recent research, English/Simplified Chinese
-selector, and text-size control.
+Show the homepage notice and say: “Company financials use real SEC filings. Price, comparison,
+portfolio, and DCA examples use synthetic data—not actual ticker history.” Show the owner, case link,
+language selector, and text-size control.
 
-## 0:25–0:55 — Company Summary
+## 0:25–1:15 — Completed AAPL case
 
-Open AAPL. Explain that Company Summary deliberately shows only five first-level outputs. Open the SEC
-receipt and note that annual facts are latest-reported/restatement-aware. Mention that missing ratios
-stay unavailable instead of becoming zero.
+Open `/case-study/aapl`. Show the FY2025 snapshot date, 10-K accession, six evidence metrics, and
+direct/constructed labels. Point to one computed analyst observation and its source receipts. Show
+reported anchors, constructed anchors, and analyst assumptions as different categories.
 
-## 0:55–1:30 — Financials and Valuation
+Show the bear/base/bull values and 5×5 sensitivity. Explain: “These are values under stated
+assumptions, not a forecast, recommendation, or market-price comparison.” Show official-source
+catalysts, risks, final uncertainty framework, and source register.
 
-Open Financials. Point to revenue CAGR, margin percentage-point change, FCF, capability gates, and an
-accession row.
+## 1:15–1:55 — Company research output
 
-Open Valuation. Review SEC-derived anchors and editable assumptions. Run the model. Show the
-bear/base/bull range before the base estimate, then WACC×terminal-growth and growth×margin
-sensitivities. Explain that current price is dated and separate. Open the comparable method: users
-must supply sourced peer multiples; the platform does not invent an industry median.
+Open current AAPL research, Financials, and Valuation. Show real SEC receipts and that missing inputs
+remain unavailable rather than zero. Change WACC and run the existing DCF. Open Memo or Report and
+show that reported facts, model assumptions, and analyst interpretation remain separate.
 
-## 1:30–2:15 — Portfolio Lab
+## 1:55–2:30 — Synthetic portfolio workflow
 
-Build AAPL/MSFT/SPY with user weights. Explain the exact common trading calendar and one return basis.
-Show return, volatility, Sharpe, Sortino, historical VaR, beta, alpha, drawdown, attribution,
-correlation, and concentration. Apply inverse-volatility weights and clarify that it is a transparent
-historical rule, not an optimizer or recommendation.
+Open Portfolio Lab. Before discussing any metric, point to `Synthetic public-demo data` and say:
+“AAPL, MSFT, and SPY are labels on synthetic samples here; these figures are not their historical
+performance.” Build fictional weights totaling 100%. Show common-calendar alignment, return basis,
+drawdown, risk measures, attribution, correlation, and concentration. Do not call the result live or real.
 
-## 2:15–2:45 — Investment Memo
+## 2:30–2:50 — DCA and export provenance
 
-Return to AAPL and open Investment Memo. Show the saved DCF range, financial evidence, source receipt,
-and separate thesis/catalyst/risk fields. Save notes, open Full report / PDF, and show the five-year
-evidence table, ratio diagnostics, DCF assumptions, filing register, and bilingual PDF export. Emphasize that facts,
-assumptions, and interpretation are visibly distinct.
+Open Historical DCA, show `Public demo available / Live market history not enabled`, run the demo,
+and point to the in-body synthetic notice and `Synthetic series` tab. Export the PDF and show its
+synthetic filename, top warning, not-a-forecast statement, and page footer.
 
-## 2:45–3:00 — Engineering close
+## 2:50–3:00 — Engineering close
 
-“The application is Next.js and strict TypeScript, with server-only data adapters, deterministic
-financial engines, regression tests, bilingual responsive UI, bounded public routes, and explicit
-methodology. The key product decision is to withhold unsupported outputs—including future DCA
-projections—rather than publish false precision.”
+“Pure TypeScript domains and tests control the calculations. Data lineage fails closed, a run cannot
+mix licensed and synthetic series, AI explanations cannot alter the math, and unsupported outputs are
+withheld. The repository includes a prepared usability protocol; participant results are not claimed.”

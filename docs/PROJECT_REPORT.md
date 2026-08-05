@@ -48,8 +48,8 @@ series therefore remain separate contracts.
 
 ### Ranges before point estimates
 
-DCF displays bear/base/bull and two sensitivity tables before a base implied share price. Current
-market price is a dated, separate comparison. Comparable valuation requires user-sourced multiples;
+DCF displays bear/base/bull and two sensitivity tables before a base implied share price. Market
+price is structurally separate and omitted from the public featured case. Comparable valuation requires user-sourced multiples;
 the platform does not manufacture a peer group or an industry median.
 
 ### Withhold unsupported results
@@ -74,7 +74,7 @@ them. This is a deliberate data-quality feature, not an incomplete zero.
 - Five-year unlevered FCFF engine.
 - No assumed tax benefit on operating losses when NOLs are not modeled.
 - Gordon terminal value with strict `WACC > g` validation.
-- EV→equity→per-share bridge and a separate dated market comparison.
+- EV→equity→per-share bridge; public featured-case output contains no market comparison.
 - Bear/base/bull range, WACC×g sensitivity, and growth×margin sensitivity.
 - P/E, EV/Revenue, and EV/EBITDA comparable ranges using user-sourced multiples.
 
@@ -86,6 +86,7 @@ them. This is a deliberate data-quality feature, not an incomplete zero.
   VaR, correlation, attribution, weight drift, HHI, and effective holdings.
 - Price-return/total-return basis is resolved once for the whole view and never mixed.
 - CSV export retains unavailable cells as empty rather than zero.
+- Public deployment samples are synthetic, visibly labelled, and pinned to one evidence mode per run.
 
 ### Investment Memo
 
@@ -153,6 +154,8 @@ them. This is a deliberate data-quality feature, not an incomplete zero.
    glyph coverage and line breaking without shipping a large embedded CJK font.
 7. Python/FastAPI/PostgreSQL remain deferred until cross-user storage or heavier analytics justify a
    separate service.
+8. Public market examples are synthetic; public live display awaits licensing and durable quota controls.
+9. The downloadable DCA PDF body is English-only in this release.
 
 ## Outcome
 

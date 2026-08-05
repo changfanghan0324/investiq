@@ -7,8 +7,11 @@ test("recruiter flow exposes evidence modes and the stable case study", async ({
   await expect(page).toHaveTitle(/Investment Research/);
   await expect(page.getByRole("heading", { name: "Investment research you can audit." })).toBeVisible();
   await expect(page.getByText("SEC fundamentals — real filed evidence")).toBeVisible();
-  await expect(page.getByText("Market examples — deterministic demonstrations")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Public demo mode" })).toBeVisible();
+  await expect(page.getByText(/use synthetic data—not actual AAPL, MSFT, SPY/)).toBeVisible();
+  await expect(page.getByText("Market examples — synthetic, not real security history")).toBeVisible();
   await expect(page.getByText("Unavailable data — never invented")).toBeVisible();
+  await expect(page.getByText(/Fang Han Chang/).first()).toBeVisible();
 
   await page.getByRole("link", { name: "Explore the AAPL case study" }).click();
   await expect(page).toHaveURL(/\/case-study\/aapl$/);
@@ -87,11 +90,13 @@ test("analysis workspaces expose unavailable live data as synthetic mode", async
   }));
 
   await page.goto("/compare");
-  await expect(page.getByText("Synthetic demo mode")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Synthetic public-demo data" })).toBeVisible();
+  await expect(page.getByText("Data source: Synthetic public-demo series · Not actual market history")).toBeVisible();
   await expect(page.getByRole("button", { name: "Run synthetic demo", exact: true })).toBeEnabled();
 
   await page.goto("/portfolio");
-  await expect(page.getByText("Synthetic demo mode")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Synthetic public-demo data" })).toBeVisible();
+  await expect(page.getByText("Data source: Synthetic public-demo series · Not actual market history")).toBeVisible();
   await expect(page.getByRole("button", { name: "Run synthetic demo", exact: true })).toBeEnabled();
 });
 
@@ -137,6 +142,8 @@ test("DCA result workspace has no prohibited ARIA attributes", async ({ page }) 
   await page.goto("/tools/dca");
   await page.getByRole("button", { name: /Load.*demo/i }).first().click();
   await expect(page.getByRole("heading", { name: "Portfolio performance" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Synthetic public-demo data" })).toBeVisible();
+  await expect(page.getByRole("tab", { name: "Synthetic series" })).toBeVisible();
   await page.waitForTimeout(400);
 
   const results = await new AxeBuilder({ page }).analyze();
@@ -144,6 +151,27 @@ test("DCA result workspace has no prohibited ARIA attributes", async ({ page }) 
     violation.impact === "critical" || violation.impact === "serious"
   ))).toEqual([]);
   expect(results.incomplete.filter((check) => check.id === "aria-prohibited-attr")).toEqual([]);
+});
+
+test("language, text scale, and print surfaces retain provenance without overflow", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "chromium", "single desktop print contract check");
+  await page.goto("/");
+  await page.getByLabel("Language").selectOption("zh-CN");
+  await expect(page.locator("html")).toHaveAttribute("lang", "zh-CN");
+  await expect(page.getByRole("heading", { name: "公开演示模式" })).toBeVisible();
+
+  await page.getByLabel("文字大小").selectOption("100");
+  await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBe(0);
+
+  for (const route of ["/case-study/aapl", "/company/AAPL/memo", "/company/AAPL/report", "/tools/dca"]) {
+    await page.goto(route);
+    await page.emulateMedia({ media: "print" });
+    await expect.poll(
+      () => page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth),
+      { message: `${route} print layout should not overflow`, timeout: 5_000 },
+    ).toBeLessThanOrEqual(1);
+    await page.emulateMedia({ media: "screen" });
+  }
 });
 
 test("mobile DCA waits for readiness before offering the demo fallback", async ({ page }, testInfo) => {
