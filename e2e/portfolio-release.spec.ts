@@ -19,11 +19,14 @@ test("homepage primary flow is keyboard reachable and has no serious axe violati
   await page.goto("/");
   await page.keyboard.press("Tab");
   await expect(page.getByRole("link", { name: "Skip to main content" })).toBeFocused();
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  await page.waitForTimeout(400);
 
   const results = await new AxeBuilder({ page }).analyze();
   expect(results.violations.filter((violation) => (
     violation.impact === "critical" || violation.impact === "serious"
   ))).toEqual([]);
+  expect(results.incomplete.filter((check) => check.id === "aria-prohibited-attr")).toEqual([]);
 });
 
 test("invalid ticker input returns an accessible validation message", async ({ page }) => {
@@ -31,6 +34,74 @@ test("invalid ticker input returns an accessible validation message", async ({ p
   await page.getByPlaceholder("Search by ticker, such as AAPL").fill("not a ticker!");
   await page.getByRole("button", { name: "Research company" }).click();
   await expect(page.locator("#research-error")).toContainText("Enter a valid US ticker");
+});
+
+test("analysis workspaces expose unavailable live data as synthetic mode", async ({ page }) => {
+  await page.route("**/api/health", (route) => route.fulfill({
+    status: 503,
+    contentType: "application/json",
+    body: JSON.stringify({
+      status: "unavailable",
+      services: {
+        priceAnalysis: "unavailable",
+        dca: "unavailable",
+        assistant: "ready",
+        database: "configured",
+      },
+    }),
+  }));
+
+  await page.goto("/compare");
+  await expect(page.getByText("Synthetic demo mode")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Run synthetic demo", exact: true })).toBeEnabled();
+
+  await page.goto("/portfolio");
+  await expect(page.getByText("Synthetic demo mode")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Run synthetic demo", exact: true })).toBeEnabled();
+});
+
+test("320px contract has no horizontal overflow on primary release routes", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "mobile-320", "320px-only contract check");
+
+  for (const route of ["/", "/about", "/case-study/aapl", "/tools/dca"]) {
+    await page.goto(route);
+    await page.waitForTimeout(400);
+    const viewport = await page.evaluate(() => ({
+      clientWidth: document.documentElement.clientWidth,
+      scrollWidth: document.documentElement.scrollWidth,
+    }));
+    expect(viewport.scrollWidth, `${route} should not overflow horizontally`).toBe(viewport.clientWidth);
+  }
+});
+
+test("mobile DCA waits for readiness before offering the demo fallback", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "mobile-320", "mobile action-bar contract check");
+
+  let releaseHealth: (() => void) | undefined;
+  const healthGate = new Promise<void>((resolve) => {
+    releaseHealth = resolve;
+  });
+  await page.route("**/api/health", async (route) => {
+    await healthGate;
+    await route.fulfill({
+      status: 503,
+      contentType: "application/json",
+      body: JSON.stringify({
+        status: "unavailable",
+        services: {
+          priceAnalysis: "unavailable",
+          dca: "unavailable",
+          assistant: "ready",
+          database: "configured",
+        },
+      }),
+    });
+  });
+
+  await page.goto("/tools/dca");
+  await expect(page.getByRole("button", { name: "Checking services", exact: true })).toBeDisabled();
+  releaseHealth?.();
+  await expect(page.getByRole("button", { name: "Load demo", exact: true })).toBeEnabled();
 });
 
 const publicModes = [
@@ -44,7 +115,8 @@ const publicModes = [
 ] as const;
 
 for (const mode of publicModes) {
-  test(`public-mode controls: ${mode.name}`, async ({ page }) => {
+  test(`public-mode controls: ${mode.name}`, async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== "chromium", "desktop control-matrix contract check");
     await page.route("**/api/health", (route) => route.fulfill({
       status: mode.status,
       contentType: "application/json",

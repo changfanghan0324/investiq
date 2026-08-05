@@ -100,8 +100,8 @@ export function ResearchHome() {
             </div>
           </div>
 
-          <div className={styles.evidencePreview} aria-label={t("research.evidencePreviewAria")}>
-            <h2>{t("research.evidencePreviewTitle")}</h2>
+          <section className={styles.evidencePreview} aria-labelledby="evidence-preview-heading">
+            <h2 id="evidence-preview-heading">{t("research.evidencePreviewTitle")}</h2>
             <div className={styles.evidenceFlow}>
               <EvidenceStep icon={<FileCheck2 />} title={t("research.filedFact")} detail={t("research.filedFactText")} />
               <EvidenceStep icon={<ReceiptText />} title={t("research.sourceReceipt")} detail={t("research.sourceReceiptText")} />
@@ -113,7 +113,7 @@ export function ResearchHome() {
               <ShieldCheck size={18} aria-hidden="true" />
               {t("research.evidencePromise")}
             </p>
-          </div>
+          </section>
         </motion.section>
 
         <section className={styles.truthBand} aria-labelledby="truth-heading">

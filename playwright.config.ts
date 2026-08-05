@@ -13,7 +13,17 @@ export default defineConfig({
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
   },
-  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
+  projects: [
+    { name: "chromium", use: { ...devices["Desktop Chrome"] } },
+    {
+      name: "mobile-320",
+      use: {
+        ...devices["Desktop Chrome"],
+        viewport: { width: 320, height: 800 },
+        isMobile: true,
+      },
+    },
+  ],
   webServer: {
     command: "npm run dev -- --hostname 127.0.0.1",
     url: "http://127.0.0.1:3000",

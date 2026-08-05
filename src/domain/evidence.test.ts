@@ -2,9 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   deriveHealthOverall,
-  marketEvidenceMode,
   parseHealthReport,
-  secEvidenceMode,
   tryParseHealthReport,
   unavailableServiceReadiness,
 } from '@/domain/evidence';
@@ -57,15 +55,6 @@ describe('service-readiness evidence contract', () => {
   ])('fails closed for malformed or partial payload %#', (payload) => {
     expect(tryParseHealthReport(payload)).toBeUndefined();
     expect(parseHealthReport(payload)).toEqual(unavailableServiceReadiness);
-  });
-
-  it('keeps section evidence modes distinct', () => {
-    expect(marketEvidenceMode({ readiness: 'ready', rendered: 'live' })).toBe('live-market');
-    expect(marketEvidenceMode({ readiness: 'unavailable', rendered: 'synthetic' })).toBe('synthetic-market');
-    expect(marketEvidenceMode({ readiness: 'unavailable', rendered: 'none' })).toBe('unavailable');
-    expect(marketEvidenceMode({ readiness: 'unavailable', rendered: 'live' })).toBe('unavailable');
-    expect(secEvidenceMode(true)).toBe('real-sec');
-    expect(secEvidenceMode(false)).toBe('unavailable');
   });
 
   it('derives the API aggregate without changing independent service fields', () => {

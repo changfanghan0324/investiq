@@ -43,6 +43,7 @@ import {
 } from "recharts";
 
 import { AppShell, ShellDisclaimer } from "@/components/app-shell";
+import { useServiceReadiness } from "@/components/readiness-provider";
 import { isValidSymbol, normalizeSymbol } from "@/domain/market-overview";
 import {
   MAX_COMPARISON_SECURITIES,
@@ -363,6 +364,8 @@ function seriesColor(index: number): string {
 
 export function StockComparison() {
   const { locale, t } = useLanguage();
+  const { readiness } = useServiceReadiness();
+  const analysisReadiness = readiness.priceAnalysis;
   const reduceMotion = useReducedMotion();
 
   const [slots, setSlots] = useState<SymbolSlot[]>(() =>
@@ -476,6 +479,7 @@ export function StockComparison() {
   // The example window depends on today's date, so it is filled in after mount: the server and
   // the client render the same empty date inputs, and the first run starts once hydration is done.
   useEffect(() => {
+    if (analysisReadiness === "checking") return;
     const timer = setTimeout(() => {
       const range = trailingRange(new Date(), EXAMPLE_YEARS);
       const example: FormState = { ...range, riskFreePercent: DEFAULT_RISK_FREE_PERCENT };
@@ -485,7 +489,7 @@ export function StockComparison() {
       if (input) void runComparison(input);
     }, 0);
     return () => clearTimeout(timer);
-  }, [runComparison]);
+  }, [analysisReadiness, runComparison]);
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -617,10 +621,18 @@ export function StockComparison() {
           onClick={() => {
             if (run) void runComparison(run.input);
           }}
-          disabled={running || !run}
+          disabled={running || !run || analysisReadiness === "checking"}
         >
           <RefreshCw size={13} aria-hidden="true" className={running ? styles.spin : undefined} />
-          <span>{running ? t("compare.rerunning") : t("compare.rerun")}</span>
+          <span>
+            {running
+              ? t("compare.rerunning")
+              : analysisReadiness === "checking"
+                ? t("analysisDemo.checking")
+                : analysisReadiness === "unavailable"
+                  ? t("analysisDemo.rerun")
+                  : t("compare.rerun")}
+          </span>
         </button>
       }
     >
@@ -763,9 +775,21 @@ export function StockComparison() {
               </p>
             </div>
 
-            <button type="submit" className={styles.runButton} disabled={running}>
+            <button
+              type="submit"
+              className={styles.runButton}
+              disabled={running || analysisReadiness === "checking"}
+            >
               <Play size={13} aria-hidden="true" />
-              <span>{running ? t("compare.running") : t("compare.run")}</span>
+              <span>
+                {running
+                  ? t("compare.running")
+                  : analysisReadiness === "checking"
+                    ? t("analysisDemo.checking")
+                    : analysisReadiness === "unavailable"
+                      ? t("analysisDemo.run")
+                      : t("compare.run")}
+              </span>
             </button>
           </div>
         </form>

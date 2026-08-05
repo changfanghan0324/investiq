@@ -551,9 +551,23 @@ export function DcaBacktestDashboard() {
           <strong>{t(input.positions.length === 1 ? "run.holding" : "run.holdings", { count: input.positions.length })}</strong>
           <span>{input.startDate.slice(0, 4)}–{input.endDate.slice(0, 4)}</span>
         </div>
-        <button type="button" disabled={Boolean(loadingMode)} onClick={() => void run(health !== "ready")}>
-          {loadingMode ? <LoaderCircle size={15} className={styles.spin} /> : health === "ready" ? <Play size={14} fill="currentColor" /> : <RefreshCw size={14} />}
-          {loadingMode ? t("run.calculating") : health === "ready" ? t("run.live") : t("run.demoShort")}
+        <button
+          type="button"
+          disabled={Boolean(loadingMode) || health === "checking"}
+          onClick={() => void run(health === "unavailable")}
+        >
+          {loadingMode || health === "checking"
+            ? <LoaderCircle size={15} className={styles.spin} />
+            : health === "ready"
+              ? <Play size={14} fill="currentColor" />
+              : <RefreshCw size={14} />}
+          {loadingMode
+            ? t("run.calculating")
+            : health === "checking"
+              ? t("run.checking")
+              : health === "ready"
+                ? t("run.live")
+                : t("run.demoShort")}
         </button>
       </div>
 
