@@ -9,7 +9,7 @@ export default function OpenGraphImage() {
     <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", justifyContent: "space-between", padding: "72px 82px", color: "#f5f8fc", background: "#020b17", fontFamily: "Arial, sans-serif" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
         <div style={{ width: 66, height: 66, display: "flex", alignItems: "center", justifyContent: "center", border: "2px solid #1980ff", borderRadius: 16, color: "#58b2ff", fontSize: 28 }}>IQ</div>
-        <div style={{ fontSize: 38, fontWeight: 700 }}>Invest<span style={{ color: "#1980ff" }}>IQ</span></div>
+        <div style={{ display: "flex", fontSize: 38, fontWeight: 700 }}>Invest<span style={{ color: "#1980ff" }}>IQ</span></div>
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
         <div style={{ maxWidth: 940, fontSize: 62, fontWeight: 700, lineHeight: 1.08, letterSpacing: "-2px" }}>Investment Research &amp; Portfolio Analytics</div>

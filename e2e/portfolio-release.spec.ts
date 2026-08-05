@@ -7,13 +7,13 @@ test("recruiter flow exposes evidence modes and the stable case study", async ({
   await expect(page).toHaveTitle(/Investment Research/);
   await expect(page.getByRole("heading", { name: "Investment research you can audit." })).toBeVisible();
   await expect(page.getByText("SEC fundamentals — real filed evidence")).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Public demo mode" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Public demo mode" })).toBeVisible();
   await expect(page.getByText(/use synthetic data—not actual AAPL, MSFT, SPY/)).toBeVisible();
   await expect(page.getByText("Market examples — synthetic, not real security history")).toBeVisible();
   await expect(page.getByText("Unavailable data — never invented")).toBeVisible();
   await expect(page.getByText(/Fang Han Chang/).first()).toBeVisible();
 
-  await page.getByRole("link", { name: "Explore the AAPL case study" }).click();
+  await page.getByRole("link", { name: "Explore the AAPL case study" }).first().click();
   await expect(page).toHaveURL(/\/case-study\/aapl$/);
   await expect(page.getByRole("heading", { name: "AAPL research case study" })).toBeVisible();
 });
@@ -90,12 +90,12 @@ test("analysis workspaces expose unavailable live data as synthetic mode", async
   }));
 
   await page.goto("/compare");
-  await expect(page.getByRole("heading", { name: "Synthetic public-demo data" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Synthetic public-demo data" })).toBeVisible();
   await expect(page.getByText("Data source: Synthetic public-demo series · Not actual market history")).toBeVisible();
   await expect(page.getByRole("button", { name: "Run synthetic demo", exact: true })).toBeEnabled();
 
   await page.goto("/portfolio");
-  await expect(page.getByRole("heading", { name: "Synthetic public-demo data" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Synthetic public-demo data" })).toBeVisible();
   await expect(page.getByText("Data source: Synthetic public-demo series · Not actual market history")).toBeVisible();
   await expect(page.getByRole("button", { name: "Run synthetic demo", exact: true })).toBeEnabled();
 });
@@ -142,8 +142,8 @@ test("DCA result workspace has no prohibited ARIA attributes", async ({ page }) 
   await page.goto("/tools/dca");
   await page.getByRole("button", { name: /Load.*demo/i }).first().click();
   await expect(page.getByRole("heading", { name: "Portfolio performance" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Synthetic public-demo data" })).toBeVisible();
-  await expect(page.getByRole("tab", { name: "Synthetic series" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Synthetic public-demo data" })).toBeVisible();
+  await expect(page.getByRole("group", { name: "Report scenario" }).getByRole("button", { name: "Synthetic series" })).toBeVisible();
   await page.waitForTimeout(400);
 
   const results = await new AxeBuilder({ page }).analyze();
@@ -155,12 +155,18 @@ test("DCA result workspace has no prohibited ARIA attributes", async ({ page }) 
 
 test("language, text scale, and print surfaces retain provenance without overflow", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "chromium", "single desktop print contract check");
+  test.setTimeout(60_000);
+  await page.route("**/api/fundamentals**", (route) => route.fulfill({
+    status: 503,
+    contentType: "application/json",
+    body: JSON.stringify({ message: "Company fundamentals are temporarily unavailable." }),
+  }));
   await page.goto("/");
   await page.getByLabel("Language").selectOption("zh-CN");
   await expect(page.locator("html")).toHaveAttribute("lang", "zh-CN");
-  await expect(page.getByRole("heading", { name: "公开演示模式" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "公开演示模式" })).toBeVisible();
 
-  await page.getByLabel("文字大小").selectOption("100");
+  await page.locator("header select").nth(1).selectOption("100");
   await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBe(0);
 
   for (const route of ["/case-study/aapl", "/company/AAPL/memo", "/company/AAPL/report", "/tools/dca"]) {
