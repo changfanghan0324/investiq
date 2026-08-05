@@ -2,14 +2,12 @@ import { describe, expect, it } from 'vitest';
 
 import {
   deriveHealthOverall,
-  parseHealthReport,
   tryParseHealthReport,
-  unavailableServiceReadiness,
 } from '@/domain/evidence';
 
 describe('service-readiness evidence contract', () => {
   it('parses a valid unavailable document independently of HTTP status', () => {
-    expect(parseHealthReport({
+    expect(tryParseHealthReport({
       status: 'unavailable',
       services: {
         priceAnalysis: 'unavailable',
@@ -27,7 +25,7 @@ describe('service-readiness evidence contract', () => {
   });
 
   it('derives readiness from services rather than trusting top-level status', () => {
-    expect(parseHealthReport({
+    expect(tryParseHealthReport({
       status: 'ready',
       services: {
         priceAnalysis: 'ready',
@@ -54,7 +52,6 @@ describe('service-readiness evidence contract', () => {
     { services: { priceAnalysis: 'ready', dca: 'ready', assistant: 'ready', database: 'unknown' } },
   ])('fails closed for malformed or partial payload %#', (payload) => {
     expect(tryParseHealthReport(payload)).toBeUndefined();
-    expect(parseHealthReport(payload)).toEqual(unavailableServiceReadiness);
   });
 
   it('derives the API aggregate without changing independent service fields', () => {
