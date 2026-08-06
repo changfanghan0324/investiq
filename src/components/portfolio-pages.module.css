@@ -41,7 +41,7 @@
 .journey a { min-height: 88px; display: grid; grid-template-columns: 34px 1fr auto; align-items: center; gap: 18px; padding: 17px 22px; }
 .journey a + a { border-top: 1px solid #304158; }
 .journey a:hover { background: #06111f; }
-.journey a > b { color: #1980ff; font-family: var(--font-geist-mono); }
+.journey a > b { color: #1980ff; font-family: var(--font-mono); }
 .journey a > span { display: grid; gap: 6px; }
 .journey strong { color: #e4eaf3; font-size: calc(14px * var(--ui-font-scale, 1)); font-weight: 600; }
 .journey small { color: #8e9caf; font-size: calc(11px * var(--ui-font-scale, 1)); line-height: 1.45; }
@@ -60,7 +60,7 @@
 .caseOutputStrip > div { display: grid; align-content: center; gap: 7px; min-width: 0; padding: 20px 14px; text-align: center; }
 .caseOutputStrip > div + div { border-left: 1px solid #304158; }
 .caseOutputStrip small { color: #89a2c3; font-size: calc(10px * var(--ui-font-scale, 1)); text-transform: uppercase; letter-spacing: .08em; }
-.caseOutputStrip strong { color: #f5f8fc; font-family: var(--font-geist-mono); font-size: calc(18px * var(--ui-font-scale, 1)); }
+.caseOutputStrip strong { color: #f5f8fc; font-family: var(--font-mono); font-size: calc(18px * var(--ui-font-scale, 1)); }
 .caseOutputStrip span { color: #77879d; font-size: calc(9px * var(--ui-font-scale, 1)); line-height: 1.4; }
 .caseDisclaimer { grid-column: 1 / -1; color: #8292a8; font-size: calc(10px * var(--ui-font-scale, 1)); }
 .caseSection { padding: 50px 0; border-bottom: 1px solid #243449; }
@@ -70,20 +70,20 @@
 .caseMetricGrid article + article { border-left: 1px solid #304158; }
 .caseMetricGrid span { color: #6f91bd; font-size: calc(9px * var(--ui-font-scale, 1)); text-transform: uppercase; letter-spacing: .08em; }
 .caseMetricGrid h3 { margin-top: 10px; color: #bdc8d7; font-size: calc(11px * var(--ui-font-scale, 1)); font-weight: 550; }
-.caseMetricGrid strong { display: block; margin-top: 9px; color: #f4f7fb; font-family: var(--font-geist-mono); font-size: calc(18px * var(--ui-font-scale, 1)); }
+.caseMetricGrid strong { display: block; margin-top: 9px; color: #f4f7fb; font-family: var(--font-mono); font-size: calc(18px * var(--ui-font-scale, 1)); }
 .caseMetricGrid p { margin-top: 11px; color: #8291a5; font-size: calc(10px * var(--ui-font-scale, 1)); line-height: 1.55; }
 .bridgePanel { display: grid; grid-template-columns: minmax(0, 1fr) 300px; border: 1px solid #304158; border-radius: 5px; overflow: hidden; }
 .bridgePanel dl { padding: 10px 24px; }
 .bridgePanel dl > div { display: flex; justify-content: space-between; gap: 20px; padding: 13px 0; color: #9ba9bc; font-size: calc(12px * var(--ui-font-scale, 1)); }
 .bridgePanel dl > div + div { border-top: 1px solid #1e3047; }
-.bridgePanel dd { color: #d9e1ed; font-family: var(--font-geist-mono); }
+.bridgePanel dd { color: #d9e1ed; font-family: var(--font-mono); }
 .bridgePanel dl > div[data-subtotal] { color: #b7c7dd; }
 .bridgePanel dl > div[data-total] { color: #fff; font-weight: 650; }
 .bridgePanel dl > div[data-total] dd { color: #69a2ff; }
 .bridgeFormula { display: grid; place-content: center; justify-items: start; gap: 10px; padding: 28px; border-left: 1px solid #304158; background: #071525; }
 .bridgeFormula svg { color: #1980ff; }
 .bridgeFormula span { color: #93a5bc; font-size: calc(11px * var(--ui-font-scale, 1)); }
-.bridgeFormula strong { color: #f4f8fd; font-family: var(--font-geist-mono); font-size: calc(25px * var(--ui-font-scale, 1)); }
+.bridgeFormula strong { color: #f4f8fd; font-family: var(--font-mono); font-size: calc(25px * var(--ui-font-scale, 1)); }
 .bridgeFormula small { color: #74859a; font-size: calc(10px * var(--ui-font-scale, 1)); }
 .liquidityCallout { margin-top: 14px; padding: 20px 22px; border: 1px solid #36577f; border-radius: 5px; background: #071525; }
 .liquidityCallout strong { color: #b9d2f7; font-size: calc(12px * var(--ui-font-scale, 1)); }
@@ -93,7 +93,7 @@
 .shareConvention > div + div { border-left: 1px solid #304158; }
 .shareConvention span { color: #71849d; font-size: calc(9px * var(--ui-font-scale, 1)); text-transform: uppercase; letter-spacing: .07em; }
 .shareConvention strong { color: #b7c4d5; font-size: calc(11px * var(--ui-font-scale, 1)); font-weight: 500; }
-.shareConvention b { color: #edf3fb; font-family: var(--font-geist-mono); font-size: calc(15px * var(--ui-font-scale, 1)); }
+.shareConvention b { color: #edf3fb; font-family: var(--font-mono); font-size: calc(15px * var(--ui-font-scale, 1)); }
 .shareConvention > p { grid-column: 1 / -1; padding: 16px 22px; border-top: 1px solid #304158; color: #8999ae; font-size: calc(10px * var(--ui-font-scale, 1)); line-height: 1.6; }
 .caseTableScroll { overflow-x: auto; border: 1px solid #304158; border-radius: 5px; }
 .caseTable { width: 100%; min-width: 720px; border-collapse: collapse; background: #04101d; }
@@ -101,7 +101,7 @@
 .caseTable td { padding: 13px 16px; border-bottom: 1px solid #203147; text-align: right; color: #aab7c9; font-size: calc(11px * var(--ui-font-scale, 1)); white-space: nowrap; }
 .caseTable th:first-child { position: sticky; left: 0; z-index: 1; text-align: left; color: #c3cedc; background: #061321; }
 .caseTable thead th { color: #dce5f1; background: #081728; font-weight: 600; }
-.caseTable td strong { color: #6fa8ff; font-family: var(--font-geist-mono); }
+.caseTable td strong { color: #6fa8ff; font-family: var(--font-mono); }
 .caseTable tbody tr:last-child th,
 .caseTable tbody tr:last-child td { border-bottom: 0; }
 .caseNotes { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 14px; }
@@ -166,6 +166,11 @@
   .sourceRegister a:nth-child(even) { border-left: 0; }
   .sourceRegister a + a { border-top: 1px solid #304158; }
 }
+
+.page :where(p, small, span, dt, dd, li) { color: var(--text-secondary) !important; font-size: calc(12px * var(--ui-font-scale, 1)); }
+.page :where(h1, h2, h3, strong, b, summary) { color: var(--text-primary) !important; }
+.page :where(a) { color: var(--accent) !important; }
+.page .actions a:first-child { color: #ffffff !important; }
 @media (max-width: 460px) {
   .caseOutputStrip,
   .caseMetricGrid,
@@ -174,4 +179,224 @@
   .caseMetricGrid article:nth-child(even),
   .shareConvention > div + div { border-top: 1px solid #304158; border-left: 0; }
   .caseMetricGrid article + article { border-top: 1px solid #304158; }
+}
+
+/* Editorial About and case-study treatment */
+.page {
+  min-height: calc(100vh - var(--iq-header-height));
+  padding: 56px 24px calc(var(--iq-bottom-nav-height) + 64px);
+  color: var(--text-primary);
+  background: var(--background);
+}
+
+.page > * {
+  max-width: 920px;
+}
+
+.hero {
+  padding-bottom: 36px;
+  border-color: var(--border);
+}
+
+.hero h1 {
+  max-width: 820px;
+  color: var(--text-primary);
+  font-size: calc(clamp(40px, 5vw, 48px) * var(--ui-font-scale, 1));
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.12;
+}
+
+.hero > p,
+.leadSection p,
+.split p,
+.principles p,
+.note p,
+.caseSummary > div:first-child > p,
+.sectionHeading > p {
+  color: var(--text-secondary);
+  font-size: calc(15px * var(--ui-font-scale, 1));
+  line-height: 1.7;
+}
+
+.actions a {
+  border-color: var(--border-strong);
+  color: var(--accent);
+  background: var(--surface);
+}
+
+.actions a:first-child {
+  border-color: var(--accent);
+  color: white;
+  background: var(--accent);
+}
+
+.leadSection h2,
+.split h2,
+.principles > h2,
+.evidenceTable > h2,
+.journey > h2,
+.note h2,
+.caseSummary h2,
+.sectionHeading h2,
+.conditionGrid h2 {
+  color: var(--text-primary);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.split,
+.principles > div,
+.evidenceTable dl,
+.journey > div,
+.note {
+  border: 0;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  background: transparent;
+}
+
+.split > div,
+.principles article {
+  padding: 28px 0;
+}
+
+.split > div + div,
+.principles article:nth-child(even) {
+  padding-left: 30px;
+  border-color: var(--border);
+}
+
+.principles article:nth-child(n + 3) {
+  border-color: var(--border);
+}
+
+.principles h3,
+.journey strong,
+.caseMetricGrid h3,
+.narrativeGrid h3 {
+  color: var(--text-primary);
+}
+
+.note {
+  padding: 28px 0;
+}
+
+.note > svg,
+.evidenceTable dt svg,
+.journey a > svg,
+.bridgeFormula svg,
+.sourceDetails summary svg {
+  display: none;
+}
+
+.caseTags span {
+  padding: 0;
+  border: 0;
+  color: var(--text-secondary);
+  background: transparent;
+}
+
+.caseSummary,
+.caseSection {
+  border-color: var(--border);
+}
+
+.caseOutputStrip,
+.caseMetricGrid,
+.bridgePanel,
+.shareConvention,
+.caseTableScroll,
+.caseList,
+.narrativeGrid,
+.conditionGrid,
+.sourceDetails,
+.caseNotes p,
+.liquidityCallout,
+.calibrationCallout,
+.subsequentNote {
+  border-color: var(--border);
+  border-radius: 6px;
+  color: var(--text-primary);
+  background: var(--surface);
+  box-shadow: none;
+}
+
+.caseOutputStrip > div + div,
+.caseMetricGrid article + article,
+.bridgeFormula,
+.shareConvention > div + div,
+.caseList li + li,
+.narrativeGrid article:nth-child(even),
+.narrativeGrid article:nth-child(n + 3),
+.conditionGrid > div + div,
+.sourceRegister,
+.sourceRegister a:nth-child(even),
+.sourceRegister a:nth-child(n + 3) {
+  border-color: var(--border);
+}
+
+.caseMetricGrid article,
+.bridgeFormula,
+.caseTable,
+.caseTable th:first-child,
+.caseTable thead th,
+.fact {
+  color: var(--text-primary);
+  background: var(--surface);
+}
+
+.caseOutputStrip strong,
+.caseMetricGrid strong,
+.bridgePanel dd,
+.bridgeFormula strong,
+.shareConvention b,
+.caseTable td strong {
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-variant-numeric: tabular-nums;
+}
+
+.caseOutputStrip small,
+.caseOutputStrip span,
+.caseMetricGrid span,
+.caseMetricGrid p,
+.bridgePanel dl > div,
+.bridgeFormula span,
+.bridgeFormula small,
+.liquidityCallout p,
+.shareConvention span,
+.shareConvention strong,
+.shareConvention > p,
+.caseTable th,
+.caseTable td,
+.caseNotes p,
+.caseList li,
+.narrativeGrid p,
+.narrativeGrid small,
+.conditionGrid li,
+.sourceDetails > p,
+.sourceRegister span,
+.sourceRegister small {
+  color: var(--text-secondary);
+}
+
+.caseTable th,
+.caseTable td {
+  border-color: var(--border);
+  background: var(--surface);
+}
+
+.caseSummary > div:first-child > span,
+.sectionHeading > div > span,
+.journey a > b,
+.narrativeGrid a {
+  color: var(--accent);
+}
+
+@media (max-width: 720px) {
+  .page { padding: 36px 16px calc(var(--iq-bottom-nav-height) + 48px); }
+  .split > div + div,
+  .principles article:nth-child(even) { padding-left: 0; border-color: var(--border); }
 }

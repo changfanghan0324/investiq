@@ -3,7 +3,7 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ChevronDown, Type } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 
 import { isActiveRoute, type NavRouteId, primaryRoutes } from "@/config/navigation";
 import { fontScaleOptions, languageOptions, type FontScale, useLanguage } from "@/i18n/language";
@@ -51,12 +51,17 @@ export function AppShell({
         </nav>
 
         <div className={styles.headerRight}>
-          {status ? <div className={styles.statusSlot}>{status}</div> : null}
           <LanguageControl />
           <FontScaleControl />
-          {actions ? <div className={styles.actionSlot}>{actions}</div> : null}
         </div>
       </header>
+
+      {status || actions ? (
+        <div className={styles.pageTools}>
+          {status ? <div className={styles.statusSlot}>{status}</div> : null}
+          {actions ? <div className={styles.actionSlot}>{actions}</div> : null}
+        </div>
+      ) : null}
 
       <main className={styles.main} id="main-content">
         {children}
@@ -94,7 +99,6 @@ function LanguageControl() {
     <label className={styles.selectControl} title={t("language.label")}>
       <span className={styles.visuallyHidden}>{t("language.label")}</span>
       <span className={styles.controlValue} aria-hidden="true">
-        <span className={styles.flag}>{active.flag}</span>
         <b>{active.shortLabel}</b>
       </span>
       <select
@@ -103,7 +107,7 @@ function LanguageControl() {
         onChange={(event) => setLanguage(event.target.value as typeof language)}
       >
         {languageOptions.map((option) => (
-          <option key={option.code} value={option.code}>{option.flag} {option.label}</option>
+          <option key={option.code} value={option.code}>{option.label}</option>
         ))}
       </select>
       <ChevronDown size={13} aria-hidden="true" />
@@ -118,8 +122,7 @@ function FontScaleControl() {
     <label className={styles.selectControl} title={t("display.fontSize")}>
       <span className={styles.visuallyHidden}>{t("display.fontSize")}</span>
       <span className={styles.controlValue} aria-hidden="true">
-        <Type size={13} />
-        <b className={styles.mono}>{active.label}</b>
+        <b>{active.label}</b>
       </span>
       <select
         value={fontScale}

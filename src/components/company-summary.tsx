@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   ArrowRight,
-  Building2,
   CheckCircle2,
   Database,
   ExternalLink,
@@ -63,6 +62,7 @@ export function CompanySummary({ rawTicker }: { rawTicker: string }) {
   const revenue = metric(fundamentals, "revenue");
   const operatingMargin = metric(fundamentals, "operatingMargin");
   const freeCashFlow = metric(fundamentals, "freeCashFlow");
+  const dilutedEps = metric(fundamentals, "dilutedEps");
   const latestReceipt = useMemo(() => latestSourceReceipt(fundamentals), [fundamentals]);
   const coverage = useMemo(
     () => fundamentals ? classifyCompanyCoverage(fundamentals) : undefined,
@@ -82,16 +82,28 @@ export function CompanySummary({ rawTicker }: { rawTicker: string }) {
   return (
     <div className={styles.summary}>
       <section className={styles.companyHeader}>
-        <span className={styles.companyMark}><Building2 size={22} /></span>
-        <div><h1>{fundamentals.identity.name}</h1><p>{fundamentals.identity.ticker} · CIK {fundamentals.identity.cik}</p></div>
+        <div><h1>{fundamentals.identity.name} <span>({fundamentals.identity.ticker})</span></h1><p>{t("company.annualLatestReported")} · CIK {fundamentals.identity.cik}</p></div>
         <div className={styles.industry}>
-          <span>{t("company.secIndustry")}</span>
-          <strong>{fundamentals.identity.sicDescription ?? t("company.unavailable")}</strong>
-          {fundamentals.identity.sicCode ? <small>SIC {fundamentals.identity.sicCode}</small> : null}
+          {latestReceipt ? <a href={latestReceipt.sourceUrl} target="_blank" rel="noreferrer">{t("company.openFiling")}<ExternalLink size={13} /></a> : null}
         </div>
       </section>
 
-      <div className={styles.grid}>
+      <section className={styles.primaryMetrics} aria-label={t("company.dataBasisTitle")}>
+        <SummaryMetric label={t("company.revenueTrend")} series={revenue} format="money" />
+        <SummaryMetric label={t("company.marginTrend")} series={operatingMargin} format="percent" />
+        <SummaryMetric label={t("company.fcfTrend")} series={freeCashFlow} format="money" />
+        <SummaryMetric label={labelMetric("dilutedEps", t)} series={dilutedEps} format="money" />
+      </section>
+
+      <section className={styles.reportedChange}>
+        <h2>{t("company.takeawaysTitle")}</h2>
+        <p>{describeTrend(revenue, "money", t)} {describeTrend(operatingMargin, "percent", t)}</p>
+        <nav><Link href={`/company/${ticker}/financials`}>{t("company.openFinancials")}</Link><Link href={`/company/${ticker}/valuation`}>{t("company.tabValuation")}</Link></nav>
+      </section>
+
+      <details className={styles.companyDetails}>
+        <summary>{t("company.dataBasisTitle")}</summary>
+        <div className={styles.grid}>
         <main className={styles.mainColumn}>
           <div className={styles.trendGrid}>
             <TrendCard number="1" title={t("company.revenueTrend")} series={revenue} format="money" />
@@ -163,7 +175,8 @@ export function CompanySummary({ rawTicker }: { rawTicker: string }) {
             {fundamentals.identity.isFinancialIssuer ? <p className={styles.financialNote}>{t("company.financialIssuerNote")}</p> : null}
           </section>
         </aside>
-      </div>
+        </div>
+      </details>
     </div>
   );
 }
@@ -195,6 +208,10 @@ function TrendCard({ number, title, series, format, constructed = false }: { num
 }
 
 function Metric({ label, value }: { label: string; value: string }) { return <div><span>{label}</span><strong>{value}</strong></div>; }
+function SummaryMetric({ label, series, format }: { label: string; series?: FundamentalsSeries; format: "money" | "percent" }) {
+  const latest = series?.available ? series.observations[0] : undefined;
+  return <div><dt>{label}</dt><dd>{latest ? display(latest.value, format) : "—"}</dd><small>{latest ? `FY${latest.fiscalYear}` : ""}</small></div>;
+}
 function Takeaway({ label, text }: { label: string; text: string }) { return <div className={styles.takeaway}><strong>{label}</strong><p>{text}</p></div>; }
 function Unavailable({ text }: { text: string }) { return <div className={styles.unavailable}><TriangleAlert size={15} /><span>{text}</span></div>; }
 function StateView({ icon, title, text }: { icon: React.ReactNode; title: string; text: string }) { return <section className={styles.state}>{icon}<h1>{title}</h1><p>{text}</p></section>; }

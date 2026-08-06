@@ -2,7 +2,7 @@
 .identity { min-height: 82px; display: flex; align-items: center; gap: 13px; padding: 12px clamp(16px, 3vw, 32px); border-bottom: 1px solid #2a2e39; background: #10141d; }
 .mark { width: 44px; height: 44px; display: grid; place-items: center; border: 1px solid #333845; border-radius: 3px; color: #8aa8ed; background: #0b1018; }
 .title { display: grid; gap: 3px; }
-.title strong { color: #f0f3fa; font-family: var(--font-geist-mono), monospace; font-size: calc(22px * var(--ui-font-scale, 1)); font-weight: 550; letter-spacing: .02em; }
+.title strong { color: #f0f3fa; font-family: var(--font-mono), monospace; font-size: calc(22px * var(--ui-font-scale, 1)); font-weight: 550; letter-spacing: .02em; }
 .title span { color: #858b97; font-size: calc(11px * var(--ui-font-scale, 1)); }
 .meta { display: flex; gap: 22px; margin-left: auto; }
 .meta span { display: inline-flex; align-items: center; gap: 6px; color: #8d94a1; font-size: calc(11px * var(--ui-font-scale, 1)); }
@@ -13,3 +13,15 @@
 .footer { margin: 0 20px; padding-top: 14px; border-top: 1px solid #20242e; color: #666c78; font-size: calc(10px * var(--ui-font-scale, 1)); text-align: center; }
 @media (max-width: 640px) { .identity { align-items: flex-start; flex-wrap: wrap; } .meta { width: 100%; margin-left: 57px; gap: 12px; flex-direction: column; } .tabs { gap: 21px; } .content { padding: 12px; } }
 @media print { .identity, .tabs, .footer { display: none; } .page { min-height: 0; padding: 0; background: #fff; } .content { padding: 0; } }
+
+.page { color: var(--text-primary); background: var(--background); }
+.identity { min-height: 72px; border-color: var(--border); background: var(--surface); }
+.mark { display: none; }
+.title strong { color: var(--text-primary); font-family: var(--font-sans); font-size: calc(20px * var(--ui-font-scale, 1)); font-weight: 600; letter-spacing: -0.02em; }
+.title span, .meta span { color: var(--text-secondary); font-size: calc(13px * var(--ui-font-scale, 1)); }
+.tabs { height: 50px; border-color: var(--border); background: var(--surface); }
+.tab, .tabActive { color: var(--text-secondary); font-size: calc(14px * var(--ui-font-scale, 1)); }
+.tabActive { border-color: var(--accent); color: var(--text-primary); }
+.content { width: min(100%, 1220px); margin: 0 auto; padding: 36px 24px 64px; }
+.footer { border-color: var(--border); color: var(--text-tertiary); font-size: calc(12px * var(--ui-font-scale, 1)); }
+@media (max-width: 640px) { .meta { margin-left: 0; } .content { padding: 28px 16px 48px; } }

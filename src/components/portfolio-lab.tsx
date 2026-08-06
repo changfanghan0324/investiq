@@ -41,7 +41,7 @@ import {
   type KeyboardEvent,
 } from "react";
 import Link from "next/link";
-import { Activity, ChevronDown, Download, Info, Play, Plus, RefreshCw, Scale, TriangleAlert, X } from "lucide-react";
+import { Activity, ChevronDown, Download, Info, Play, Plus, Scale, TriangleAlert, X } from "lucide-react";
 import { useReducedMotion } from "motion/react";
 import {
   CartesianGrid,
@@ -104,6 +104,11 @@ const BENCHMARK_SYMBOL = "SPY";
 
 /** Opening example, so the workspace shows a usable analysis instead of an empty form. */
 const EXAMPLE_HOLDINGS: Array<{ symbol: string; weightPercent: string }> = [
+  { symbol: "AAPL", weightPercent: "50.0" },
+  { symbol: "MSFT", weightPercent: "50.0" },
+];
+
+const THREE_HOLDING_EXAMPLE: Array<{ symbol: string; weightPercent: string }> = [
   { symbol: "AAPL", weightPercent: "40.0" },
   { symbol: "MSFT", weightPercent: "30.0" },
   { symbol: "SPY", weightPercent: "30.0" },
@@ -164,6 +169,7 @@ const PORTFOLIO_COLOR = "#5b8cff";
 const BENCHMARK_COLOR = "#f2b636";
 
 type ChartTab = "value" | "cumulative";
+type PeriodChoice = 1 | 3 | 5 | "custom";
 
 const CHART_TABS: Array<{ id: ChartTab; labelKey: TranslationKey }> = [
   { id: "value", labelKey: "portfolioLab.tabValue" },
@@ -606,6 +612,7 @@ export function PortfolioLab() {
   const [running, setRunning] = useState(false);
   const [loadedAt, setLoadedAt] = useState<Date>();
   const [chartTab, setChartTab] = useState<ChartTab>("value");
+  const [period, setPeriod] = useState<PeriodChoice>(5);
   // The Risk Context answers. They describe the reader, not the portfolio, so they are deliberately
   // held here and nowhere else: no storage, no query string, no request, and they are not part of
   // the run, so changing one never invalidates a result or re-measures anything.
@@ -709,24 +716,15 @@ export function PortfolioLab() {
     setLoadedAt(new Date());
   }, [loadBenchmarkLeg, run]);
 
-  // The example window depends on today's date, so it is filled in after mount: the server and the
-  // client render the same empty date inputs, and the first run starts once hydration is done.
+  // The default period depends on today's date, so dates are filled after hydration. No analysis
+  // is requested until the reader submits the form.
   useEffect(() => {
-    if (analysisReadiness === "checking") return;
     const timer = setTimeout(() => {
       const range = trailingRange(new Date(), EXAMPLE_YEARS);
-      const example: FormState = {
-        ...range,
-        initialCapital: DEFAULT_INITIAL_CAPITAL,
-        riskFreePercent: DEFAULT_RISK_FREE_PERCENT,
-      };
-      setForm(example);
-      const exampleSlots = EXAMPLE_HOLDINGS.map((entry, index) => ({ id: index + 1, ...entry }));
-      const { input } = validateForm(exampleSlots, example, range.endDate);
-      if (input) void runPortfolio(input);
+      setForm((current) => ({ ...current, ...range }));
     }, 0);
     return () => clearTimeout(timer);
-  }, [analysisReadiness, runPortfolio]);
+  }, []);
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -823,6 +821,25 @@ export function PortfolioLab() {
 
   function updateField(field: keyof FormState, value: string) {
     setForm((prev) => ({ ...prev, [field]: value }));
+    setErrors([]);
+    invalidateCurrentRun();
+  }
+
+  function selectPeriod(next: PeriodChoice) {
+    setPeriod(next);
+    if (next !== "custom") {
+      const range = trailingRange(new Date(), next);
+      setForm((current) => ({ ...current, ...range }));
+      setErrors([]);
+      invalidateCurrentRun();
+    }
+  }
+
+  function loadThreeHoldingExample() {
+    setSlots(THREE_HOLDING_EXAMPLE.map((entry, index) => ({ id: index + 1, ...entry })));
+    nextSlotIdRef.current = THREE_HOLDING_EXAMPLE.length + 1;
+    setPeriod(5);
+    setForm((current) => ({ ...current, ...trailingRange(new Date(), EXAMPLE_YEARS) }));
     setErrors([]);
     invalidateCurrentRun();
   }
@@ -963,39 +980,12 @@ export function PortfolioLab() {
   }
 
   return (
-    <AppShell
-      status={
-        <p className={styles.statusLine} role="status" aria-live="polite">
-          <i className={running ? styles.statusDotLoading : styles.statusDot} aria-hidden="true" />
-          {statusText}
-        </p>
-      }
-      actions={
-        <button
-          type="button"
-          className={styles.refreshButton}
-          onClick={() => {
-            if (run) void runPortfolio(run.input);
-          }}
-          disabled={running || !run || analysisReadiness === "checking"}
-        >
-          <RefreshCw size={13} aria-hidden="true" className={running ? styles.spin : undefined} />
-          <span>
-            {running
-              ? t("portfolioLab.rerunning")
-              : analysisReadiness === "checking"
-                ? t("analysisDemo.checking")
-                : analysisReadiness === "unavailable"
-                  ? t("analysisDemo.rerun")
-                  : t("portfolioLab.rerun")}
-          </span>
-        </button>
-      }
-    >
+    <AppShell>
       <div className={styles.page}>
         <div className={styles.pageHead}>
-          <h1>{t("portfolioLab.title")}</h1>
+          <h1>{locale.startsWith("zh") ? "建立投资组合" : "Build a portfolio"}</h1>
           <p className={styles.subtitle}>{t(showSyntheticNotice ? "portfolioLab.subtitleSynthetic" : "portfolioLab.subtitle")}</p>
+          {(run || running) ? <p className={styles.quietStatus} role="status" aria-live="polite">{statusText}</p> : null}
         </div>
 
         {showSyntheticNotice ? <EvidenceModeNotice id="portfolio-demo-title" /> : null}
@@ -1078,18 +1068,6 @@ export function PortfolioLab() {
                 <Plus size={13} aria-hidden="true" />
                 <span>{t("portfolioLab.addHolding")}</span>
               </button>
-              <button type="button" className={styles.equalButton} onClick={applyEqualWeights}>
-                <Scale size={13} aria-hidden="true" />
-                <span>{t("portfolioLab.equalWeight")}</span>
-              </button>
-              <button type="button" className={styles.equalButton} onClick={applyRiskAdjustedWeights} disabled={!view}>
-                <Activity size={13} aria-hidden="true" />
-                <span>{t("portfolioLab.riskAdjustedWeight")}</span>
-              </button>
-              <button type="button" className={styles.equalButton} onClick={applyMinimumVarianceWeights} disabled={!view}>
-                <Activity size={13} aria-hidden="true" />
-                <span>{t("portfolioLab.minimumVarianceWeight")}</span>
-              </button>
             </div>
 
             <p className={styles.controlHint} id="portfolio-slot-hint">
@@ -1126,119 +1104,67 @@ export function PortfolioLab() {
             ) : null}
           </fieldset>
 
-          <div className={styles.windowFields}>
+          <div className={styles.basicSettings}>
+            <fieldset className={styles.periodField}>
+              <legend>{locale.startsWith("zh") ? "期间" : "Period"}</legend>
+              <div className={styles.periodChoices}>
+                {([1, 3, 5, "custom"] as PeriodChoice[]).map((choice) => (
+                  <button
+                    key={choice}
+                    type="button"
+                    className={period === choice ? styles.periodActive : styles.periodButton}
+                    onClick={() => selectPeriod(choice)}
+                    aria-pressed={period === choice}
+                  >
+                    {choice === "custom" ? (locale.startsWith("zh") ? "自定义" : "Custom") : `${choice}Y`}
+                  </button>
+                ))}
+              </div>
+            </fieldset>
+
+            {period === "custom" ? (
+              <div className={styles.customDates}>
+                <div className={styles.controlField}>
+                  <label htmlFor="portfolio-start">{t("date.start")}</label>
+                  <input id="portfolio-start" type="date" className={styles.control} value={form.startDate} min={EARLIEST_START_DATE} onChange={(event) => updateField("startDate", event.target.value)} aria-invalid={errorFor("startDate") ? true : undefined} />
+                  {errorFor("startDate") ? <p className={styles.fieldError}>{t(errorFor("startDate")!.messageKey, errorFor("startDate")!.params)}</p> : null}
+                </div>
+                <div className={styles.controlField}>
+                  <label htmlFor="portfolio-end">{t("date.end")}</label>
+                  <input id="portfolio-end" type="date" className={styles.control} value={form.endDate} min={EARLIEST_START_DATE} onChange={(event) => updateField("endDate", event.target.value)} aria-invalid={errorFor("endDate") ? true : undefined} />
+                  {errorFor("endDate") ? <p className={styles.fieldError}>{t(errorFor("endDate")!.messageKey, errorFor("endDate")!.params)}</p> : null}
+                </div>
+              </div>
+            ) : null}
+
             <div className={styles.controlField}>
               <label htmlFor="portfolio-capital">{t("portfolioLab.capitalLabel")}</label>
-              <input
-                id="portfolio-capital"
-                type="number"
-                inputMode="decimal"
-                step="0.01"
-                min={MIN_INITIAL_CAPITAL}
-                max={MAX_INITIAL_CAPITAL}
-                className={`${styles.control} ${styles.mono}`}
-                value={form.initialCapital}
-                onChange={(event) => updateField("initialCapital", event.target.value)}
-                aria-invalid={errorFor("initialCapital") ? true : undefined}
-                aria-describedby={
-                  errorFor("initialCapital")
-                    ? "portfolio-capital-error portfolio-capital-hint"
-                    : "portfolio-capital-hint"
-                }
-              />
-              {errorFor("initialCapital") ? (
-                <p className={styles.fieldError} id="portfolio-capital-error">
-                  {t(errorFor("initialCapital")!.messageKey, errorFor("initialCapital")!.params)}
-                </p>
-              ) : null}
-              <p className={styles.controlHint} id="portfolio-capital-hint">
-                {t("portfolioLab.capitalHint")}
-              </p>
+              <input id="portfolio-capital" type="number" inputMode="decimal" step="0.01" min={MIN_INITIAL_CAPITAL} max={MAX_INITIAL_CAPITAL} className={styles.control} value={form.initialCapital} onChange={(event) => updateField("initialCapital", event.target.value)} aria-invalid={errorFor("initialCapital") ? true : undefined} />
+              {errorFor("initialCapital") ? <p className={styles.fieldError}>{t(errorFor("initialCapital")!.messageKey, errorFor("initialCapital")!.params)}</p> : null}
             </div>
+          </div>
 
-            <div className={styles.controlField}>
-              <label htmlFor="portfolio-start">{t("date.start")}</label>
-              <input
-                id="portfolio-start"
-                type="date"
-                className={styles.control}
-                value={form.startDate}
-                min={EARLIEST_START_DATE}
-                onChange={(event) => updateField("startDate", event.target.value)}
-                aria-invalid={errorFor("startDate") ? true : undefined}
-                aria-describedby={errorFor("startDate") ? "portfolio-start-error" : undefined}
-              />
-              {errorFor("startDate") ? (
-                <p className={styles.fieldError} id="portfolio-start-error">
-                  {t(errorFor("startDate")!.messageKey, errorFor("startDate")!.params)}
-                </p>
-              ) : null}
+          <details className={styles.advancedSettings}>
+            <summary>{locale.startsWith("zh") ? "高级设置" : "Advanced settings"}</summary>
+            <div className={styles.advancedBody}>
+              <div className={styles.controlField}>
+                <label htmlFor="portfolio-risk-free">{t("portfolioLab.riskFreeLabel")}</label>
+                <input id="portfolio-risk-free" type="number" inputMode="decimal" step="0.1" min={0} max={RISK_FREE_PERCENT_LIMIT} className={styles.control} value={form.riskFreePercent} onChange={(event) => updateField("riskFreePercent", event.target.value)} aria-invalid={errorFor("riskFree") ? true : undefined} />
+                {errorFor("riskFree") ? <p className={styles.fieldError}>{t(errorFor("riskFree")!.messageKey, errorFor("riskFree")!.params)}</p> : null}
+              </div>
+              <p>{locale.startsWith("zh") ? "基准、收益口径、再平衡、VaR 与风险背景会在结果和方法说明中展示。" : "Benchmark, return basis, rebalancing, VaR, and Risk Context remain available with the results and methodology."}</p>
             </div>
+          </details>
 
-            <div className={styles.controlField}>
-              <label htmlFor="portfolio-end">{t("date.end")}</label>
-              <input
-                id="portfolio-end"
-                type="date"
-                className={styles.control}
-                value={form.endDate}
-                min={EARLIEST_START_DATE}
-                onChange={(event) => updateField("endDate", event.target.value)}
-                aria-invalid={errorFor("endDate") ? true : undefined}
-                aria-describedby={errorFor("endDate") ? "portfolio-end-error" : undefined}
-              />
-              {errorFor("endDate") ? (
-                <p className={styles.fieldError} id="portfolio-end-error">
-                  {t(errorFor("endDate")!.messageKey, errorFor("endDate")!.params)}
-                </p>
-              ) : null}
-            </div>
-
-            <div className={styles.controlField}>
-              <label htmlFor="portfolio-risk-free">{t("portfolioLab.riskFreeLabel")}</label>
-              <input
-                id="portfolio-risk-free"
-                type="number"
-                inputMode="decimal"
-                step="0.1"
-                min={0}
-                max={RISK_FREE_PERCENT_LIMIT}
-                className={`${styles.control} ${styles.mono}`}
-                value={form.riskFreePercent}
-                onChange={(event) => updateField("riskFreePercent", event.target.value)}
-                aria-invalid={errorFor("riskFree") ? true : undefined}
-                aria-describedby={
-                  errorFor("riskFree")
-                    ? "portfolio-risk-free-error portfolio-risk-free-hint"
-                    : "portfolio-risk-free-hint"
-                }
-              />
-              {errorFor("riskFree") ? (
-                <p className={styles.fieldError} id="portfolio-risk-free-error">
-                  {t(errorFor("riskFree")!.messageKey, errorFor("riskFree")!.params)}
-                </p>
-              ) : null}
-              <p className={styles.controlHint} id="portfolio-risk-free-hint">
-                {t("portfolioLab.riskFreeHint")}
-              </p>
-            </div>
-
-            <button
-              type="submit"
-              className={styles.runButton}
-              disabled={running || analysisReadiness === "checking"}
-            >
+          <div className={styles.formActions}>
+            <button type="submit" className={styles.runButton} disabled={running || analysisReadiness === "checking"}>
               <Play size={13} aria-hidden="true" />
-              <span>
-                {running
-                  ? t("portfolioLab.running")
-                  : analysisReadiness === "checking"
-                    ? t("analysisDemo.checking")
-                    : analysisReadiness === "unavailable"
-                      ? t("analysisDemo.run")
-                      : t("portfolioLab.run")}
-              </span>
+              <span>{running ? t("portfolioLab.running") : analysisReadiness === "unavailable" ? t("analysisDemo.run") : t("portfolioLab.run")}</span>
             </button>
+            <button type="button" className={styles.exampleButton} onClick={loadThreeHoldingExample}>
+              {locale.startsWith("zh") ? "载入三项持仓示例" : "Load a three-holding example"}
+            </button>
+            {analysisReadiness !== "ready" ? <p className={styles.modeLine}>{locale.startsWith("zh") ? "使用合成数据，并非真实市场历史。" : "Uses synthetic data, not actual market history."}</p> : null}
           </div>
         </form>
 
@@ -1350,20 +1276,34 @@ export function PortfolioLab() {
               </section>
             ) : null}
 
-            <HeadlineMetrics view={view} input={run.input} locale={locale} t={t} />
-            {rebalancingAnalysis && !rebalancingAnalysis.unavailable ? (
-              <RebalancingPanel scenarios={rebalancingAnalysis.scenarios} basis={view.returnBasis} locale={locale} t={t} />
-            ) : rebalancingAnalysis?.unavailable ? (
-              <AdvancedAnalysisUnavailable title={t("portfolioLab.rebalanceTitle")} body={t("portfolioLab.rebalanceUnavailable")} />
-            ) : null}
-            {frontierAnalysis && !frontierAnalysis.unavailable ? (
-              <EfficientFrontierPanel frontier={frontierAnalysis.frontier} locale={locale} t={t} />
-            ) : frontierAnalysis?.unavailable ? (
-              <AdvancedAnalysisUnavailable
-                title={t("portfolioLab.frontierTitle")}
-                body={t(frontierAnalysis.needsTwo ? "portfolioLab.frontierNeedsTwo" : "portfolioLab.frontierUnavailable")}
-              />
-            ) : null}
+            <HeadlineMetrics view={view} locale={locale} t={t} />
+            <details className={styles.alternativeMethods}>
+              <summary>{locale.startsWith("zh") ? "探索其他历史权重示例" : "Explore alternative historical weight examples"}</summary>
+              <div className={styles.alternativeActions}>
+                <button type="button" className={styles.equalButton} onClick={applyEqualWeights}>
+                  <Scale size={13} aria-hidden="true" />
+                  <span>{t("portfolioLab.equalWeight")}</span>
+                </button>
+                <button type="button" className={styles.equalButton} onClick={applyRiskAdjustedWeights}>
+                  <Activity size={13} aria-hidden="true" />
+                  <span>{t("portfolioLab.riskAdjustedWeight")}</span>
+                </button>
+                <button type="button" className={styles.equalButton} onClick={applyMinimumVarianceWeights}>
+                  <Activity size={13} aria-hidden="true" />
+                  <span>{t("portfolioLab.minimumVarianceWeight")}</span>
+                </button>
+              </div>
+              {rebalancingAnalysis && !rebalancingAnalysis.unavailable ? (
+                <RebalancingPanel scenarios={rebalancingAnalysis.scenarios} basis={view.returnBasis} locale={locale} t={t} />
+              ) : rebalancingAnalysis?.unavailable ? (
+                <AdvancedAnalysisUnavailable title={t("portfolioLab.rebalanceTitle")} body={t("portfolioLab.rebalanceUnavailable")} />
+              ) : null}
+              {frontierAnalysis && !frontierAnalysis.unavailable ? (
+                <EfficientFrontierPanel frontier={frontierAnalysis.frontier} locale={locale} t={t} />
+              ) : frontierAnalysis?.unavailable ? (
+                <AdvancedAnalysisUnavailable title={t("portfolioLab.frontierTitle")} body={t(frontierAnalysis.needsTwo ? "portfolioLab.frontierNeedsTwo" : "portfolioLab.frontierUnavailable")} />
+              ) : null}
+            </details>
 
             <div className={styles.grid}>
               <div className={styles.mainColumn}>
@@ -1782,12 +1722,10 @@ function WindowPanel({ view, locale, t }: { view: PortfolioLabViewModel; locale:
  */
 function HeadlineMetrics({
   view,
-  input,
   locale,
   t,
 }: {
   view: PortfolioLabViewModel;
-  input: PortfolioInput;
   locale: string;
   t: Translate;
 }) {
@@ -1817,35 +1755,6 @@ function HeadlineMetrics({
           t={t}
         />
         <MetricCard
-          label={t("portfolioLab.metricTotalReturn")}
-          value={formatSignedRate(view.totalPriceReturn, locale)}
-          tone={view.totalPriceReturn < 0 ? "negative" : "positive"}
-          detail={t("portfolioLab.metricTotalReturnDetail")}
-          t={t}
-        />
-        <MetricCard
-          label={t("portfolioLab.metricVendorTotalReturn")}
-          value={view.totalReturn === undefined ? undefined : formatSignedRate(view.totalReturn, locale)}
-          tone={view.totalReturn === undefined ? undefined : view.totalReturn < 0 ? "negative" : "positive"}
-          detail={
-            view.totalReturn === undefined
-              ? t("portfolioLab.metricVendorTotalReturnMissing")
-              : t("portfolioLab.metricVendorTotalReturnDetail")
-          }
-          t={t}
-        />
-        <MetricCard
-          label={t("portfolioLab.metricCagr")}
-          value={view.cagr === undefined ? undefined : formatSignedRate(view.cagr, locale)}
-          tone={view.cagr === undefined ? undefined : view.cagr < 0 ? "negative" : "positive"}
-          detail={
-            view.cagr === undefined
-              ? t("portfolioLab.metricCagrMissing")
-              : t("portfolioLab.metricCagrDetail", { years: view.window.years.toFixed(1) })
-          }
-          t={t}
-        />
-        <MetricCard
           label={t("portfolioLab.metricVolatility")}
           value={view.volatility === undefined ? undefined : formatRate(view.volatility, locale)}
           detail={
@@ -1856,29 +1765,6 @@ function HeadlineMetrics({
           t={t}
         />
         <MetricCard
-          label={t("portfolioLab.metricSharpe")}
-          value={view.sharpeRatio === undefined ? undefined : formatRatio(view.sharpeRatio, locale)}
-          detail={
-            view.sharpeRatio === undefined
-              ? t("portfolioLab.metricSharpeMissing")
-              : t("portfolioLab.metricSharpeDetail", { rate: `${input.riskFreePercent}%` })
-          }
-          t={t}
-        />
-        <MetricCard
-          label={t("portfolioLab.metricSortino")}
-          value={view.sortinoRatio === undefined ? undefined : formatRatio(view.sortinoRatio, locale)}
-          detail={view.sortinoRatio === undefined ? t("portfolioLab.metricSortinoMissing") : t("portfolioLab.metricSortinoDetail", { rate: `${input.riskFreePercent}%` })}
-          t={t}
-        />
-        <MetricCard
-          label={t("portfolioLab.metricVar")}
-          value={view.historicalValueAtRisk.value === undefined ? undefined : formatRate(view.historicalValueAtRisk.value, locale)}
-          tone={view.historicalValueAtRisk.value !== undefined && view.historicalValueAtRisk.value > 0 ? "negative" : undefined}
-          detail={view.historicalValueAtRisk.value === undefined ? t("portfolioLab.metricVarMissing") : t("portfolioLab.metricVarDetail", { confidence: formatRate(view.historicalValueAtRisk.confidence, locale), count: formatCount(view.historicalValueAtRisk.sample, locale) })}
-          t={t}
-        />
-        <MetricCard
           label={t("portfolioLab.metricMaxDrawdown")}
           value={formatRate(drawdown.drawdown, locale)}
           tone={drawdown.drawdown < 0 ? "negative" : undefined}
@@ -1886,25 +1772,9 @@ function HeadlineMetrics({
           t={t}
         />
         <MetricCard
-          label={t("portfolioLab.metricBeta", { symbol: BENCHMARK_SYMBOL })}
-          value={view.benchmark?.beta === undefined ? undefined : formatRatio(view.benchmark.beta, locale)}
-          detail={
-            view.benchmark === undefined
-              ? t("portfolioLab.metricBetaMissing", { symbol: BENCHMARK_SYMBOL })
-              : view.benchmark.beta === undefined
-                ? t("portfolioLab.metricBetaNotComputable", { symbol: BENCHMARK_SYMBOL })
-                : t("portfolioLab.metricBetaDetail", {
-                    symbol: BENCHMARK_SYMBOL,
-                    count: formatCount(view.benchmark.overlappingSessions, locale),
-                  })
-          }
-          t={t}
-        />
-        <MetricCard
-          label={t("portfolioLab.metricAlpha", { symbol: BENCHMARK_SYMBOL })}
-          value={view.benchmark?.alpha === undefined ? undefined : formatSignedRate(view.benchmark.alpha, locale)}
-          tone={view.benchmark?.alpha === undefined ? undefined : view.benchmark.alpha < 0 ? "negative" : "positive"}
-          detail={view.benchmark?.alpha === undefined ? t("portfolioLab.metricAlphaMissing") : t("portfolioLab.metricAlphaDetail", { symbol: BENCHMARK_SYMBOL, count: formatCount(view.benchmark.overlappingSessions, locale) })}
+          label={t("portfolioLab.concentrationLargest")}
+          value={`${view.concentration.largestWeightSymbol} ${formatRate(view.concentration.largestWeight, locale)}`}
+          detail={t("portfolioLab.concentrationTargetNote")}
           t={t}
         />
       </dl>

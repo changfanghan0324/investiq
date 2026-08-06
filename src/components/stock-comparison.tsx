@@ -29,7 +29,7 @@ import {
   type KeyboardEvent,
 } from "react";
 import Link from "next/link";
-import { Download, Info, Play, Plus, RefreshCw, TriangleAlert, X } from "lucide-react";
+import { Download, Info, Play, Plus, TriangleAlert, X } from "lucide-react";
 import { useReducedMotion } from "motion/react";
 import {
   CartesianGrid,
@@ -98,6 +98,7 @@ const SERIES_COLORS = ["#5b8cff", "#f2b636", "#45c1a8", "#c084fc", "#f5709a"];
 const FALLBACK_COLOR = SERIES_COLORS[0];
 
 type ChartTab = "cumulative" | "daily";
+type PeriodChoice = 1 | 3 | 5 | "custom";
 
 const CHART_TABS: Array<{ id: ChartTab; labelKey: TranslationKey }> = [
   { id: "cumulative", labelKey: "compare.tabCumulative" },
@@ -389,6 +390,7 @@ export function StockComparison() {
   const [running, setRunning] = useState(false);
   const [loadedAt, setLoadedAt] = useState<Date>();
   const [chartTab, setChartTab] = useState<ChartTab>("cumulative");
+  const [period, setPeriod] = useState<PeriodChoice>(5);
 
   // Supersedes an in-flight sequence: every await re-checks the token before writing state.
   const runIdRef = useRef(0);
@@ -487,20 +489,30 @@ export function StockComparison() {
     setLoadedAt(new Date());
   }, [loadBenchmarkLeg, run]);
 
-  // The example window depends on today's date, so it is filled in after mount: the server and
-  // the client render the same empty date inputs, and the first run starts once hydration is done.
+  // Dates are filled after hydration, but the comparison never runs without an explicit submit.
   useEffect(() => {
-    if (analysisReadiness === "checking") return;
     const timer = setTimeout(() => {
       const range = trailingRange(new Date(), EXAMPLE_YEARS);
-      const example: FormState = { ...range, riskFreePercent: DEFAULT_RISK_FREE_PERCENT };
-      setForm(example);
-      const exampleSlots = EXAMPLE_SYMBOLS.map((value, index) => ({ id: index + 1, value }));
-      const { input } = validateForm(exampleSlots, example, range.endDate);
-      if (input) void runComparison(input);
+      setForm({ ...range, riskFreePercent: DEFAULT_RISK_FREE_PERCENT });
     }, 0);
     return () => clearTimeout(timer);
-  }, [analysisReadiness, runComparison]);
+  }, []);
+
+  function selectPeriod(next: PeriodChoice) {
+    setPeriod(next);
+    setErrors([]);
+    if (next !== "custom") {
+      const range = trailingRange(new Date(), next);
+      setForm((current) => ({ ...current, ...range }));
+    }
+  }
+
+  function loadExample() {
+    setSlots(EXAMPLE_SYMBOLS.map((value, index) => ({ id: index + 1, value })));
+    selectPeriod(5);
+    setRun(undefined);
+    setLoadedAt(undefined);
+  }
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -619,39 +631,12 @@ export function StockComparison() {
   }
 
   return (
-    <AppShell
-      status={
-        <p className={styles.statusLine} role="status" aria-live="polite">
-          <i className={running ? styles.statusDotLoading : styles.statusDot} aria-hidden="true" />
-          {statusText}
-        </p>
-      }
-      actions={
-        <button
-          type="button"
-          className={styles.refreshButton}
-          onClick={() => {
-            if (run) void runComparison(run.input);
-          }}
-          disabled={running || !run || analysisReadiness === "checking"}
-        >
-          <RefreshCw size={13} aria-hidden="true" className={running ? styles.spin : undefined} />
-          <span>
-            {running
-              ? t("compare.rerunning")
-              : analysisReadiness === "checking"
-                ? t("analysisDemo.checking")
-                : analysisReadiness === "unavailable"
-                  ? t("analysisDemo.rerun")
-                  : t("compare.rerun")}
-          </span>
-        </button>
-      }
-    >
+    <AppShell>
       <div className={styles.page}>
         <div className={styles.pageHead}>
           <h1>{t("compare.title")}</h1>
           <p className={styles.subtitle}>{t(showSyntheticNotice ? "compare.subtitleSynthetic" : "compare.subtitle")}</p>
+          {run || running ? <p className={styles.quietStatus} role="status" aria-live="polite">{statusText}</p> : null}
         </div>
 
         {showSyntheticNotice ? <EvidenceModeNotice id="comparison-demo-title" /> : null}
@@ -714,74 +699,78 @@ export function StockComparison() {
             </p>
           </fieldset>
 
-          <div className={styles.windowFields}>
-            <div className={styles.controlField}>
-              <label htmlFor="compare-start">{t("date.start")}</label>
-              <input
-                id="compare-start"
-                type="date"
-                className={styles.control}
-                value={form.startDate}
-                min={EARLIEST_START_DATE}
-                onChange={(event) => updateField("startDate", event.target.value)}
-                aria-invalid={errorFor("startDate") ? true : undefined}
-                aria-describedby={errorFor("startDate") ? "compare-start-error" : undefined}
-              />
-              {errorFor("startDate") ? (
-                <p className={styles.fieldError} id="compare-start-error">
-                  {t(errorFor("startDate")!.messageKey, errorFor("startDate")!.params)}
-                </p>
-              ) : null}
+          <fieldset className={styles.periodField}>
+            <legend>{locale.startsWith("zh") ? "期间" : "Period"}</legend>
+            <div className={styles.periodChoices}>
+              {([1, 3, 5, "custom"] as PeriodChoice[]).map((choice) => (
+                <button
+                  key={choice}
+                  type="button"
+                  className={period === choice ? styles.periodActive : styles.periodButton}
+                  onClick={() => selectPeriod(choice)}
+                  aria-pressed={period === choice}
+                >
+                  {choice === "custom" ? (locale.startsWith("zh") ? "自定义" : "Custom") : `${choice}Y`}
+                </button>
+              ))}
             </div>
+          </fieldset>
 
-            <div className={styles.controlField}>
-              <label htmlFor="compare-end">{t("date.end")}</label>
-              <input
-                id="compare-end"
-                type="date"
-                className={styles.control}
-                value={form.endDate}
-                min={EARLIEST_START_DATE}
-                onChange={(event) => updateField("endDate", event.target.value)}
-                aria-invalid={errorFor("endDate") ? true : undefined}
-                aria-describedby={errorFor("endDate") ? "compare-end-error" : undefined}
-              />
-              {errorFor("endDate") ? (
-                <p className={styles.fieldError} id="compare-end-error">
-                  {t(errorFor("endDate")!.messageKey, errorFor("endDate")!.params)}
-                </p>
-              ) : null}
+          {period === "custom" ? (
+            <div className={styles.customDates}>
+              <div className={styles.controlField}>
+                <label htmlFor="compare-start">{t("date.start")}</label>
+                <input
+                  id="compare-start"
+                  type="date"
+                  className={styles.control}
+                  value={form.startDate}
+                  min={EARLIEST_START_DATE}
+                  onChange={(event) => updateField("startDate", event.target.value)}
+                  aria-invalid={errorFor("startDate") ? true : undefined}
+                />
+                {errorFor("startDate") ? <p className={styles.fieldError}>{t(errorFor("startDate")!.messageKey, errorFor("startDate")!.params)}</p> : null}
+              </div>
+              <div className={styles.controlField}>
+                <label htmlFor="compare-end">{t("date.end")}</label>
+                <input
+                  id="compare-end"
+                  type="date"
+                  className={styles.control}
+                  value={form.endDate}
+                  min={EARLIEST_START_DATE}
+                  onChange={(event) => updateField("endDate", event.target.value)}
+                  aria-invalid={errorFor("endDate") ? true : undefined}
+                />
+                {errorFor("endDate") ? <p className={styles.fieldError}>{t(errorFor("endDate")!.messageKey, errorFor("endDate")!.params)}</p> : null}
+              </div>
             </div>
+          ) : null}
 
-            <div className={styles.controlField}>
-              <label htmlFor="compare-risk-free">{t("compare.riskFreeLabel")}</label>
-              <input
-                id="compare-risk-free"
-                type="number"
-                inputMode="decimal"
-                step="0.1"
-                min={0}
-                max={RISK_FREE_PERCENT_LIMIT}
-                className={`${styles.control} ${styles.mono}`}
-                value={form.riskFreePercent}
-                onChange={(event) => updateField("riskFreePercent", event.target.value)}
-                aria-invalid={errorFor("riskFree") ? true : undefined}
-                aria-describedby={
-                  errorFor("riskFree")
-                    ? "compare-risk-free-error compare-risk-free-hint"
-                    : "compare-risk-free-hint"
-                }
-              />
-              {errorFor("riskFree") ? (
-                <p className={styles.fieldError} id="compare-risk-free-error">
-                  {t(errorFor("riskFree")!.messageKey, errorFor("riskFree")!.params)}
-                </p>
-              ) : null}
-              <p className={styles.controlHint} id="compare-risk-free-hint">
-                {t("compare.riskFreeHint")}
-              </p>
+          <details className={styles.advancedSettings}>
+            <summary>{locale.startsWith("zh") ? "高级设置" : "Advanced settings"}</summary>
+            <div className={styles.advancedBody}>
+              <div className={styles.controlField}>
+                <label htmlFor="compare-risk-free">{t("compare.riskFreeLabel")}</label>
+                <input
+                  id="compare-risk-free"
+                  type="number"
+                  inputMode="decimal"
+                  step="0.1"
+                  min={0}
+                  max={RISK_FREE_PERCENT_LIMIT}
+                  className={styles.control}
+                  value={form.riskFreePercent}
+                  onChange={(event) => updateField("riskFreePercent", event.target.value)}
+                  aria-invalid={errorFor("riskFree") ? true : undefined}
+                />
+                {errorFor("riskFree") ? <p className={styles.fieldError}>{t(errorFor("riskFree")!.messageKey, errorFor("riskFree")!.params)}</p> : null}
+              </div>
+              <p>{locale.startsWith("zh") ? "结果使用共同日期窗口，并要求至少 60 个共同观测值。基准、收益口径和样本说明会随结果显示。" : "Results use a common date window and require at least 60 shared observations. Benchmark, return-basis, and sample details appear with the results."}</p>
             </div>
+          </details>
 
+          <div className={styles.formActions}>
             <button
               type="submit"
               className={styles.runButton}
@@ -791,13 +780,17 @@ export function StockComparison() {
               <span>
                 {running
                   ? t("compare.running")
-                  : analysisReadiness === "checking"
-                    ? t("analysisDemo.checking")
-                    : analysisReadiness === "unavailable"
-                      ? t("analysisDemo.run")
-                      : t("compare.run")}
+                  : analysisReadiness === "unavailable"
+                    ? t("analysisDemo.run")
+                    : t("compare.run")}
               </span>
             </button>
+            <button type="button" className={styles.exampleButton} onClick={loadExample}>
+              {locale.startsWith("zh") ? "载入 AAPL 与 MSFT 示例" : "Load AAPL vs MSFT example"}
+            </button>
+            {analysisReadiness !== "ready" ? (
+              <p className={styles.modeLine}>{locale.startsWith("zh") ? "使用合成数据，并非真实市场历史。" : "Uses synthetic data, not actual market history."}</p>
+            ) : null}
           </div>
         </form>
 

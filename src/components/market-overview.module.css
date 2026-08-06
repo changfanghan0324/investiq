@@ -9,7 +9,7 @@
 }
 
 .mono {
-  font-family: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: var(--font-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.01em;
 }
@@ -867,3 +867,13 @@
     animation: none;
   }
 }
+
+.page { max-width: 1220px; padding: 40px 24px 64px; color: var(--text-primary); }
+.pageHead { padding-bottom: 24px; border-color: var(--border); }
+.pageHead h1 { color: var(--text-primary); font-size: clamp(2rem, 4vw, 2.5rem); letter-spacing: -0.02em; }
+.subtitle, .windowLine, .explainer p { color: var(--text-secondary); font-size: calc(13px * var(--ui-font-scale, 1)); }
+.explainer, .panel, .errorPanel { border-color: var(--border); border-radius: 6px; color: var(--text-primary); background: var(--surface); box-shadow: none; }
+.explainer { border-left: 1px solid var(--border); }
+.explainer h2 { color: var(--text-primary); font-size: calc(14px * var(--ui-font-scale, 1)); letter-spacing: 0; text-transform: none; }
+.statusDotLoading { animation: none; }
+@media (max-width: 640px) { .page { padding: 28px 16px 48px; } }

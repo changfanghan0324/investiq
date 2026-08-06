@@ -15,7 +15,7 @@
 .cover dd { color: #c5ccd6; text-align: right; }
 .section { padding: 18px 21px; border-bottom: 1px solid #292e39; }
 .section > header { display: flex; align-items: flex-start; gap: 11px; margin-bottom: 13px; }
-.section > header > span { min-width: 24px; color: #6686c8; font-family: var(--font-geist-mono), monospace; font-size: calc(8px * var(--ui-font-scale, 1)); }
+.section > header > span { min-width: 24px; color: #6686c8; font-family: var(--font-mono), monospace; font-size: calc(8px * var(--ui-font-scale, 1)); }
 .section h2 { color: #e0e4eb; font-size: calc(12px * var(--ui-font-scale, 1)); font-weight: 540; }
 .section header small { display: block; margin-top: 3px; color: #747d89; font-size: calc(8px * var(--ui-font-scale, 1)); }
 .sectionIntro { margin: 0 0 11px 35px; color: #838c99; font-size: calc(8px * var(--ui-font-scale, 1)); line-height: 1.5; }
@@ -35,7 +35,7 @@
 .scenarios { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; margin-left: 35px; background: #303744; }
 .scenarios div { min-height: 70px; display: grid; align-content: center; justify-items: center; gap: 8px; background: #10161f; }
 .scenarios span { color: #7b8491; font-size: calc(8px * var(--ui-font-scale, 1)); }
-.scenarios strong { color: #dce5f4; font-family: var(--font-geist-mono), monospace; font-size: calc(15px * var(--ui-font-scale, 1)); font-weight: 520; }
+.scenarios strong { color: #dce5f4; font-family: var(--font-mono), monospace; font-size: calc(15px * var(--ui-font-scale, 1)); font-weight: 520; }
 .valuationGrid { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(220px, .7fr); gap: 10px; margin-top: 10px; }
 .valuationGrid .tableWrap { margin-left: 35px; }
 .valuationGrid table { min-width: 420px; }
@@ -105,4 +105,20 @@
   .disclaimer { margin-top: 6px; padding: 6px 10px; border-color: #94a3b8; background: #fff; }
   .disclaimer p { line-height: 1.45; }
   .reportFooter { display: none; }
+}
+
+@media screen {
+  .report { max-width: 900px; margin: 0 auto; gap: 24px; color: var(--text-primary); }
+  .toolbar { padding: 0 0 24px; border: 0; border-bottom: 1px solid var(--border); background: transparent; }
+  .toolbar h1 { color: var(--text-primary); font-size: calc(32px * var(--ui-font-scale, 1)); font-weight: 600; letter-spacing: -0.02em; }
+  .toolbar p { color: var(--text-secondary); font-size: calc(13px * var(--ui-font-scale, 1)); }
+  .toolbar button { min-height: 42px; border-color: var(--accent); border-radius: 4px; color: white; background: var(--accent); font-size: calc(13px * var(--ui-font-scale, 1)); }
+  .paper { border: 0; border-radius: 0; background: var(--surface); box-shadow: none; }
+  .cover { border-color: var(--border); background: var(--surface); }
+  .cover h2, .section h2, .noteGrid h3, .scenarios strong, .sources strong { color: var(--text-primary); }
+  .cover p, .cover dt, .cover dd, .section header small, .sectionIntro, .noteGrid p, .limitations, .disclaimer p, .sources span, .sources code { color: var(--text-secondary); font-size: calc(12px * var(--ui-font-scale, 1)); }
+  .section, .noteGrid section, .tableWrap, .sources, .sources li, .cover dl div { border-color: var(--border); }
+  .noteGrid section, .scenarios div, .bridge, .missing, .tableWrap thead th, .tableWrap tbody th, .tableWrap td { color: var(--text-primary); background: var(--surface-subtle); }
+  .tableWrap th, .tableWrap td { border-color: var(--border); }
+  .reportFooter { color: var(--text-tertiary); background: var(--surface-subtle); }
 }

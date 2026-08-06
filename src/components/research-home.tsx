@@ -1,29 +1,10 @@
 "use client";
 
-import { type FormEvent, type ReactNode, useEffect, useState } from "react";
+import { type FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import {
-  ArrowRight,
-  Calculator,
-  Check,
-  ExternalLink,
-  FileCheck2,
-  FileQuestion,
-  FileText,
-  Code2,
-  Landmark,
-  PieChart,
-  ReceiptText,
-  Search,
-  ShieldCheck,
-  SlidersHorizontal,
-  TriangleAlert,
-} from "lucide-react";
-import { motion, useReducedMotion } from "motion/react";
 
 import { AppShell } from "@/components/app-shell";
-import { EvidenceModeNotice } from "@/components/evidence-mode-notice";
 import { publicProfile } from "@/config/public-profile";
 import { useLanguage } from "@/i18n/language";
 
@@ -33,27 +14,25 @@ const TICKER_PATTERN = /^[A-Z0-9.-]{1,12}$/;
 const RECENT_RESEARCH_KEY = "investiq-recent-research";
 
 export function ResearchHome() {
-  const { t } = useLanguage();
+  const { language, t } = useLanguage();
   const router = useRouter();
-  const reducedMotion = useReducedMotion();
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState("AAPL");
   const [error, setError] = useState("");
   const [recent, setRecent] = useState<string[]>([]);
+  const zh = language === "zh-CN";
 
   useEffect(() => {
-    const restore = window.setTimeout(() => {
+    const timer = window.setTimeout(() => {
       try {
         const parsed: unknown = JSON.parse(window.localStorage.getItem(RECENT_RESEARCH_KEY) ?? "[]");
         if (Array.isArray(parsed)) {
-          setRecent(parsed.filter((item): item is string => (
-            typeof item === "string" && TICKER_PATTERN.test(item)
-          )).slice(0, 4));
+          setRecent(parsed.filter((item): item is string => typeof item === "string" && TICKER_PATTERN.test(item)).slice(0, 4));
         }
       } catch {
         setRecent([]);
       }
-    });
-    return () => window.clearTimeout(restore);
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, []);
 
   function openResearch(event: FormEvent<HTMLFormElement>) {
@@ -77,84 +56,17 @@ export function ResearchHome() {
   return (
     <AppShell>
       <div className={styles.page}>
-        <motion.section
-          className={styles.hero}
-          initial={reducedMotion ? false : { opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.34, ease: "easeOut" }}
-          aria-labelledby="research-heading"
-        >
+        <section className={styles.hero} aria-labelledby="research-heading">
           <div className={styles.heroCopy}>
-            <h1 id="research-heading" aria-label={t("research.auditTitle")}>
-              {t("research.auditTitleLead")}<em>{t("research.auditTitleAccent")}</em>{t("research.auditTitleTail")}
-            </h1>
-            <p>{t("research.auditSubtitle")}</p>
-            <div className={styles.heroActions}>
-              <Link className={styles.primaryAction} href="/case-study/aapl">
-                <FileText size={18} aria-hidden="true" />
-                {t("research.caseStudyAction")}
-                <ArrowRight size={18} aria-hidden="true" />
-              </Link>
-              <a className={styles.secondaryAction} href="#company-search">
-                <Search size={18} aria-hidden="true" />
-                {t("research.openCompanyAction")}
-                <ArrowRight size={18} aria-hidden="true" />
-              </a>
-            </div>
-          </div>
-
-          <section className={styles.evidencePreview} aria-labelledby="evidence-preview-heading">
-            <h2 id="evidence-preview-heading">{t("research.evidencePreviewTitle")}</h2>
-            <div className={styles.evidenceFlow}>
-              <EvidenceStep icon={<FileCheck2 />} title={t("research.filedFact")} detail={t("research.filedFactText")} />
-              <EvidenceStep icon={<ReceiptText />} title={t("research.sourceReceipt")} detail={t("research.sourceReceiptText")} />
-              <EvidenceStep icon={<SlidersHorizontal />} title={t("research.modelAssumption")} detail={t("research.modelAssumptionText")} />
-              <EvidenceStep icon={<Calculator />} title={t("research.calculatedOutput")} detail={t("research.calculatedOutputText")} />
-              <EvidenceStep unavailable icon={<FileQuestion />} title={t("research.unavailableStays")} detail={t("research.unavailableStaysText")} />
-            </div>
-            <p className={styles.evidencePromise}>
-              <ShieldCheck size={18} aria-hidden="true" />
-              {t("research.evidencePromise")}
-            </p>
-          </section>
-        </motion.section>
-
-        <EvidenceModeNotice id="public-demo-mode" homepage />
-
-        <section className={styles.truthBand} aria-labelledby="truth-heading">
-          <div className={styles.truthTitle}>
-            <ShieldCheck size={46} aria-hidden="true" />
-            <h2 id="truth-heading">{t("research.truthTitle")}</h2>
-          </div>
-          <ul>
-            <TruthRow>{t("research.truthSec")}</TruthRow>
-            <TruthRow warning>{t("research.truthSynthetic")}</TruthRow>
-            <TruthRow>{t("research.truthUnavailable")}</TruthRow>
-          </ul>
-        </section>
-
-        <section className={styles.workflow} aria-labelledby="workflow-heading">
-          <h2 id="workflow-heading">{t("research.workflowTitle")}</h2>
-          <div className={styles.workflowRail}>
-            <WorkflowStep number="1" icon={<Landmark />} title={t("research.workflowFundamentals")} detail={t("research.workflowFundamentalsText")} />
-            <WorkflowStep number="2" icon={<Calculator />} title={t("research.workflowValuation")} detail={t("research.workflowValuationText")} />
-            <WorkflowStep number="3" icon={<PieChart />} title={t("research.workflowRisk")} detail={t("research.workflowRiskText")} />
-            <WorkflowStep number="4" icon={<FileText />} title={t("research.workflowMemo")} detail={t("research.workflowMemoText")} />
-          </div>
-        </section>
-
-        <section className={styles.companySearch} id="company-search" aria-labelledby="company-search-heading">
-          <div>
-            <h2 id="company-search-heading">{t("research.companySearchTitle")}</h2>
-            <p>{t("research.companySearchText")}</p>
+            <h1 id="research-heading">{zh ? "基于 SEC 申报文件的公司研究" : "Company research built from SEC filings."}</h1>
+            <p>{zh ? "查看财务表现、测试估值假设，并理解投资组合风险。" : "Review financial performance, test valuation assumptions, and understand portfolio risk."}</p>
           </div>
           <form className={styles.searchForm} onSubmit={openResearch} noValidate>
-            <label className={styles.searchField}>
-              <span className={styles.visuallyHidden}>{t("research.searchLabel")}</span>
-              <Search size={19} aria-hidden="true" />
+            <label htmlFor="home-ticker">{zh ? "股票代码" : "Ticker"}</label>
+            <div className={styles.searchRow}>
               <input
+                id="home-ticker"
                 value={query}
-                placeholder={t("research.searchPlaceholder")}
                 aria-invalid={Boolean(error)}
                 aria-describedby={error ? "research-error" : undefined}
                 autoCapitalize="characters"
@@ -165,75 +77,43 @@ export function ResearchHome() {
                   if (error) setError("");
                 }}
               />
-            </label>
-            <button type="submit">
-              {t("research.searchAction")}<ArrowRight size={16} aria-hidden="true" />
-            </button>
+              <button type="submit">{zh ? "研究公司" : "Research company"}</button>
+            </div>
+            {error ? <p className={styles.formError} id="research-error" role="alert">{error}</p> : null}
+            <div className={styles.heroLinks}>
+              <Link href="/case-study/aapl">{zh ? "查看 AAPL 示例" : "View the AAPL example"}</Link>
+              <Link href="/methodology">{zh ? "阅读方法说明" : "Read methodology"}</Link>
+            </div>
           </form>
-          {error ? <p className={styles.formError} id="research-error" role="alert">{error}</p> : null}
-          {recent.length > 0 ? (
-            <nav className={styles.recentList} aria-label={t("research.recentTitle")}>
-              <span>{t("research.recentTitle")}</span>
-              {recent.map((ticker) => <Link key={ticker} href={`/company/${encodeURIComponent(ticker)}`}>{ticker}</Link>)}
-            </nav>
-          ) : null}
         </section>
 
-        <section className={styles.owner} aria-labelledby="owner-heading">
-          <div>
-            <h2 id="owner-heading">{t("research.ownerTitle")}</h2>
-            <p>{t("research.ownerText")}</p>
+        <section className={styles.dataTruth} aria-labelledby="data-truth-heading">
+          <h2 id="data-truth-heading">{zh ? "本公开演示使用的数据" : "Data used in this public demo"}</h2>
+          <dl>
+            <div><dt>{zh ? "公司财务数据" : "Company financials"}</dt><dd>{zh ? "真实 SEC 申报文件" : "Real SEC filings"}</dd></div>
+            <div><dt>{zh ? "市场示例" : "Market examples"}</dt><dd>{zh ? "合成数据——并非 AAPL、MSFT、SPY 或其他证券的真实市场历史" : "Synthetic data—not actual AAPL, MSFT, SPY, or other market history"}</dd></div>
+            <div><dt>{zh ? "缺失字段" : "Missing fields"}</dt><dd>{zh ? "保持不可用，绝不以零替代" : "Left unavailable and never replaced with zero"}</dd></div>
+          </dl>
+        </section>
+
+        <section className={styles.researchTools} aria-labelledby="research-tools-heading">
+          <h2 id="research-tools-heading">{zh ? "研究工具" : "Research tools"}</h2>
+          <div className={styles.toolGrid}>
+            <article><h3>{zh ? "公司财务" : "Company Financials"}</h3><p>{zh ? "查看收入、利润率、现金流与财务健康状况。" : "Review revenue, margins, cash flow, and financial health."}</p><Link href="/company/AAPL/financials">{zh ? "查看财务" : "Open financials"}</Link></article>
+            <article><h3>{zh ? "估值" : "Valuation"}</h3><p>{zh ? "测试 DCF 假设与敏感性。" : "Test DCF assumptions and sensitivity."}</p><Link href="/company/AAPL/valuation">{zh ? "打开估值" : "Open valuation"}</Link></article>
+            <article><h3>{zh ? "投资组合" : "Portfolio"}</h3><p>{zh ? "衡量回报、回撤、相关性与集中度。" : "Measure return, drawdown, correlation, and concentration."}</p><Link href="/portfolio">{zh ? "建立投资组合" : "Build a portfolio"}</Link></article>
           </div>
-          <Link href="/about">{t("research.aboutAction")}<ArrowRight size={15} aria-hidden="true" /></Link>
         </section>
 
         <footer className={styles.footer}>
-          <strong>Invest<span>IQ</span></strong>
+          <div><strong>{zh ? "由 Fang Han Chang（Peter Chang）构建" : "Built by Fang Han Chang (Peter Chang)"}</strong><p>{zh ? "金融背景 · 即将入读波士顿大学 MSBA" : "Finance background · Incoming Boston University MSBA student"}</p></div>
           <nav aria-label={t("research.footerLinksAria")}>
-            <a href={publicProfile.repository} target="_blank" rel="noreferrer">
-              <Code2 size={14} aria-hidden="true" />GitHub<ExternalLink size={12} aria-hidden="true" />
-            </a>
-            <Link href="/methodology">{t("research.methodology")}<ArrowRight size={12} aria-hidden="true" /></Link>
-            <Link href="/case-study/aapl">{t("research.caseStudyAction")}<ArrowRight size={12} aria-hidden="true" /></Link>
-            <Link href="/about">{t("research.projectBrief")}<ArrowRight size={12} aria-hidden="true" /></Link>
+            <a href={publicProfile.repository} target="_blank" rel="noreferrer">GitHub</a>
+            <Link href="/about">{zh ? "关于" : "About"}</Link>
+            <Link href="/methodology">{zh ? "方法说明" : "Methodology"}</Link>
           </nav>
         </footer>
       </div>
     </AppShell>
-  );
-}
-
-function EvidenceStep({
-  icon,
-  title,
-  detail,
-  unavailable = false,
-}: {
-  icon: ReactNode;
-  title: string;
-  detail: string;
-  unavailable?: boolean;
-}) {
-  return (
-    <div className={unavailable ? styles.evidenceStepUnavailable : styles.evidenceStep}>
-      <span aria-hidden="true">{icon}</span>
-      <strong>{title}</strong>
-      <p>{detail}</p>
-    </div>
-  );
-}
-
-function TruthRow({ children, warning = false }: { children: ReactNode; warning?: boolean }) {
-  return <li>{warning ? <TriangleAlert size={17} aria-hidden="true" /> : <Check size={17} aria-hidden="true" />}<span>{children}</span></li>;
-}
-
-function WorkflowStep({ number, icon, title, detail }: { number: string; icon: ReactNode; title: string; detail: string }) {
-  return (
-    <article className={styles.workflowStep}>
-      <span className={styles.workflowIcon} aria-hidden="true">{icon}</span>
-      <b>{number}</b>
-      <h3>{title}</h3>
-      <p>{detail}</p>
-    </article>
   );
 }
