@@ -171,11 +171,11 @@ export function CompanyValuation({ rawTicker }: { rawTicker: string }) {
             </label>
           </div>
           <div className={styles.fieldGrid}>
-            <PercentField field="growth" label={t("valuation.revenueGrowth")} form={form} setForm={setForm} source={t("valuation.historicalStarter")} />
-            <PercentField field="margin" label={t("valuation.operatingMargin")} form={form} setForm={setForm} source={t("valuation.latestStarter")} />
+            <PercentField field="growth" label={t("valuation.revenueGrowth")} form={form} setForm={setForm} source={t("valuation.growthMedianStarter")} />
+            <PercentField field="margin" label={t("valuation.operatingMargin")} form={form} setForm={setForm} source={t("valuation.historicalStarter")} />
             <PercentField field="tax" label={t("valuation.cashTax")} form={form} setForm={setForm} source={t("valuation.manualStarter")} />
             <PercentField field="da" label={t("valuation.daRevenue")} form={form} setForm={setForm} source={t("valuation.historicalStarter")} />
-            <PercentField field="capex" label={t("valuation.capexRevenue")} form={form} setForm={setForm} source={t("valuation.latestStarter")} />
+            <PercentField field="capex" label={t("valuation.capexRevenue")} form={form} setForm={setForm} source={t("valuation.historicalStarter")} />
             <PercentField field="nwc" label={t("valuation.nwcIncremental")} form={form} setForm={setForm} source={t("valuation.manualStarter")} />
             <PercentField field="wacc" label="WACC" form={form} setForm={setForm} source={t("valuation.manualStarter")} />
             <PercentField field="terminal" label={t("valuation.terminalGrowth")} form={form} setForm={setForm} source={t("valuation.manualStarter")} />

@@ -7,13 +7,10 @@ import {
   useRef,
   useState,
 } from "react";
-import Link from "next/link";
 import {
   Activity,
-  Apple,
   ArrowRight,
   BarChart3,
-  Bot,
   CalendarDays,
   Check,
   ChevronDown,
@@ -27,16 +24,16 @@ import {
   Pencil,
   Play,
   Plus,
-  RefreshCw,
   ShieldCheck,
-  Sparkles,
+  MessageSquare,
   Trash2,
   X,
   Zap,
 } from "lucide-react";
-import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { AnimatePresence, motion } from "motion/react";
 
 import { AppShell } from "@/components/app-shell";
+import { EvidenceModeNotice } from "@/components/evidence-mode-notice";
 import { brokerPresets, getBrokerPreset } from "@/constants/broker-presets";
 import { PortfolioPerformanceChart } from "@/components/portfolio-performance-chart";
 import { MAX_DCA_HOLDINGS } from "@/domain/dca-limits";
@@ -62,7 +59,6 @@ import type {
   ProjectionScenarioId,
   TimeWeightedReturn,
 } from "@/types/backtest";
-import type { ServiceStatus } from "@/types/evidence";
 import { addYearsClamped, todayDateString } from "@/utils/date";
 import { formatCurrency, formatPercent } from "@/utils/format";
 
@@ -83,14 +79,14 @@ const intervalOptions: Array<{ labelKey: TranslationKey; value: IntervalUnit }> 
 ];
 
 export function DcaBacktestDashboard() {
-  const { t } = useLanguage();
+  const { locale, t } = useLanguage();
   const { readiness } = useServiceReadiness();
   const health = readiness.dca;
   const [input, setInput] = useState<PortfolioInput>(createDefaultInput);
   const [portfolioName, setPortfolioName] = useState("Portfolio 01");
   const [report, setReport] = useState<PortfolioReport>();
   const [resultMode, setResultMode] = useState<ResultMode>("historical");
-  const [loadingMode, setLoadingMode] = useState<LoadingMode | undefined>("demo");
+  const [loadingMode, setLoadingMode] = useState<LoadingMode | undefined>();
   const [error, setError] = useState("");
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [advancedFees, setAdvancedFees] = useState(false);
@@ -110,22 +106,6 @@ export function DcaBacktestDashboard() {
       }
     });
     return () => window.clearTimeout(restoreName);
-  }, []);
-
-  useEffect(() => {
-    let active = true;
-    const previewRevision = inputRevisionRef.current;
-    createPortfolioReport({ input: createDefaultInput(), demo: true })
-      .then((preview) => {
-        if (active && inputRevisionRef.current === previewRevision) setReport(preview);
-      })
-      .catch(() => undefined)
-      .finally(() => {
-        if (active) setLoadingMode(undefined);
-      });
-    return () => {
-      active = false;
-    };
   }, []);
 
   const selected = useMemo(() => selectResult(report, resultMode), [report, resultMode]);
@@ -249,19 +229,13 @@ export function DcaBacktestDashboard() {
   }
 
   return (
-    <AppShell
-      status={<ServiceStatus health={health} />}
-      actions={
-        <HeaderActions
-          reportReady={Boolean(report && selected)}
-          assistantReady={readiness.assistant === "ready"}
-          onAssistant={() => setAssistantOpen(true)}
-          onExport={exportPdf}
-        />
-      }
-    >
+    <AppShell>
       <div className={styles.appShell}>
-      <AmbientBackground />
+      <header className={styles.quietPageHead}>
+        <h1>{locale.startsWith("zh") ? "测试定期投资计划" : "Test a recurring investment plan"}</h1>
+        <p>{locale.startsWith("zh") ? "设定投入金额、频率与期间，然后查看历史结果。" : "Set an amount, frequency, and period, then review the historical result."}</p>
+        <span>{health === "ready" ? t("header.liveCapability") : t("header.publicDemoAvailable")}</span>
+      </header>
 
       <div className={`${styles.dashboardGrid} ${setupCollapsed ? styles.setupCollapsed : ""}`}>
         <aside className={`${styles.builder} ${setupCollapsed ? styles.builderCollapsed : ""}`} aria-label={t("builder.setup")}>
@@ -296,9 +270,6 @@ export function DcaBacktestDashboard() {
               className={styles.addHolding}
               disabled={input.positions.length >= MAX_DCA_HOLDINGS}
               onClick={addHolding}
-              whileTap={input.positions.length < MAX_DCA_HOLDINGS ? { scale: 0.975 } : undefined}
-              whileHover={input.positions.length < MAX_DCA_HOLDINGS ? { scale: 1.006 } : undefined}
-              transition={{ type: "spring", stiffness: 450, damping: 28 }}
             >
               <Plus size={15} /> {t("holding.add")}
             </motion.button>
@@ -337,6 +308,9 @@ export function DcaBacktestDashboard() {
             </div>
             <p className={styles.helperText}>{t("date.nonTrading")}</p>
 
+            <details className={styles.advancedAssumptions}>
+              <summary>{locale.startsWith("zh") ? "高级假设" : "Advanced assumptions"}</summary>
+              <p className={styles.advancedIntro}>{locale.startsWith("zh") ? "券商费用、税金、股数订单、股息与期末清仓" : "Broker fees, taxes, share orders, dividends, and end liquidation"}</p>
             <div className={styles.builderDivider} />
             <SectionLabel icon={<ShieldCheck size={14} />} title={t("tax.section")} />
             <Field label={t("tax.basis")}>
@@ -468,6 +442,7 @@ export function DcaBacktestDashboard() {
               ) : null}
             </AnimatePresence>
             <p className={styles.brokerNote}>{localizedBrokerNote(input.fees.brokerId, input.fees.notes, t)} {t("broker.checked", { date: input.fees.checkedDate })}</p>
+            </details>
 
             {error ? (
               <motion.div className={styles.errorBanner} initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} role="alert">
@@ -478,53 +453,25 @@ export function DcaBacktestDashboard() {
 
           </div>
           <div className={styles.builderActionBar}>
-            <motion.button
+            <button
               type="button"
               className={styles.runButton}
-              disabled={Boolean(loadingMode) || health !== "ready"}
-              onClick={() => void run(false)}
-              whileTap={loadingMode || health !== "ready" ? undefined : { scale: 0.975 }}
-              transition={{ type: "spring", stiffness: 460, damping: 28 }}
+              disabled={Boolean(loadingMode) || health === "checking"}
+              onClick={() => void run(health !== "ready")}
             >
               <span className={styles.runIcon}>
-                {loadingMode === "live" ? <LoaderCircle size={17} className={styles.spin} /> : <Play size={15} fill="currentColor" />}
+                {loadingMode ? <LoaderCircle size={17} className={styles.spin} /> : <Play size={15} aria-hidden="true" />}
               </span>
               <span className={styles.runLabel}>
-                {loadingMode === "live"
-                  ? t("run.calculatingExact")
-                  : health === "checking"
-                    ? t("run.checking")
-                    : health === "ready"
-                      ? t("run.liveBacktest")
-                      : t("run.liveUnavailableShort")}
+                {loadingMode ? t("run.calculating") : health === "checking" ? t("run.checking") : health === "ready" ? t("run.liveBacktest") : locale.startsWith("zh") ? "运行示例" : "Run demo"}
               </span>
-              <span className={styles.runTrailing}>{loadingMode ? null : <ArrowRight size={15} />}</span>
-            </motion.button>
-            <motion.button
-              type="button"
-              className={styles.demoButton}
-              disabled={Boolean(loadingMode)}
-              onClick={() => void run(true)}
-              whileTap={loadingMode ? undefined : { scale: 0.98 }}
-              transition={{ type: "spring", stiffness: 440, damping: 28 }}
-            >
-              <RefreshCw size={13} className={loadingMode === "demo" ? styles.spin : undefined} />
-              {t("run.loadDemo")}
-            </motion.button>
-            <div className={styles.readyState}>
-              <span className={health === "ready" ? styles.statusReady : styles.statusMuted} />
-              {loadingMode === "live"
-                ? t("run.aligning")
-                : health === "checking"
-                  ? t("run.checking")
-                  : health === "ready"
-                    ? t("run.ready")
-                    : t("run.unavailable")}
-            </div>
+            </button>
+            <p className={styles.dataModeLine}>{health === "ready" ? (locale.startsWith("zh") ? "使用可用的真实市场数据。" : "Uses available live market data.") : (locale.startsWith("zh") ? "此公开示例使用合成数据，并非真实 AAPL 历史。" : "This public demo uses synthetic data, not actual AAPL history.")}</p>
           </div>
         </aside>
 
         <section className={styles.workspace} ref={workspaceRef} id="portfolio-lab">
+          {report?.source === "demo" ? <EvidenceModeNotice id="dca-demo-title" /> : null}
           {selected && report ? (
             <ResultsWorkspace
               report={report}
@@ -540,43 +487,20 @@ export function DcaBacktestDashboard() {
           )}
         </section>
 
-        <aside className={styles.insights} aria-label={t("audit.summaryAria")}>
-          {selected && report ? (
-            <InsightsRail
-              result={selected}
-              report={report}
-              holdingResults={holdingResults}
-              onAssistant={() => setAssistantOpen(true)}
-            />
-          ) : (
-            <InsightsLoading />
-          )}
-        </aside>
-      </div>
-
-      <div className={styles.mobileRunBar}>
-        <div>
-          <strong>{t(input.positions.length === 1 ? "run.holding" : "run.holdings", { count: input.positions.length })}</strong>
-          <span>{input.startDate.slice(0, 4)}–{input.endDate.slice(0, 4)}</span>
-        </div>
-        <button
-          type="button"
-          disabled={Boolean(loadingMode) || health === "checking"}
-          onClick={() => void run(health === "unavailable")}
-        >
-          {loadingMode || health === "checking"
-            ? <LoaderCircle size={15} className={styles.spin} />
-            : health === "ready"
-              ? <Play size={14} fill="currentColor" />
-              : <RefreshCw size={14} />}
-          {loadingMode
-            ? t("run.calculating")
-            : health === "checking"
-              ? t("run.checking")
-              : health === "ready"
-                ? t("run.live")
-                : t("run.demoShort")}
-        </button>
+        {selected && report ? (
+          <aside className={styles.resultActions} aria-label={t("audit.summaryAria")}>
+            <button type="button" onClick={() => setAssistantOpen(true)} disabled={readiness.assistant !== "ready"}>
+              <MessageSquare size={15} aria-hidden="true" /> {locale.startsWith("zh") ? "说明结果" : "Explain results"}
+            </button>
+            <button type="button" onClick={exportPdf}>
+              <Download size={15} aria-hidden="true" /> {t("header.exportPdf")}
+            </button>
+            <details>
+              <summary>{locale.startsWith("zh") ? "结果详情" : "Result details"}</summary>
+              <InsightsRail result={selected} report={report} holdingResults={holdingResults} />
+            </details>
+          </aside>
+        ) : null}
       </div>
 
       <AnimatePresence>
@@ -590,78 +514,6 @@ export function DcaBacktestDashboard() {
       </AnimatePresence>
       </div>
     </AppShell>
-  );
-}
-
-function ServiceStatus({ health }: { health: ServiceStatus }) {
-  const { t } = useLanguage();
-  return (
-    <>
-      <HeaderMarketPulse />
-      <div className={styles.marketStatus} title={t("header.serviceStatus")}>
-        <span className={health === "ready" ? styles.statusReady : health === "checking" ? styles.statusChecking : styles.statusMuted} />
-        <div><strong>{health === "ready" ? t("header.dataReady") : health === "checking" ? t("header.checkingData") : t("header.dataDegraded")}</strong><small>{t("header.serverVerified")}</small></div>
-      </div>
-    </>
-  );
-}
-
-function HeaderActions({
-  reportReady,
-  assistantReady,
-  onAssistant,
-  onExport,
-}: {
-  reportReady: boolean;
-  assistantReady: boolean;
-  onAssistant: () => void;
-  onExport: () => void;
-}) {
-  const { t } = useLanguage();
-  return (
-    <>
-      <Link className={styles.secondaryAction} href="/methodology" aria-label={t("nav.methodology")}>
-        <CircleHelp size={15} /> <span>{t("nav.methodology")}</span>
-      </Link>
-      <motion.button
-        type="button"
-        className={styles.secondaryAction}
-        disabled={!reportReady || !assistantReady}
-        onClick={onAssistant}
-        aria-label={t("header.aiAnalyst")}
-        whileTap={reportReady && assistantReady ? { scale: 0.96 } : undefined}
-      >
-        <Sparkles size={15} /> <span>{t("header.aiAnalyst")}</span>
-      </motion.button>
-      <motion.button
-        type="button"
-        className={styles.primaryAction}
-        disabled={!reportReady}
-        onClick={onExport}
-        aria-label={t("header.exportPdf")}
-        whileTap={reportReady ? { scale: 0.96 } : undefined}
-      >
-        <Download size={15} /> <span>{t("header.exportPdf")}</span>
-      </motion.button>
-    </>
-  );
-}
-
-function HeaderMarketPulse() {
-  const reduceMotion = useReducedMotion();
-  return (
-    <div className={styles.headerPulse} aria-hidden="true">
-      <svg viewBox="0 0 108 30" role="presentation">
-        <path className={styles.pulseBaseline} d="M2 23 L106 23" />
-        <motion.path
-          className={styles.pulseLine}
-          d="M2 24 L10 20 L18 22 L27 14 L36 17 L44 10 L52 13 L61 9 L70 12 L79 5 L87 8 L97 3 L106 6"
-          initial={reduceMotion ? false : { pathLength: 0, opacity: 0.35 }}
-          animate={{ pathLength: 1, opacity: 1 }}
-          transition={reduceMotion ? { duration: 0 } : { duration: 1.35, ease: "easeOut", repeat: Infinity, repeatDelay: 2.4 }}
-        />
-      </svg>
-    </div>
   );
 }
 
@@ -779,14 +631,8 @@ function HoldingEditor({
   const orderInputId = `${position.id}-order-value`;
   const intervalInputId = `${position.id}-interval-value`;
   return (
-    <motion.div
-      layout
+    <div
       className={styles.holdingCard}
-      initial={{ opacity: 0, x: -12, scale: 0.985 }}
-      animate={{ opacity: 1, x: 0, scale: 1 }}
-      exit={{ opacity: 0, height: 0, x: -10, scale: 0.97 }}
-      whileHover={{ y: -1, borderColor: "rgba(91, 140, 255, 0.48)" }}
-      transition={{ type: "spring", stiffness: 310, damping: 28, delay: Math.min(index * 0.035, 0.18) }}
     >
       <div className={styles.holdingTopline}>
         <span className={styles.holdingIndex}>{index + 1}</span>
@@ -815,14 +661,6 @@ function HoldingEditor({
         ) : <span className={styles.iconSpacer} />}
       </div>
       {errors[tickerKey] ? <small className={styles.fieldError} id={`${tickerKey}-error`}>{errors[tickerKey]}</small> : null}
-      <Field label={t("holding.orderType")}>
-        <SegmentedControl
-          ariaLabel={`${t("holding.orderType")} ${index + 1}`}
-          value={position.investment.mode}
-          options={[{ label: t("holding.cash"), value: "amount" }, { label: t("holding.shares"), value: "shares" }]}
-          onChange={(mode) => onChange({ investment: { ...position.investment, mode: mode as "amount" | "shares" } })}
-        />
-      </Field>
       <div className={styles.orderRow}>
         <Field
           label={position.investment.mode === "amount" ? t("holding.usdPerOrder") : t("holding.sharesPerOrder")}
@@ -847,19 +685,8 @@ function HoldingEditor({
         </Field>
         <Field label={t("holding.repeat")} htmlFor={intervalInputId} error={errors[intervalKey]} errorId={`${intervalKey}-error`}>
           <div className={styles.intervalControl}>
-            <span>{t("holding.every")}</span>
-            <input
-              id={intervalInputId}
-              aria-label={t("holding.intervalCount", { count: index + 1 })}
-              aria-invalid={Boolean(errors[intervalKey])}
-              aria-describedby={errors[intervalKey] ? `${intervalKey}-error` : undefined}
-              type="number"
-              min="1"
-              step="1"
-              value={position.investment.intervalValue}
-              onChange={(event) => onChange({ investment: { ...position.investment, intervalValue: safeNumber(event.target.value) } })}
-            />
             <select
+              id={intervalInputId}
               aria-label={t("holding.intervalUnit", { count: index + 1 })}
               value={position.investment.intervalUnit}
               onChange={(event) => onChange({ investment: { ...position.investment, intervalUnit: event.target.value as IntervalUnit } })}
@@ -869,7 +696,29 @@ function HoldingEditor({
           </div>
         </Field>
       </div>
-    </motion.div>
+      <details className={styles.holdingAdvanced}>
+        <summary>{t("holding.orderType")}</summary>
+        <Field label={t("holding.orderType")}>
+          <SegmentedControl
+            ariaLabel={`${t("holding.orderType")} ${index + 1}`}
+            value={position.investment.mode}
+            options={[{ label: t("holding.cash"), value: "amount" }, { label: t("holding.shares"), value: "shares" }]}
+            onChange={(mode) => onChange({ investment: { ...position.investment, mode: mode as "amount" | "shares" } })}
+          />
+        </Field>
+        <Field label={t("holding.every")}>
+          <input
+            aria-label={t("holding.intervalCount", { count: index + 1 })}
+            className={styles.input}
+            type="number"
+            min="1"
+            step="1"
+            value={position.investment.intervalValue}
+            onChange={(event) => onChange({ investment: { ...position.investment, intervalValue: safeNumber(event.target.value) } })}
+          />
+        </Field>
+      </details>
+    </div>
   );
 }
 
@@ -897,7 +746,7 @@ function ResultsWorkspace({
   const transactions = showAllTransactions ? [...result.transactions].reverse() : result.transactions.slice(-7).reverse();
 
   return (
-    <motion.div key={`${report.source}-${resultMode}-${result.endDate}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ staggerChildren: 0.06 }}>
+    <div key={`${report.source}-${resultMode}-${result.endDate}`}>
       <div className={styles.resultHeader}>
         <div>
           <div className={styles.resultTitleRow}>
@@ -913,7 +762,7 @@ function ResultsWorkspace({
               disabled={!report.historical}
               onClick={() => onResultMode("historical")}
             >
-              {t("result.historical")}
+              {t(report.source === "demo" ? "result.syntheticSeries" : "result.historical")}
             </button>
             <button
               type="button"
@@ -948,7 +797,6 @@ function ResultsWorkspace({
         <Metric label={t("result.finalValue")} value={result.finalAmount} formatter={formatCurrency} />
         <Metric label={t("result.netContributions")} value={result.totalContributions} formatter={formatCurrency} />
         <Metric label={t("result.netGainLoss")} value={result.totalProfit} formatter={formatCurrency} tone={positive ? "positive" : "negative"} />
-        <Metric label={t("result.netGainRatio")} value={result.netGainRatioPercent} formatter={formatPercent} tone={positive ? "positive" : "negative"} />
         <Metric label={t("result.maxDrawdown")} value={result.maxDrawdown.percent} formatter={formatPercent} tone="negative" />
       </div>
 
@@ -957,7 +805,7 @@ function ResultsWorkspace({
       <div className={styles.lowerGrid}>
         {/* Reveals on mount, not on scroll: a scroll-triggered fade left these panels blank
             below the fold, which read as a large empty gap on mobile. */}
-        <motion.section className={styles.panel} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.42 }}>
+        <section className={styles.panel}>
           <PanelHeader title={t("result.attribution")} meta={t("result.contributionWeighted")} />
           <div className={styles.attributionHeader}>
             <span>{t("result.ticker")}</span><span>{t("result.finalValue")}</span><span>{t("result.return")}</span><span>{t("result.portfolio")}</span>
@@ -973,9 +821,9 @@ function ResultsWorkspace({
               </div>
             );
           })}
-        </motion.section>
+        </section>
 
-        <motion.section className={styles.panel} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.42, delay: 0.06 }}>
+        <section className={styles.panel}>
           <PanelHeader title={t("result.recentTransactions")} meta={t("result.totalCount", { count: result.transactions.length })} />
           <div
             className={styles.transactionScroller}
@@ -1002,9 +850,9 @@ function ResultsWorkspace({
           <button type="button" className={styles.tableAction} onClick={onToggleTransactions}>
             {showAllTransactions ? t("result.showRecent") : t("result.viewAll")} <ArrowRight size={14} />
           </button>
-        </motion.section>
+        </section>
       </div>
-    </motion.div>
+    </div>
   );
 }
 
@@ -1012,15 +860,13 @@ function InsightsRail({
   result,
   report,
   holdingResults,
-  onAssistant,
 }: {
   result: PortfolioAggregateResult;
   report: PortfolioReport;
   holdingResults: Array<{ ticker: string; result: BacktestResult }>;
-  onAssistant: () => void;
 }) {
   const { t } = useLanguage();
-  const topHolding = [...holdingResults].sort((a, b) => b.result.totalProfit - a.result.totalProfit)[0];
+  void holdingResults;
   const contributionBase = Math.max(result.totalContributions, 0.000001);
   return (
     <div className={styles.insightScroll}>
@@ -1084,15 +930,6 @@ function InsightsRail({
         <p className={styles.railFootnote}>{t("audit.cashFlowFootnote")}</p>
       </RailSection>
 
-      <button type="button" className={styles.aiCard} onClick={onAssistant}>
-        <div><Sparkles size={18} /><strong>{t("ai.analysis")}</strong><ArrowRight size={16} /></div>
-        <p>
-          {topHolding
-            ? t("ai.topHolding", { ticker: topHolding.ticker })
-            : t("ai.askReport")}
-        </p>
-        <span>{t("ai.open")}</span>
-      </button>
     </div>
   );
 }
@@ -1106,7 +943,7 @@ function AssistantDrawer({
   mode: ResultMode;
   onClose: () => void;
 }) {
-  const { t } = useLanguage();
+  const { locale, t } = useLanguage();
   const [messages, setMessages] = useState<AssistantMessage[]>([]);
   const [question, setQuestion] = useState("");
   const [loading, setLoading] = useState(false);
@@ -1150,14 +987,14 @@ function AssistantDrawer({
         aria-label={t("ai.dialog")}
       >
         <div className={styles.drawerHeader}>
-          <div><span><Sparkles size={16} /></span><div><strong>InvestIQ AI</strong><small>{t("ai.subtitle")}</small></div></div>
+          <div><span><MessageSquare size={16} /></span><div><strong>{locale.startsWith("zh") ? "说明结果" : "Explain results"}</strong><small>{t("ai.subtitle")}</small></div></div>
           <button type="button" aria-label={t("ai.close")} onClick={onClose}><X size={18} /></button>
         </div>
         <div className={styles.aiGuardrail}><ShieldCheck size={15} /><span>{t("ai.guardrail")}</span></div>
         <div className={styles.messageList}>
           {messages.length === 0 ? (
             <div className={styles.aiEmpty}>
-              <Bot size={30} />
+              <Info size={30} />
               <h2>{t("ai.understand")}</h2>
               <p>{t("ai.help")}</p>
               <div>
@@ -1173,7 +1010,7 @@ function AssistantDrawer({
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
             >
-              <span>{message.role === "assistant" ? <Sparkles size={13} /> : t("ai.you")}</span>
+              <span>{message.role === "assistant" ? <MessageSquare size={13} /> : t("ai.you")}</span>
               <p>{message.text}</p>
             </motion.div>
           ))}
@@ -1190,6 +1027,7 @@ function AssistantDrawer({
           />
           <div><span>{question.length}/500</span><button type="submit" disabled={!question.trim() || loading}>{t("ai.ask")} <ArrowRight size={14} /></button></div>
         </form>
+        <p className={styles.explanationReceipt}>{locale.startsWith("zh") ? "此说明基于页面中显示的报告生成，不会修改任何计算结果。" : "This explanation is generated from the displayed report. It does not change any calculation."}</p>
       </motion.aside>
     </motion.div>
   );
@@ -1206,29 +1044,12 @@ function Metric({
   formatter: (value: number) => string;
   tone?: "positive" | "negative";
 }) {
-  const [display, setDisplay] = useState(0);
-  const reduceMotion = useReducedMotion();
-  useEffect(() => {
-    if (reduceMotion) {
-      const frame = requestAnimationFrame(() => setDisplay(value));
-      return () => cancelAnimationFrame(frame);
-    }
-    const start = performance.now();
-    let frame = 0;
-    const tick = (time: number) => {
-      const progress = Math.min(1, (time - start) / 780);
-      const eased = 1 - Math.pow(1 - progress, 3);
-      setDisplay(value * eased);
-      if (progress < 1) frame = requestAnimationFrame(tick);
-    };
-    frame = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(frame);
-  }, [reduceMotion, value]);
+  const display = value;
   return (
-    <motion.div className={styles.metric} initial={{ opacity: 0, y: 9 }} animate={{ opacity: 1, y: 0 }}>
+    <div className={styles.metric}>
       <span>{label}</span>
       <strong className={tone === "positive" ? styles.positive : tone === "negative" ? styles.negative : undefined}>{formatter(display)}</strong>
-    </motion.div>
+    </div>
   );
 }
 
@@ -1399,18 +1220,7 @@ function AuditRow({
 
 function TickerBadge({ ticker }: { ticker: string }) {
   const normalized = ticker.trim().toUpperCase();
-  if (normalized === "AAPL") {
-    return <span className={`${styles.tickerBadge} ${styles.appleBadge}`} aria-hidden="true"><Apple size={17} fill="currentColor" /></span>;
-  }
-  if (normalized === "GOOG" || normalized === "GOOGL") {
-    return <span className={`${styles.tickerBadge} ${styles.googleBadge}`} aria-hidden="true">G</span>;
-  }
-  if (normalized === "MSFT") {
-    return <span className={`${styles.tickerBadge} ${styles.microsoftBadge}`} aria-hidden="true"><i /><i /><i /><i /></span>;
-  }
-  const palette = ["#5b8cff", "#19b89e", "#9b8cff", "#d99a47", "#f05d69"];
-  const color = palette[normalized.split("").reduce((sum, char) => sum + char.charCodeAt(0), 0) % palette.length];
-  return <span className={styles.tickerBadge} style={{ color, borderColor: `${color}55`, background: `${color}12` }}>{normalized.slice(0, 1) || "?"}</span>;
+  return <span className={styles.tickerBadge} aria-hidden="true">{normalized.slice(0, 1) || "?"}</span>;
 }
 
 function WorkspaceLoading({ loading }: { loading: boolean }) {
@@ -1425,22 +1235,11 @@ function WorkspaceLoading({ loading }: { loading: boolean }) {
   );
 }
 
-function InsightsLoading() {
-  const { t } = useLanguage();
-  return <div className={styles.insightsEmpty}><Sparkles size={24} /><strong>{t("audit.readyTitle")}</strong><p>{t("audit.readyText")}</p></div>;
-}
-
-function AmbientBackground() {
-  return <div className={styles.ambient} aria-hidden="true"><i /><i /><i /></div>;
-}
-
 function createDefaultInput(): PortfolioInput {
   const today = todayDateString();
   return {
     positions: [
       { id: "holding-aapl", ticker: "AAPL", investment: { mode: "amount", value: 500, intervalValue: 1, intervalUnit: "months" } },
-      { id: "holding-goog", ticker: "GOOG", investment: { mode: "amount", value: 500, intervalValue: 1, intervalUnit: "months" } },
-      { id: "holding-msft", ticker: "MSFT", investment: { mode: "amount", value: 500, intervalValue: 1, intervalUnit: "months" } },
     ],
     startDate: addYearsClamped(today, -8),
     endDate: today,

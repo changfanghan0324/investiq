@@ -4,7 +4,7 @@ import { AaplCaseStudy } from "@/components/aapl-case-study";
 
 export const metadata: Metadata = {
   title: "AAPL Research Case Study",
-  description: "A stable walkthrough of InvestIQ's source-to-conclusion research workflow.",
+  description: "A dated, evidence-linked Apple case separating SEC facts, constructed observations, and analyst-owned DCF scenarios.",
 };
 
 export default function AaplCaseStudyRoute() {

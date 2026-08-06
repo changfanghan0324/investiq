@@ -1,18 +1,46 @@
 :root {
   --ui-font-scale: 1;
-  --iq-header-height: 60px;
+  --iq-header-height: 58px;
   --iq-bottom-nav-height: 0px;
-  --background: #0b0e14;
-  --foreground: #d1d4dc;
-  --panel: #131722;
-  --panel-2: #1e222d;
-  --line: #2a2e39;
-  --line-strong: #363a45;
-  --muted: #787b86;
-  --cyan: #2962ff;
-  --cyan-2: #5b8cff;
-  --green: #089981;
-  --red: #f23645;
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
+  --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  --background: #f6f7f8;
+  --surface: #ffffff;
+  --surface-subtle: #f0f2f4;
+  --surface-selected: #edf3f7;
+  --text-primary: #17191d;
+  --text-secondary: #58616c;
+  --text-tertiary: #7a838e;
+  --border: #dce1e7;
+  --border-strong: #c7ced7;
+  --accent: #274f73;
+  --accent-hover: #1f405d;
+  --accent-subtle: #e8f0f5;
+  --positive: #187158;
+  --positive-subtle: #e8f4ef;
+  --negative: #a63f45;
+  --negative-subtle: #f8ebec;
+  --warning: #85631f;
+  --warning-subtle: #f7f1df;
+  --focus: #315f86;
+  --foreground: var(--text-primary);
+  --panel: var(--surface);
+  --panel-2: var(--surface-subtle);
+  --line: var(--border);
+  --line-strong: var(--border-strong);
+  --muted: var(--text-secondary);
+  --cyan: var(--accent);
+  --cyan-2: var(--accent);
+  --green: var(--positive);
+  --red: var(--negative);
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --space-8: 64px;
 }
 
 html {
@@ -30,7 +58,7 @@ html {
   scroll-padding-top: 76px;
 }
 
-/* Reserves room for the fixed five-item bottom navigation on compact viewports. */
+/* Reserves room for the fixed four-item bottom navigation on compact viewports. */
 @media (max-width: 980px) {
   :root {
     --iq-bottom-nav-height: calc(56px + env(safe-area-inset-bottom));
@@ -43,7 +71,9 @@ body {
   flex-direction: column;
   color: var(--foreground);
   background: var(--background);
-  font-family: var(--font-geist-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: var(--font-sans);
+  font-size: calc(16px * var(--ui-font-scale, 1));
+  font-variant-numeric: tabular-nums lining-nums;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -79,13 +109,13 @@ input:focus-visible,
 select:focus-visible,
 textarea:focus-visible,
 a:focus-visible {
-  outline: 2px solid var(--cyan);
+  outline: 2px solid var(--focus);
   outline-offset: 2px;
 }
 
 ::selection {
   color: #ffffff;
-  background: var(--cyan-2);
+  background: var(--accent);
 }
 
 * {
@@ -111,8 +141,35 @@ a:focus-visible {
   background: rgba(109, 153, 172, 0.58);
 }
 
-html {
-  color-scheme: dark;
+html { color-scheme: light; }
+
+h1,
+h2,
+h3 {
+  color: var(--text-primary);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+input,
+select,
+textarea {
+  color: var(--text-primary);
+  background: var(--surface);
+}
+
+/* The redesigned product uses solid surfaces. This also neutralizes decorative gradients and
+   glass effects in secondary legacy views while their calculation markup remains unchanged. */
+body *,
+body *::before,
+body *::after {
+  background-image: none !important;
+  backdrop-filter: none !important;
+}
+
+[class*="ambient"],
+[class*="pulse"] {
+  animation: none !important;
 }
 
 @media (prefers-reduced-motion: reduce) {

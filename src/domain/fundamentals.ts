@@ -292,7 +292,7 @@ const DIRECT_METRICS: DirectMetricSpec[] = [
     key: 'debtCurrent',
     kind: 'instant',
     unit: 'USD',
-    basis: 'Current interest-bearing debt and current maturities',
+    basis: 'Selected current interest-bearing debt; separately reported commercial paper is added only to aligned current term debt, never to a comprehensive current-debt concept',
     nonNegative: true,
     aliases: [
       { taxonomy: 'us-gaap', concept: 'DebtCurrent' },
@@ -447,6 +447,23 @@ const DIRECT_METRICS: DirectMetricSpec[] = [
   },
 ];
 
+/**
+ * Commercial paper is selected separately because it cannot be another `debtCurrent`
+ * alias: alias precedence chooses one fact, while issuers such as Apple report current
+ * term debt and commercial paper as two additive balances. The composition step below
+ * adds this fact only when `LongTermDebtCurrent` is the selected, non-comprehensive
+ * current-debt concept. `DebtCurrent` and `ShortTermBorrowings` are left untouched to
+ * avoid double-counting balances they may already include.
+ */
+const COMMERCIAL_PAPER_SPEC: DirectMetricSpec = {
+  key: 'debtCurrent',
+  kind: 'instant',
+  unit: 'USD',
+  basis: 'Separately reported commercial paper',
+  nonNegative: true,
+  aliases: [{ taxonomy: 'us-gaap', concept: 'CommercialPaper' }],
+};
+
 // --- Selection internals -------------------------------------------------------
 
 interface SelectedObservation {
@@ -489,6 +506,13 @@ export function buildFundamentals(
   for (const spec of DIRECT_METRICS) {
     selected.set(spec.key, selectDirectMetric(facts, spec, identity.cikNumber));
   }
+  selected.set(
+    'debtCurrent',
+    includeAlignedCommercialPaper(
+      selected.get('debtCurrent') ?? [],
+      selectDirectMetric(facts, COMMERCIAL_PAPER_SPEC, identity.cikNumber),
+    ),
+  );
 
   // 2. Anchor the window on the most recent annual flow year across income-statement
   //    and cash-flow metrics, then keep the latest five fiscal years.
@@ -548,7 +572,7 @@ export function buildFundamentals(
     toSeries(
       'totalDebt',
       'USD',
-      'Current debt + noncurrent debt',
+      'Current interest-bearing debt + noncurrent debt',
       totalDebt,
       REASON_NO_ANNUAL,
       unavailable,
@@ -563,7 +587,7 @@ export function buildFundamentals(
     toSeries(
       'netDebt',
       'USD',
-      'Total debt − cash and cash equivalents',
+      'Current interest-bearing debt + noncurrent debt − cash and cash equivalents; marketable securities excluded',
       netDebt,
       REASON_NET_DEBT,
       unavailable,
@@ -882,6 +906,33 @@ function constructInstantSum(
     });
   }
   return out;
+}
+
+/**
+ * Adds a separately reported commercial-paper balance only to a selected
+ * `LongTermDebtCurrent` observation on the identical balance-sheet date.
+ *
+ * `DebtCurrent` is treated as comprehensive and `ShortTermBorrowings` may already
+ * include commercial paper, so neither is augmented. A missing or date-misaligned
+ * commercial-paper fact leaves the selected current-debt observation unchanged;
+ * absence is never fabricated as a reported zero or attached as a receipt.
+ */
+function includeAlignedCommercialPaper(
+  currentDebt: SelectedObservation[],
+  commercialPaper: SelectedObservation[],
+): SelectedObservation[] {
+  const commercialPaperByFy = indexByFiscalYear(commercialPaper);
+  return currentDebt.map((debtObservation) => {
+    if (debtObservation.receipts[0]?.concept !== 'LongTermDebtCurrent') return debtObservation;
+    const paperObservation = commercialPaperByFy.get(debtObservation.fiscalYear);
+    if (!paperObservation || paperObservation.periodEnd !== debtObservation.periodEnd) return debtObservation;
+    return {
+      fiscalYear: debtObservation.fiscalYear,
+      periodEnd: debtObservation.periodEnd,
+      value: debtObservation.value + paperObservation.value,
+      receipts: [...debtObservation.receipts, ...paperObservation.receipts],
+    };
+  });
 }
 
 function sameAnnualPeriod(left: SelectedObservation, right: SelectedObservation): boolean {

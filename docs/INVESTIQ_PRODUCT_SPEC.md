@@ -11,7 +11,7 @@ The primary question is not “how much money will I have?” It is:
 > What do reported fundamentals, explicit valuation assumptions, and portfolio risk say about this
 > investment case—and which conclusions remain uncertain?
 
-Historical DCA and growth calculators are supporting tools. They must never dominate the research
+Historical DCA and market context are supporting tools. They must never dominate the research
 home or be presented as the platform's investment conclusion.
 
 ## Personas and jobs to be done
@@ -36,7 +36,7 @@ Primary navigation contains exactly four destinations: Research, Compare, Portfo
   ratio diagnostics, DCF assumptions/scenarios, SEC filing register, limitations, and print pagination.
 - `/compare` — two to five securities on one common return calendar.
 - `/portfolio` — one to ten holdings, user/equal/inverse-volatility weights and portfolio risk.
-- `/tools` — secondary market and calculator tools.
+- `/tools` — Historical DCA and Market Context hub.
 - `/tools/dca` — historical recurring-investment backtest; no future estimates.
 - `/market`, `/methodology` — contextual destinations outside primary navigation.
 
@@ -65,7 +65,8 @@ Primary navigation contains exactly four destinations: Research, Compare, Portfo
   ΔNWC, WACC, terminal growth, and net debt.
 - Displays bear/base/bull range before base implied price, two 5×5 sensitivity tables, full forecast,
   terminal bridge, and EV→equity bridge.
-- Current price comparison is separate and includes a quote date.
+- Market-price comparison is structurally separate from DCF; it is omitted in the public featured
+  case until display rights, attribution, and snapshot policy are approved.
 - Comparable method applies user-researched P/E, EV/Revenue, or EV/EBITDA ranges; InvestIQ does not
   invent peers or medians.
 - Never uses “fair value,” “price target,” “prediction,” “guarantee,” or buy/sell language.
@@ -109,7 +110,8 @@ Primary navigation contains exactly four destinations: Research, Compare, Portfo
 ## Experience requirements
 
 - English and Simplified Chinese only; language selector shows 🇺🇸 and 🇨🇳.
-- Text-size choices 25/50/75/100 with 25 as default; layouts remain usable at 100.
+- Text-size choices 100%/115%/130%/145% (stored internally as 25/50/75/100); layouts remain usable
+  at 145%.
 - Professional low-saturation dark interface: thin borders, restrained blue/teal status color,
   limited radius, mono numerics, no glassmorphism or neon gradients.
 - Keyboard operation, visible focus, labelled landmarks, text equivalents for charts, reduced-motion
@@ -120,8 +122,8 @@ Primary navigation contains exactly four destinations: Research, Compare, Portfo
 
 - Public GitHub repository and Vercel deployment.
 - Passing typecheck, lint, deterministic unit tests, production build, and browser acceptance checks.
-- README, methodology, known limitations, data-source configuration, equity research sample, project
+- README, methodology, data governance, model contracts, known limitations, equity research sample, project
   report, three-minute demo script, and one-page summary PDF.
 - Codex owns product acceptance, math review, test execution, final integration, GitHub, and delivery.
-  Claude Opus 4.8 High is used as a coding/review partner where available; its output is never merged
+  Claude Opus is used as an independent review partner where available; its output is never merged
   without independent Codex tests and review.

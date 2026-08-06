@@ -1,75 +1,204 @@
-# AAPL — Evidence-linked research memo sample
+# AAPL research case study
 
-**Purpose:** demonstration of the InvestIQ workflow, not investment advice or a recommendation.
+**FY2025 snapshot:** 2025-09-27 · **Case reviewed through 2026-08-04**
 
-**Reporting basis:** SEC annual facts as most recently reported.
+**Educational case · no recommendation**
 
-**Latest filing receipt used:** filed 2025-10-31, accession `0000320193-25-000079`.
-**Market comparison:** split-adjusted close of $333.43 on 2026-07-30, as returned during the local
-acceptance run. Market data may be delayed or revised.
+Apple's five-year filing record shows moderate revenue growth, higher operating margin, and resilient cash generation. The DCF is a transparent assumption stress test; it is not a forecast, target price, or conclusion that the market is wrong.
 
-## Company overview
+> As most recently reported; later restatements may apply.
 
-Apple Inc. (`AAPL`) is classified by the SEC under SIC 3571, Electronic Computers. InvestIQ does not
-infer a full business description, segment mix, competitive position, or GICS sector from the
-standardized numeric feed; those items require review of the filing narrative.
+## Five-year filing evidence
 
-## Reported financial evidence
+| Evidence | FY2025 observation | Historical reading | Ownership |
+| --- | ---: | --- | --- |
+| Revenue | $416.2B | 3.3% CAGR | Reported |
+| Operating margin | 32.0% | +2.2 pp from FY2021 | Constructed |
+| Constructed free cash flow | $98.8B | 1.5% CAGR | Constructed |
+| Diluted EPS | $7.46 | 7.4% CAGR | Reported |
+| Effective tax context | 15.6% | 15.6% five-year median | Constructed context; DCF input is analyst-owned |
 
-| Metric | Latest annual observation | Historical reading |
+## DCF net debt — stated scope
+
+All inputs below share the 2025-09-27 balance-sheet date. Current debt includes separately reported commercial paper and current term debt.
+
+| Component | Value | Evidence concept |
 | --- | ---: | --- |
-| Revenue | $416.2B, FY2025 | 3.3% CAGR across the available five-year window |
-| Operating margin | 32.0%, FY2025 | +2.2 percentage points across the window |
-| Net income | $112.0B, FY2025 | 4.3% CAGR |
-| Diluted EPS | $7.46, FY2025 | 7.4% CAGR |
-| Constructed FCF | $98.8B, FY2025 | 1.5% CAGR |
-| Operating cash flow | $111.5B, FY2025 | Direct annual SEC fact |
+| Commercial paper | $7.979B | `CommercialPaper` |
+| Current term debt | $12.350B | `LongTermDebtCurrent` |
+| Current interest-bearing debt | $20.329B | Constructed sum |
+| Noncurrent term debt | $78.328B | `LongTermDebtNoncurrent` |
+| Cash and cash equivalents | ($35.934B) | `CashAndCashEquivalentsAtCarryingValue` |
+| **DCF net debt — stated scope** | **$62.723B** | **Current debt + noncurrent debt − cash** |
 
-Interpretation: reported revenue and constructed FCF both grew, while operating margin improved.
-EPS grew faster than net income over the window. These statements describe historical filing data;
-they do not establish future growth, durability, or an investment recommendation.
+A broader liquidity convention could also net $96.486B of current and noncurrent marketable securities. That would increase each scenario by about $6.43 per diluted share; InvestIQ does not use that alternative in the headline outputs.
 
-## Demonstration DCF—not an analyst conclusion
+**FY2025 weighted-average diluted shares:** 15.005B  
+**Point-in-time shares at 2025-10-17:** 14.776B
 
-The following run illustrates the model and deliberately shows why assumptions must be reviewed.
+The model uses weighted-average diluted shares to match the reusable valuation workspace. Apple's repurchases make the point-in-time count lower; this choice is a disclosed limitation.
 
-| Assumption | Demonstration input | Basis |
-| --- | ---: | --- |
-| Base revenue | $416.2B | FY2025 SEC revenue |
-| Diluted shares | approximately 15.0B | FY2025 weighted-average diluted shares |
-| Revenue growth | 3.3% | historical revenue CAGR starter |
-| Operating margin | 32.0% | latest aligned SEC margin |
-| Cash tax | 21.0% | manual starter assumption |
-| D&A / revenue | 3.0% | manual starter assumption |
-| CapEx / revenue | 3.1% | latest aligned SEC CapEx/revenue starter |
-| ΔNWC / incremental revenue | 0.0% | manual starter assumption |
-| WACC | 9.0% | manual starter assumption |
-| Terminal growth | 2.5% | manual starter assumption |
-| Net debt | $0 | **unverified placeholder that must be replaced** |
+## Bear, base, and bull assumption sets
 
-The demonstration returned an implied range of **$77.62 to $176.63**, with a base output of
-**$114.00** and terminal value equal to **73.9% of enterprise value**. The base output was 65.8%
-below the dated market price. This is not evidence that the market is wrong: the result is dominated
-by unverified D&A, working-capital, net-debt, WACC, and terminal assumptions. It is a model diagnostic,
-not a price target.
+Each column reruns the existing five-year FCFF domain function. Base means the mid-assumption set—not a most-likely estimate. All scenarios remain inside the observed five-year revenue-growth band and none models a revenue decline, although FY2023 revenue declined.
 
-## Thesis, catalysts, and risks
+| Every forecast input is analyst-owned | Bear | Base | Bull |
+| --- | ---: | ---: | ---: |
+| Revenue growth | 1.0% | 4.0% | 6.5% |
+| Operating margin | 28.5% | 30.3% | 32.0% |
+| Cash tax rate | 20.0% | 18.0% | 16.0% |
+| D&A / revenue | 2.9% | 2.9% | 2.9% |
+| CapEx / revenue | 3.3% | 2.9% | 3.1% |
+| ΔNWC / incremental revenue | 5.0% | 3.0% | 2.0% |
+| WACC | 10.0% | 9.0% | 8.0% |
+| Terminal growth | 2.0% | 2.5% | 3.0% |
+| **Implied per diluted share** | **$71.57** | **$111.20** | **$172.63** |
+| Terminal value / enterprise value | 68.1% | 74.1% | 80.0% |
 
-A final thesis is intentionally not auto-generated. A defensible memo should add filing-supported
-answers to these questions:
+The positive ΔNWC assumptions are deliberately conservative relative to Apple's reported working-capital position. Standardized facts do not support a complete historical operating-working-capital bridge, so no partial proxy is presented.
 
-- Which products, services, regions, or installed-base economics explain reported growth?
-- Is the margin improvement structural, cyclical, mix-driven, or temporary?
-- What reinvestment is necessary to sustain growth, and does the DCF represent it?
-- Which product, regulatory, supply-chain, platform, geographic, and valuation risks could invalidate
-  the thesis?
-- Which peer set is economically comparable, and what dated multiples support its range?
+Five forecast years matches InvestIQ's reusable valuation workspace. With 68%–80% of enterprise value coming from terminal value, the output remains highly dependent on long-duration assumptions.
 
-## Conclusion
+## Base-set discount-rate sensitivity
 
-The data supports a historical statement—moderate revenue/FCF growth and improved operating margin—
-but it does not support an unconditional buy/sell conclusion. A completed research view requires a
-verified balance-sheet bridge, company-specific forecast assumptions, sourced peers, narrative filing
-review, and explicit downside conditions.
+Holding every non-discount assumption at the base set, the 5×5 WACC and terminal-growth grid spans $86.77–$157.12. Lower WACC and higher terminal growth increase this positive-FCFF case; no cell is selected as preferred.
 
-**Primary filing source:** [SEC filing index](https://www.sec.gov/Archives/edgar/data/320193/000032019325000079/0000320193-25-000079-index.htm)
+| WACC ↓ / terminal growth → | 1.5% | 2.0% | 2.5% | 3.0% | 3.5% |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 8.0% | $115.18 | $123.04 | $132.33 | $143.49 | $157.12 |
+| 8.5% | $106.55 | $113.17 | $120.89 | $130.01 | $140.96 |
+| 9.0% | $99.08 | $104.71 | $111.20 | $118.78 | $127.74 |
+| 9.5% | $92.54 | $97.38 | $102.90 | $109.28 | $116.72 |
+| 10.0% | $86.77 | $90.96 | $95.71 | $101.14 | $107.40 |
+
+## Conditional research view
+
+- Reported revenue and operating margin improved across the five-year window, supporting evidence of durable earnings capacity—not a forecast of the same path continuing.
+- Cash generation remains substantial, while reinvestment, working capital, tax, WACC, and terminal growth still require analyst ownership.
+- The case supports a range of assumption outcomes, not a security rating, recommendation, or target price.
+
+### Model calibration boundary
+
+A DCF built this way can differ substantially from a traded price. The model does not resolve that difference. This public case deliberately shows no quote comparison because InvestIQ cannot republish licensed quote data.
+
+## Catalysts and risks to monitor
+
+**Subsequent official update:** Apple's fiscal Q3 2026 release, published 2026-07-30 for the quarter ended 2026-06-27, is manually transcribed and shown only as later evidence. It does not change the FY2025 model anchors and does not auto-update after 2026-08-04.
+
+### Product and Services demand
+
+Apple reported a June-quarter revenue record with double-digit growth across iPhone, Mac, Services, and every geographic segment.
+
+**Monitor:** Monitor whether revenue breadth and Services momentum persist in later official filings.
+
+**Official source:** [Fiscal Q3 2026 results release · subsequent management-stated evidence](https://www.apple.com/newsroom/2026/07/apple-reports-third-quarter-results/)
+
+### Installed-base engagement
+
+Management stated that the installed base reached a new high across all major product categories and geographic segments.
+
+**Monitor:** Treat installed base as management-stated, unaudited evidence; monitor Services growth and disclosure quality.
+
+**Official source:** [Fiscal Q3 2026 results release · subsequent management-stated evidence](https://www.apple.com/newsroom/2026/07/apple-reports-third-quarter-results/)
+
+### Competition and product transitions
+
+The 10-K describes aggressive competition, short product cycles, and execution risk around product and service transitions.
+
+**Monitor:** Watch reported revenue growth, product mix, operating margin, and transition commentary.
+
+**Official source:** [FY2025 Form 10-K · financial statements, debt note, MD&A, and risk factors](https://www.sec.gov/Archives/edgar/data/320193/000032019325000079/aapl-20250927.htm)
+
+### Supply chain and trade restrictions
+
+Apple relies on outsourced and single-source partners across several countries; tariffs and trade restrictions can affect availability, cost, and margin.
+
+**Monitor:** Watch gross margin, supplier concentration disclosures, tariffs, and manufacturing-transition commentary.
+
+**Official source:** [FY2025 Form 10-K · financial statements, debt note, MD&A, and risk factors](https://www.sec.gov/Archives/edgar/data/320193/000032019325000079/aapl-20250927.htm)
+
+### Regulation and margin pressure
+
+Changing laws, investigations, product requirements, foreign exchange, and mix shifts can increase costs or constrain offerings.
+
+**Monitor:** Watch legal disclosures, Services policy changes, geographic mix, and margin bridge commentary.
+
+**Official source:** [FY2025 Form 10-K · financial statements, debt note, MD&A, and risk factors](https://www.sec.gov/Archives/edgar/data/320193/000032019325000079/aapl-20250927.htm)
+
+## What would invalidate the view
+
+- A sustained deterioration in reported revenue breadth or operating margin without a sourced transition explanation.
+- Cash generation that no longer supports the reinvestment profile assumed in the scenarios.
+- Evidence that regulatory, supply-chain, or product-transition pressure structurally changes the business economics used here.
+
+## Unresolved research questions
+
+- How much of Services and installed-base momentum is durable versus period-specific?
+- What complete operating-working-capital convention best matches Apple's disclosures and the DCF's incremental-revenue input?
+- How should marketable securities and the declining share count be treated under alternative valuation conventions?
+
+## Evidence receipts and source register
+
+This frozen numeric snapshot is manually transcribed from SEC XBRL facts and retains concept, period, accession, and filing date. Manually transcribed narrative evidence stays in a separate citation tier.
+
+| XBRL concept | Period end | Filing accession | Filed |
+| --- | --- | --- | --- |
+| [`RevenueFromContractWithCustomerExcludingAssessedTax`](https://www.sec.gov/Archives/edgar/data/320193/000032019323000106/0000320193-23-000106-index.htm) | 2021-09-25 | `0000320193-23-000106` | 2023-11-03 |
+| [`RevenueFromContractWithCustomerExcludingAssessedTax`](https://www.sec.gov/Archives/edgar/data/320193/000032019324000123/0000320193-24-000123-index.htm) | 2022-09-24 | `0000320193-24-000123` | 2024-11-01 |
+| [`RevenueFromContractWithCustomerExcludingAssessedTax`](https://www.sec.gov/Archives/edgar/data/320193/000032019325000079/0000320193-25-000079-index.htm) | 2023-09-30 | `0000320193-25-000079` | 2025-10-31 |
+| [`RevenueFromContractWithCustomerExcludingAssessedTax`](https://www.sec.gov/Archives/edgar/data/320193/000032019325000079/0000320193-25-000079-index.htm) | 2024-09-28 | `0000320193-25-000079` | 2025-10-31 |
+| [`RevenueFromContractWithCustomerExcludingAssessedTax`](https://www.sec.gov/Archives/edgar/data/320193/000032019325000079/0000320193-25-000079-index.htm) | 2025-09-27 | `0000320193-25-000079` | 2025-10-31 |
+| [`OperatingIncomeLoss`](https://www.sec.gov/Archives/edgar/data/320193/000032019323000106/0000320193-23-000106-index.htm) | 2021-09-25 | `0000320193-23-000106` | 2023-11-03 |
+| [`OperatingIncomeLoss`](https://www.sec.gov/Archives/edgar/data/320193/000032019324000123/0000320193-24-000123-index.htm) | 2022-09-24 | `0000320193-24-000123` | 2024-11-01 |
+| [`OperatingIncomeLoss`](https://www.sec.gov/Archives/edgar/data/320193/000032019325000079/0000320193-25-000079-index.htm) | 2023-09-30 | `0000320193-25-000079` | 2025-10-31 |
+| [`OperatingIncomeLoss`](https://www.sec.gov/Archives/edgar/data/320193/000032019325000079/0000320193-25-000079-index.htm) | 2024-09-28 | `0000320193-25-000079` | 2025-10-31 |
+| [`OperatingIncomeLoss`](https://www.sec.gov/Archives/edgar/data/320193/000032019325000079/0000320193-25-000079-index.htm) | 2025-09-27 | `0000320193-25-000079` | 2025-10-31 |
+| [`NetIncomeLoss`](https://www.sec.gov/Archives/edgar/data/320193/000032019323000106/0000320193-23-000106-index.htm) | 2021-09-25 | `0000320193-23-000106` | 2023-11-03 |
+| [`NetIncomeLoss`](https://www.sec.gov/Archives/edgar/data/320193/000032019324000123/0000320193-24-000123-index.htm) | 2022-09-24 | `0000320193-24-000123` | 2024-11-01 |
+| [`NetIncomeLoss`](https://www.sec.gov/Archives/edgar/data/320193/000032019325000079/0000320193-25-000079-index.htm) | 2023-09-30 | `0000320193-25-000079` | 2025-10-31 |
+| [`NetIncomeLoss`](https://www.sec.gov/Archives/edgar/data/320193/000032019325000079/0000320193-25-000079-index.htm) | 2024-09-28 | `0000320193-25-000079` | 2025-10-31 |
+| [`NetIncomeLoss`](https://www.sec.gov/Archives/edgar/data/320193/000032019325000079/0000320193-25-000079-index.htm) | 2025-09-27 | `0000320193-25-000079` | 2025-10-31 |
+| [`EarningsPerShareDiluted`](https://www.sec.gov/Archives/edgar/data/320193/000032019323000106/0000320193-23-000106-index.htm) | 2021-09-25 | `0000320193-23-000106` | 2023-11-03 |
+| [`EarningsPerShareDiluted`](https://www.sec.gov/Archives/edgar/data/320193/000032019324000123/0000320193-24-000123-index.htm) | 2022-09-24 | `0000320193-24-000123` | 2024-11-01 |
+| [`EarningsPerShareDiluted`](https://www.sec.gov/Archives/edgar/data/320193/000032019325000079/0000320193-25-000079-index.htm) | 2023-09-30 | `0000320193-25-000079` | 2025-10-31 |
+| [`EarningsPerShareDiluted`](https://www.sec.gov/Archives/edgar/data/320193/000032019325000079/0000320193-25-000079-index.htm) | 2024-09-28 | `0000320193-25-000079` | 2025-10-31 |
+| [`EarningsPerShareDiluted`](https://www.sec.gov/Archives/edgar/data/320193/000032019325000079/0000320193-25-000079-index.htm) | 2025-09-27 | `0000320193-25-000079` | 2025-10-31 |
+| [`NetCashProvidedByUsedInOperatingActivities`](https://www.sec.gov/Archives/edgar/data/320193/000032019323000106/0000320193-23-000106-index.htm) | 2021-09-25 | `0000320193-23-000106` | 2023-11-03 |
+| [`NetCashProvidedByUsedInOperatingActivities`](https://www.sec.gov/Archives/edgar/data/320193/000032019324000123/0000320193-24-000123-index.htm) | 2022-09-24 | `0000320193-24-000123` | 2024-11-01 |
+| [`NetCashProvidedByUsedInOperatingActivities`](https://www.sec.gov/Archives/edgar/data/320193/000032019325000079/0000320193-25-000079-index.htm) | 2023-09-30 | `0000320193-25-000079` | 2025-10-31 |
+| [`NetCashProvidedByUsedInOperatingActivities`](https://www.sec.gov/Archives/edgar/data/320193/000032019325000079/0000320193-25-000079-index.htm) | 2024-09-28 | `0000320193-25-000079` | 2025-10-31 |
+| [`NetCashProvidedByUsedInOperatingActivities`](https://www.sec.gov/Archives/edgar/data/320193/000032019325000079/0000320193-25-000079-index.htm) | 2025-09-27 | `0000320193-25-000079` | 2025-10-31 |
+| [`PaymentsToAcquirePropertyPlantAndEquipment`](https://www.sec.gov/Archives/edgar/data/320193/000032019323000106/0000320193-23-000106-index.htm) | 2021-09-25 | `0000320193-23-000106` | 2023-11-03 |
+| [`PaymentsToAcquirePropertyPlantAndEquipment`](https://www.sec.gov/Archives/edgar/data/320193/000032019324000123/0000320193-24-000123-index.htm) | 2022-09-24 | `0000320193-24-000123` | 2024-11-01 |
+| [`PaymentsToAcquirePropertyPlantAndEquipment`](https://www.sec.gov/Archives/edgar/data/320193/000032019325000079/0000320193-25-000079-index.htm) | 2023-09-30 | `0000320193-25-000079` | 2025-10-31 |
+| [`PaymentsToAcquirePropertyPlantAndEquipment`](https://www.sec.gov/Archives/edgar/data/320193/000032019325000079/0000320193-25-000079-index.htm) | 2024-09-28 | `0000320193-25-000079` | 2025-10-31 |
+| [`PaymentsToAcquirePropertyPlantAndEquipment`](https://www.sec.gov/Archives/edgar/data/320193/000032019325000079/0000320193-25-000079-index.htm) | 2025-09-27 | `0000320193-25-000079` | 2025-10-31 |
+| [`DepreciationDepletionAndAmortization`](https://www.sec.gov/Archives/edgar/data/320193/000032019323000106/0000320193-23-000106-index.htm) | 2021-09-25 | `0000320193-23-000106` | 2023-11-03 |
+| [`DepreciationDepletionAndAmortization`](https://www.sec.gov/Archives/edgar/data/320193/000032019324000123/0000320193-24-000123-index.htm) | 2022-09-24 | `0000320193-24-000123` | 2024-11-01 |
+| [`DepreciationDepletionAndAmortization`](https://www.sec.gov/Archives/edgar/data/320193/000032019325000079/0000320193-25-000079-index.htm) | 2023-09-30 | `0000320193-25-000079` | 2025-10-31 |
+| [`DepreciationDepletionAndAmortization`](https://www.sec.gov/Archives/edgar/data/320193/000032019325000079/0000320193-25-000079-index.htm) | 2024-09-28 | `0000320193-25-000079` | 2025-10-31 |
+| [`DepreciationDepletionAndAmortization`](https://www.sec.gov/Archives/edgar/data/320193/000032019325000079/0000320193-25-000079-index.htm) | 2025-09-27 | `0000320193-25-000079` | 2025-10-31 |
+| [`IncomeTaxExpenseBenefit`](https://www.sec.gov/Archives/edgar/data/320193/000032019323000106/0000320193-23-000106-index.htm) | 2021-09-25 | `0000320193-23-000106` | 2023-11-03 |
+| [`IncomeTaxExpenseBenefit`](https://www.sec.gov/Archives/edgar/data/320193/000032019324000123/0000320193-24-000123-index.htm) | 2022-09-24 | `0000320193-24-000123` | 2024-11-01 |
+| [`IncomeTaxExpenseBenefit`](https://www.sec.gov/Archives/edgar/data/320193/000032019325000079/0000320193-25-000079-index.htm) | 2023-09-30 | `0000320193-25-000079` | 2025-10-31 |
+| [`IncomeTaxExpenseBenefit`](https://www.sec.gov/Archives/edgar/data/320193/000032019325000079/0000320193-25-000079-index.htm) | 2024-09-28 | `0000320193-25-000079` | 2025-10-31 |
+| [`IncomeTaxExpenseBenefit`](https://www.sec.gov/Archives/edgar/data/320193/000032019325000079/0000320193-25-000079-index.htm) | 2025-09-27 | `0000320193-25-000079` | 2025-10-31 |
+| [`IncomeLossFromContinuingOperationsBeforeIncomeTaxesExtraordinaryItemsNoncontrollingInterest`](https://www.sec.gov/Archives/edgar/data/320193/000032019323000106/0000320193-23-000106-index.htm) | 2021-09-25 | `0000320193-23-000106` | 2023-11-03 |
+| [`IncomeLossFromContinuingOperationsBeforeIncomeTaxesExtraordinaryItemsNoncontrollingInterest`](https://www.sec.gov/Archives/edgar/data/320193/000032019324000123/0000320193-24-000123-index.htm) | 2022-09-24 | `0000320193-24-000123` | 2024-11-01 |
+| [`IncomeLossFromContinuingOperationsBeforeIncomeTaxesExtraordinaryItemsNoncontrollingInterest`](https://www.sec.gov/Archives/edgar/data/320193/000032019325000079/0000320193-25-000079-index.htm) | 2023-09-30 | `0000320193-25-000079` | 2025-10-31 |
+| [`IncomeLossFromContinuingOperationsBeforeIncomeTaxesExtraordinaryItemsNoncontrollingInterest`](https://www.sec.gov/Archives/edgar/data/320193/000032019325000079/0000320193-25-000079-index.htm) | 2024-09-28 | `0000320193-25-000079` | 2025-10-31 |
+| [`IncomeLossFromContinuingOperationsBeforeIncomeTaxesExtraordinaryItemsNoncontrollingInterest`](https://www.sec.gov/Archives/edgar/data/320193/000032019325000079/0000320193-25-000079-index.htm) | 2025-09-27 | `0000320193-25-000079` | 2025-10-31 |
+| [`CommercialPaper`](https://www.sec.gov/Archives/edgar/data/320193/000032019325000079/0000320193-25-000079-index.htm) | 2025-09-27 | `0000320193-25-000079` | 2025-10-31 |
+| [`LongTermDebtCurrent`](https://www.sec.gov/Archives/edgar/data/320193/000032019325000079/0000320193-25-000079-index.htm) | 2025-09-27 | `0000320193-25-000079` | 2025-10-31 |
+| [`LongTermDebtNoncurrent`](https://www.sec.gov/Archives/edgar/data/320193/000032019325000079/0000320193-25-000079-index.htm) | 2025-09-27 | `0000320193-25-000079` | 2025-10-31 |
+| [`CashAndCashEquivalentsAtCarryingValue`](https://www.sec.gov/Archives/edgar/data/320193/000032019325000079/0000320193-25-000079-index.htm) | 2025-09-27 | `0000320193-25-000079` | 2025-10-31 |
+| [`MarketableSecuritiesCurrent`](https://www.sec.gov/Archives/edgar/data/320193/000032019325000079/0000320193-25-000079-index.htm) | 2025-09-27 | `0000320193-25-000079` | 2025-10-31 |
+| [`MarketableSecuritiesNoncurrent`](https://www.sec.gov/Archives/edgar/data/320193/000032019325000079/0000320193-25-000079-index.htm) | 2025-09-27 | `0000320193-25-000079` | 2025-10-31 |
+| [`EntityCommonStockSharesOutstanding`](https://www.sec.gov/Archives/edgar/data/320193/000032019325000079/0000320193-25-000079-index.htm) | 2025-10-17 | `0000320193-25-000079` | 2025-10-31 |
+| [`WeightedAverageNumberOfDilutedSharesOutstanding`](https://www.sec.gov/Archives/edgar/data/320193/000032019325000079/0000320193-25-000079-index.htm) | 2025-09-27 | `0000320193-25-000079` | 2025-10-31 |
+
+The web case is available in English and Simplified Chinese. This checked-in Markdown artifact is generated in English.
+
+## Case-study limits
+
+This is educational research software, not investment advice. SEC facts can be restated; narrative updates can become stale; scenario outputs are not forecasts, fair value, recommendations, or price targets.

@@ -15,7 +15,8 @@ investment memo without presenting educational analysis as investment advice.
    comparable-company multiples.
 4. Analyze a 1-10 holding portfolio using return, volatility, Sharpe, Sortino, beta, alpha,
    historical VaR, drawdown, correlation, attribution, and concentration.
-5. Turn the evidence and analyst-owned interpretation into a printable one-page investment memo.
+5. Turn the evidence and analyst-owned interpretation into a printable memo or full report.
+6. Use Market Context or 1-10 holding Historical DCA as supporting workflows.
 
 ## Technical contribution
 
@@ -35,17 +36,23 @@ investment memo without presenting educational analysis as investment advice.
 - DCF starter assumptions remain editable and visibly separate from reported facts.
 - Historical VaR is not described as a maximum loss, and inverse-volatility allocation is not
   described as an optimizer.
-- Future DCA estimates are disabled; all current performance views describe completed history.
+- Future DCA estimates are disabled. Public market examples are synthetic workflow demonstrations,
+  not actual ticker history; company financials remain real SEC evidence.
 
 ## Evidence base
 
 Methodology follows SEC EDGAR API guidance, CFA Institute material on downside risk and VaR, and
 Damodaran's firm-valuation and terminal-value framework. Full assumptions, sources, limitations,
-tests, and known gaps are documented in README.md, docs/PROJECT_REPORT.md, and /methodology.
+tests, and known gaps are documented in README.md, docs/METHODOLOGY.md,
+docs/DATA_GOVERNANCE.md, docs/FINANCIAL_MODEL_CONTRACTS.md, and /methodology.
 
 ## Portfolio deliverables
 
-Public web application, source repository, methodology, project report, AAPL research memo sample,
-three-minute demo script, and this one-page summary.
+Public web application, source repository, completed AAPL case, methodology, project report,
+usability protocol (no participant results claimed), release-candidate package, and demo script.
+
+`output/pdf/InvestIQ_Project_Summary.pdf` is a generated convenience artifact. Its Markdown/source
+dependencies and content drift must be checked before release; the repository does not claim that a
+tracked binary automatically stays synchronized.
 
 Educational research software only. Not investment, legal, or tax advice.

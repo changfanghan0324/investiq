@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   loadAnalysisMarketData,
+  resolveAnalysisDataMode,
   resetAnalysisCapabilityCache,
   stableDemoSeed,
   type AnalysisMarketDataDependencies,
@@ -65,22 +66,37 @@ describe('analysis market-data resolution', () => {
     expect(dependencies.loadLive).not.toHaveBeenCalled();
   });
 
-  it('falls back to labelled demo data when a previously-ready live provider fails transiently', async () => {
+  it('honors a run-pinned mode without re-resolving capability', async () => {
     const demo = {
-      ticker: 'AAPL',
-      source: 'demo',
-      prices: [{ date: '2021-06-01' }],
-      dividends: [],
-      splits: [],
+      ticker: 'AAPL', source: 'demo', prices: [], dividends: [], splits: [],
     } as unknown as MarketData;
     const dependencies: AnalysisMarketDataDependencies = {
       liveCapability: vi.fn().mockResolvedValue(true),
-      loadLive: vi.fn().mockRejectedValue(new MarketDataError('busy', 429)),
+      loadLive: vi.fn(),
       createDemo: vi.fn().mockReturnValue(demo),
     };
 
-    await expect(loadAnalysisMarketData(options, dependencies)).resolves.toMatchObject({ source: 'demo' });
-    expect(dependencies.createDemo).toHaveBeenCalledOnce();
+    await expect(loadAnalysisMarketData({ ...options, mode: 'synthetic-demo' }, dependencies))
+      .resolves.toMatchObject({ source: 'demo' });
+    expect(dependencies.liveCapability).not.toHaveBeenCalled();
+    expect(dependencies.loadLive).not.toHaveBeenCalled();
+  });
+
+  it('resolves one explicit mode value for a multi-security run', async () => {
+    await expect(resolveAnalysisDataMode(vi.fn().mockResolvedValue(true))).resolves.toBe('licensed-live');
+    await expect(resolveAnalysisDataMode(vi.fn().mockResolvedValue(false))).resolves.toBe('synthetic-demo');
+  });
+
+  it('keeps a failed security unavailable instead of mixing live and synthetic series', async () => {
+    const error = new MarketDataError('busy', 429);
+    const dependencies: AnalysisMarketDataDependencies = {
+      liveCapability: vi.fn().mockResolvedValue(true),
+      loadLive: vi.fn().mockRejectedValue(error),
+      createDemo: vi.fn(),
+    };
+
+    await expect(loadAnalysisMarketData(options, dependencies)).rejects.toBe(error);
+    expect(dependencies.createDemo).not.toHaveBeenCalled();
   });
 
   it.each([400, 404, 422])('does not disguise a confirmed input error (%s) as demo data', async (status) => {

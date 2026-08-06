@@ -17,12 +17,12 @@
 .memoGrid > main { border-right: 1px solid #2a2e39; }
 .section { padding: 15px 17px; border-bottom: 1px solid #292e39; }
 .section > header { display: flex; align-items: center; gap: 9px; margin-bottom: 12px; }
-.section > header span { color: #627eb7; font-family: var(--font-geist-mono), monospace; font-size: calc(8px * var(--ui-font-scale, 1)); }
+.section > header span { color: #627eb7; font-family: var(--font-mono), monospace; font-size: calc(8px * var(--ui-font-scale, 1)); }
 .section h3, .memoGrid > aside h3 { color: #d8dde5; font-size: calc(10px * var(--ui-font-scale, 1)); font-weight: 510; }
 .overviewGrid, .evidenceGrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: #292f39; }
 .fact { min-height: 64px; padding: 10px; background: #0f131b; }
 .fact span { display: block; color: #747c88; font-size: calc(8px * var(--ui-font-scale, 1)); }
-.fact strong { display: block; margin-top: 7px; color: #e0e4eb; font-family: var(--font-geist-mono), monospace; font-size: calc(11px * var(--ui-font-scale, 1)); font-weight: 500; }
+.fact strong { display: block; margin-top: 7px; color: #e0e4eb; font-family: var(--font-mono), monospace; font-size: calc(11px * var(--ui-font-scale, 1)); font-weight: 500; }
 .fact small { display: block; margin-top: 4px; color: #6d88bd; font-size: calc(7px * var(--ui-font-scale, 1)); }
 .coverageNote, .interpretation { margin-top: 10px; color: #777f8b; font-size: calc(8px * var(--ui-font-scale, 1)); line-height: 1.5; }
 .interpretation { padding-left: 9px; border-left: 2px solid #4c6fae; color: #9aa3af; }
@@ -52,3 +52,18 @@
 @media (max-width: 920px) { .memoGrid { grid-template-columns: 1fr; } .memoGrid > main { border-right: 0; } }
 @media (max-width: 620px) { .heading, .memoHeader { align-items: flex-start; flex-direction: column; } .actions { width: 100%; } .actions button { flex: 1; justify-content: center; } .memoHeader > div:last-child { justify-items: start; } .overviewGrid, .evidenceGrid, .scenarios, .splitSections { grid-template-columns: 1fr; } .splitSections .section:first-child { border-right: 0; } }
 @media print { :global(html) { --ui-font-scale: 1 !important; } .heading { display: none; } .page { display: block; } .memo { border: 0; color: #111; background: #fff; } .memoGrid { grid-template-columns: 1.55fr .75fr; } .memoGrid > main { border-color: #ccd1d8; } .memoHeader, .section, .valuationCard, .conclusionCard, .sourceCard { break-inside: avoid; border-color: #ccd1d8; } .memoHeader h2, .section h3, .memoGrid > aside h3, .fact strong { color: #111; } .memoHeader p, .memoHeader span, .memoHeader small, .fact span, .coverageNote, .interpretation, .valuationCard dt, .sourceCard dt, .valuationCard dd, .sourceCard dd, .valuationCard > p, .conclusionCard > p { color: #424954; } .fact, .memoGrid > aside, .section textarea, .conclusionCard textarea { color: #111; background: #fff; } .overviewGrid, .evidenceGrid, .scenarios { gap: 0; background: #fff; } .fact, .section textarea, .conclusionCard textarea { border: 1px solid #ccd1d8; } }
+
+.page { max-width: 900px; margin: 0 auto; gap: 24px; color: var(--text-primary); }
+.heading { min-height: auto; padding: 0 0 24px; border: 0; border-bottom: 1px solid var(--border); background: transparent; }
+.heading h1 { color: var(--text-primary); font-size: calc(32px * var(--ui-font-scale, 1)); font-weight: 600; letter-spacing: -0.02em; }
+.heading p { color: var(--text-secondary); font-size: calc(13px * var(--ui-font-scale, 1)); }
+.actions button, .reportLink { min-height: 42px; border-color: var(--border-strong); border-radius: 4px; color: var(--text-primary); background: var(--surface); font-size: calc(13px * var(--ui-font-scale, 1)); }
+.reportLink { border-color: var(--accent); color: white; background: var(--accent); }
+.memo { border: 0; border-radius: 0; background: var(--surface); box-shadow: none; }
+.memoHeader, .section, .valuationCard, .conclusionCard, .sourceCard, .memoGrid > main { border-color: var(--border); }
+.memoHeader h2, .section h3, .memoGrid > aside h3, .fact strong { color: var(--text-primary); font-family: var(--font-sans); }
+.memoHeader p, .memoHeader span, .memoHeader small, .fact span, .coverageNote, .interpretation, .valuationCard dt, .sourceCard dt, .valuationCard dd, .sourceCard dd, .valuationCard > p, .conclusionCard > p { color: var(--text-secondary); font-size: calc(12px * var(--ui-font-scale, 1)); }
+.overviewGrid, .evidenceGrid, .scenarios { background: var(--border); }
+.fact, .memoGrid > aside { background: var(--surface-subtle); }
+.section textarea, .conclusionCard textarea { border-color: var(--border-strong); border-radius: 4px; color: var(--text-primary); background: var(--surface); font-size: calc(14px * var(--ui-font-scale, 1)); }
+.state { border-color: var(--border); color: var(--accent); background: var(--surface); }
