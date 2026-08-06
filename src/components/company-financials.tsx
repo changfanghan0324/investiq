@@ -7,6 +7,7 @@ import { buildCompanyFinancialAnalysis, type CompanyRatioKey, type CompanyRatioS
 import type { FundamentalsMetricKey, FundamentalsResult, FundamentalsSeries } from "@/domain/fundamentals";
 import { useLanguage, type Translate } from "@/i18n/language";
 import { loadCompanyFundamentals } from "@/services/fundamentals-api";
+import { FinancialOriginLabel } from "./financial-origin-label";
 
 import styles from "./company-financials.module.css";
 
@@ -51,9 +52,9 @@ export function CompanyFinancials({ rawTicker }: { rawTicker: string }) {
         <GroupHeader number="1" title={t("financials.growthTitle")} text={t("financials.growthText")} />
         <div className={styles.metricGrid}>
           <FinancialMetric label={t("company.metricRevenue")} series={revenue} format="money" t={t} />
-          <FinancialMetric label={t("company.metricEbitda")} series={ebitda} format="money" t={t} constructed />
+          <FinancialMetric label={t("company.metricEbitda")} series={ebitda} format="money" t={t} />
           <FinancialMetric label={t("company.metricDilutedEps")} series={eps} format="perShare" t={t} />
-          <FinancialMetric label={t("company.metricFreeCashFlow")} series={fcf} format="money" t={t} constructed />
+          <FinancialMetric label={t("company.metricFreeCashFlow")} series={fcf} format="money" t={t} />
         </div>
       </section>
 
@@ -99,11 +100,10 @@ export function CompanyFinancials({ rawTicker }: { rawTicker: string }) {
         <div className={styles.auditRows}>
           {result.metrics.filter((item) => item.available).map((item) => {
             const latest = item.observations[0];
-            const receipt = latest.receipts[0];
             return (
               <details key={item.metric}>
-                <summary><span>{metricName(item.metric, t)}</span><strong>FY{latest.fiscalYear}</strong><small>{receipt?.filed ?? "—"}</small></summary>
-                <div><code>{receipt?.taxonomy}:{receipt?.concept}</code><span>{receipt?.accn}</span>{receipt ? <a href={receipt.sourceUrl} target="_blank" rel="noreferrer">{t("company.openFiling")}<ExternalLink size={12} /></a> : null}</div>
+                <summary><span>{metricName(item.metric, t)}</span><strong>FY{latest.fiscalYear}</strong><FinancialOriginLabel observation={latest} /></summary>
+                <div>{latest.receipts.map((receipt) => <a key={`${receipt.concept}-${receipt.accn}-${receipt.start ?? "instant"}-${receipt.end}`} href={receipt.sourceUrl} target="_blank" rel="noreferrer"><code>{receipt.taxonomy}:{receipt.concept}</code><ExternalLink size={12} /></a>)}</div>
               </details>
             );
           })}
@@ -124,7 +124,7 @@ export function CompanyFinancials({ rawTicker }: { rawTicker: string }) {
 
 function GroupHeader({ number, title, text }: { number: string; title: string; text: string }) { return <header className={styles.groupHeader}><span>{number}</span><div><h2>{title}</h2><p>{text}</p></div></header>; }
 
-function FinancialMetric({ label, series, format, t, constructed = false }: { label: string; series?: FundamentalsSeries; format: Format; t: Translate; constructed?: boolean }) {
+function FinancialMetric({ label, series, format, t }: { label: string; series?: FundamentalsSeries; format: Format; t: Translate }) {
   if (!series?.available || !series.observations.length) return <UnavailableMetric label={label} text={t("company.metricUnavailable")} />;
   const latest = series.observations[0];
   const oldest = series.observations.at(-1)!;
@@ -132,7 +132,7 @@ function FinancialMetric({ label, series, format, t, constructed = false }: { la
   const periodValue = format === "percent" ? signedPoints(latest.value - oldest.value) : cagr === undefined ? "—" : signedPercent(cagr);
   return (
     <article className={styles.metric}>
-      <header><span>{label}</span>{constructed ? <small>{t("company.constructed")}</small> : null}</header>
+      <header><span>{label}</span><FinancialOriginLabel observation={latest} /></header>
       <strong>{formatValue(latest.value, format)}</strong>
       <p>FY{latest.fiscalYear}</p>
       <div><span>{format === "percent" ? t("financials.periodChange") : t("financials.periodGrowth")}</span><b>{periodValue}</b></div>
@@ -146,7 +146,7 @@ function RatioMetric({ label, series }: { label: string; series?: CompanyRatioSe
   if (!series?.available || !series.observations.length) return <UnavailableMetric label={label} text={ratioUnavailableText(series, t)} />;
   const latest = series.observations[0];
   const value = series.unit === "percent" ? plainPercent(latest.value) : series.unit === "days" ? `${latest.value.toFixed(1)} ${t("financials.days")}` : `${latest.value.toFixed(2)}×`;
-  return <article className={styles.metric}><header><span>{label}</span><small>{t("company.constructed")}</small></header><strong>{value}</strong><p>FY{latest.fiscalYear} · {latest.receipts.length} sources</p><details><summary>{t("financials.formula")}</summary><p>{series.formula}{series.basis ? ` ${series.basis}` : ""}</p></details></article>;
+  return <article className={styles.metric}><header><span>{label}</span><FinancialOriginLabel origin="constructed-standard" /></header><strong>{value}</strong><p>FY{latest.fiscalYear} · {latest.receipts.length} sources</p><details><summary>{t("financials.formula")}</summary><p>{series.formula}{series.basis ? ` ${series.basis}` : ""}</p></details></article>;
 }
 
 function UnavailableMetric({ label, text }: { label: string; text: string }) { return <article className={`${styles.metric} ${styles.metricUnavailable}`}><header><span>{label}</span></header><strong>—</strong><p>{text}</p></article>; }

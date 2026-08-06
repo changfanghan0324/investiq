@@ -35,6 +35,10 @@ function annual(row: AnnualFixtureRow, value: number): SecFact {
   };
 }
 
+function instant(row: AnnualFixtureRow, value: number): SecFact {
+  return { end: `${row.fy}-12-31`, val: value, accn: row.accn, fy: row.fy, fp: 'FY', form: '10-K', filed: row.filed };
+}
+
 export const FSLY_IDENTITY: FundamentalsIdentityInput = {
   cik: '0001517413',
   cikNumber: 1517413,
@@ -53,6 +57,11 @@ export function fslyCompanyFacts(includeDirectRevenue = true): CompanyFacts {
     WeightedAverageNumberOfDilutedSharesOutstanding: { units: { shares: FSLY_VALUES.map((row) => annual(row, row.shares)) } },
     EarningsPerShareDiluted: { units: { 'USD/shares': FSLY_VALUES.map((row) => annual(row, row.eps)) } },
     DepreciationDepletionAndAmortization: { units: { USD: [annual(FSLY_VALUES[4], 28_799_000)] } },
+    PaymentsToAcquirePropertyPlantAndEquipment: { units: { USD: [28_694_000, 10_330_000, 10_976_000, 19_975_000, 34_816_000].map((value, index) => annual(FSLY_VALUES[index], value)) } },
+    NetCashProvidedByUsedInOperatingActivities: { units: { USD: [94_444_000, 16_406_000, 362_000, -69_632_000, -38_482_000].map((value, index) => annual(FSLY_VALUES[index], value)) } },
+    LongTermDebtCurrent: { units: { USD: [instant(FSLY_VALUES[0], 38_557_000)] } },
+    LongTermDebtNoncurrent: { units: { USD: [instant(FSLY_VALUES[0], 323_282_000)] } },
+    CashAndCashEquivalentsAtCarryingValue: { units: { USD: [instant(FSLY_VALUES[0], 180_563_000)] } },
   };
   if (includeDirectRevenue) {
     usGaap.RevenueFromContractWithCustomerIncludingAssessedTax = {

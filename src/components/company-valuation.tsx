@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Calculator, CheckCircle2, Database, Info, LoaderCircle, Play, TriangleAlert } from "lucide-react";
 
 import type { FundamentalsMetricKey, FundamentalsResult, FundamentalsSeries } from "@/domain/fundamentals";
+import { buildValuationReadiness, type ValuationReadiness } from "@/domain/valuation-readiness";
 import {
   ValuationError,
   buildComparableValuation,
@@ -27,11 +28,14 @@ import { saveValuationSnapshot } from "@/services/valuation-snapshot";
 import { addYearsClamped, todayDateString } from "@/utils/date";
 
 import styles from "./company-valuation.module.css";
+import { FinancialOriginLabel } from "./financial-origin-label";
 
 const TICKER_PATTERN = /^[A-Z0-9.-]{1,12}$/;
 
-type FieldKey = "growth" | "margin" | "tax" | "da" | "capex" | "nwc" | "wacc" | "terminal" | "netDebt" | "currentPrice" | "currentPriceDate";
+type FieldKey = "baseRevenue" | "dilutedShares" | "growth" | "margin" | "tax" | "da" | "capex" | "nwc" | "wacc" | "terminal" | "netDebt" | "currentPrice" | "currentPriceDate";
 type FormState = Record<FieldKey, string>;
+type ValuationInputOrigin = "sec-direct" | "sec-constructed" | "historical-derived" | "manual-example" | "manual-required" | "user-entered";
+type FieldOrigins = Record<FieldKey, ValuationInputOrigin>;
 
 interface ValuationView {
   base: DcfValuation;
@@ -42,10 +46,12 @@ interface ValuationView {
 }
 
 const STARTER: FormState = {
+  baseRevenue: "",
+  dilutedShares: "",
   growth: "5.0",
-  margin: "15.0",
+  margin: "",
   tax: "21.0",
-  da: "3.0",
+  da: "",
   capex: "4.0",
   nwc: "0.0",
   wacc: "9.0",
@@ -55,11 +61,16 @@ const STARTER: FormState = {
   currentPriceDate: "",
 };
 
+const STARTER_ORIGINS: FieldOrigins = Object.fromEntries(
+  (Object.keys(STARTER) as FieldKey[]).map((key) => [key, STARTER[key] === "" ? "manual-required" : "manual-example"]),
+) as FieldOrigins;
+
 export function CompanyValuation({ rawTicker }: { rawTicker: string }) {
   const { t, language } = useLanguage();
   const ticker = safeTicker(rawTicker);
   const [fundamentals, setFundamentals] = useState<FundamentalsResult>();
   const [form, setForm] = useState<FormState>(STARTER);
+  const [fieldOrigins, setFieldOrigins] = useState<FieldOrigins>(STARTER_ORIGINS);
   const [priceFromProvider, setPriceFromProvider] = useState(false);
   const [settled, setSettled] = useState(false);
   const [view, setView] = useState<ValuationView>();
@@ -77,7 +88,10 @@ export function CompanyValuation({ rawTicker }: { rawTicker: string }) {
       .then((result) => {
         if (!active) return;
         setFundamentals(result);
-        setForm((current) => suggestedForm(result, current));
+        const readiness = buildValuationReadiness(result);
+        setForm((current) => suggestedForm(result, readiness, current));
+        setFieldOrigins((current) => suggestedOrigins(result, readiness, current));
+        if (readiness.defaultComparableMethod) setComparableMetric(readiness.defaultComparableMethod);
       })
       .catch(() => undefined)
       .finally(() => { if (active) setSettled(true); });
@@ -92,14 +106,22 @@ export function CompanyValuation({ rawTicker }: { rawTicker: string }) {
     return () => { active = false; };
   }, [ticker]);
 
-  const anchors = useMemo(() => fundamentals ? dcfAnchors(fundamentals) : undefined, [fundamentals]);
+  const readiness = useMemo(() => fundamentals ? buildValuationReadiness(fundamentals) : undefined, [fundamentals]);
+  const anchors = useMemo(() => readiness ? editableAnchors(readiness, form) : undefined, [readiness, form]);
   const comparableBasis = useMemo(() => fundamentals && anchors ? comparableValues(fundamentals, anchors) : undefined, [fundamentals, anchors]);
   const currentPrice = optionalPositiveFinite(form.currentPrice);
   const datedCurrentPrice = currentPrice !== undefined && isValidQuoteDate(form.currentPriceDate, todayDateString()) ? currentPrice : undefined;
+  const canRun = Boolean(anchors && ["growth", "margin", "tax", "da", "capex", "nwc", "wacc", "terminal", "netDebt"].every((key) => optionalFinite(form[key as FieldKey]) !== undefined));
+
+  function updateField(field: FieldKey, value: string, origin: ValuationInputOrigin = "user-entered") {
+    setForm((current) => ({ ...current, [field]: value }));
+    setFieldOrigins((current) => ({ ...current, [field]: origin }));
+    setView(undefined);
+  }
 
   function submit(event: FormEvent) {
     event.preventDefault();
-    if (!fundamentals || !anchors) return;
+    if (!fundamentals || !anchors || !readiness) return;
     try {
       const assumptions = buildAssumptions(form, anchors);
       const base = buildDcfValuation(assumptions);
@@ -122,7 +144,19 @@ export function CompanyValuation({ rawTicker }: { rawTicker: string }) {
       const current = currentPrice !== undefined && quoteDate ? compareToCurrentPrice({ impliedSharePrice: base.impliedSharePrice, currentPrice, valuationDate: todayDateString(), quoteDate }) : undefined;
       setView({ base, scenarios, waccTerminal, growthMargin, current });
       const byId = Object.fromEntries(scenarios.scenarios.map((item) => [item.id, item.valuation.impliedSharePrice]));
-      saveValuationSnapshot({ version: 1, ticker, generatedAt: new Date().toISOString(), fiscalYear: anchors.fiscalYear, assumptions, values: { bear: byId.bear, base: byId.base, bull: byId.bull, low: scenarios.lowImpliedSharePrice, high: scenarios.highImpliedSharePrice, enterpriseValue: base.bridge.enterpriseValue, equityValue: base.bridge.equityValue, ...(currentPrice !== undefined && quoteDate ? { currentPrice, quoteDate } : {}), ...(current ? { upsideDownside: current.upsideDownside } : {}) } });
+      saveValuationSnapshot({
+        version: 1,
+        ticker,
+        generatedAt: new Date().toISOString(),
+        fiscalYear: anchors.fiscalYear,
+        assumptions,
+        anchorProvenance: {
+          baseRevenue: snapshotAnchor("baseRevenue", anchors.baseRevenue, anchors.fiscalYear, readiness, fieldOrigins.baseRevenue),
+          dilutedShares: snapshotAnchor("dilutedShares", anchors.dilutedShares, anchors.fiscalYear, readiness, fieldOrigins.dilutedShares),
+          netDebt: snapshotAnchor("netDebt", assumptions.netDebt, anchors.fiscalYear, readiness, fieldOrigins.netDebt),
+        },
+        values: { bear: byId.bear, base: byId.base, bull: byId.bull, low: scenarios.lowImpliedSharePrice, high: scenarios.highImpliedSharePrice, enterpriseValue: base.bridge.enterpriseValue, equityValue: base.bridge.equityValue, ...(currentPrice !== undefined && quoteDate ? { currentPrice, quoteDate } : {}), ...(current ? { upsideDownside: current.upsideDownside } : {}) },
+      });
       setError(undefined);
     } catch (caught) {
       setView(undefined);
@@ -146,7 +180,7 @@ export function CompanyValuation({ rawTicker }: { rawTicker: string }) {
   }
 
   if (!ticker || (settled && !fundamentals)) return <PageState error text={t("valuation.loadError")} />;
-  if (!fundamentals || !anchors || !comparableBasis) return <PageState text={settled ? t("valuation.coverageError") : t("valuation.loading")} error={settled} />;
+  if (!fundamentals || !readiness) return <PageState text={t("valuation.loading")} />;
 
   return (
     <div className={styles.page}>
@@ -155,35 +189,37 @@ export function CompanyValuation({ rawTicker }: { rawTicker: string }) {
         <aside><Database size={14} /><strong>{t("valuation.secAnchors")}</strong><small>{t("valuation.userAssumptions")}</small></aside>
       </header>
 
+      <ReadinessSummary readiness={readiness} t={t} language={language} />
+
       <section className={styles.topGrid}>
         <form className={styles.assumptions} onSubmit={submit}>
           <header><div><h2>{t("valuation.assumptionTitle")}</h2><p>{t("valuation.assumptionText")}</p></div><span>{t("valuation.editable")}</span></header>
           <div className={styles.anchorGrid}>
-            <Anchor label={t("valuation.baseRevenue")} value={money(anchors.baseRevenue, language)} detail={`FY${anchors.fiscalYear}`} />
-            <Anchor label={t("valuation.dilutedShares")} value={compact(anchors.dilutedShares, language)} detail={`FY${anchors.fiscalYear}`} />
+            <AnchorInput field="baseRevenue" label={t("valuation.baseRevenue")} form={form} updateField={updateField} prefix="$" source={fieldSourceLabel(fieldOrigins.baseRevenue, t)} />
+            <AnchorInput field="dilutedShares" label={t("valuation.dilutedShares")} form={form} updateField={updateField} source={fieldSourceLabel(fieldOrigins.dilutedShares, t)} />
             <label className={`${styles.anchor} ${styles.priceAnchor}`}>
               <span>{t("valuation.currentPrice")}</span>
               <div className={styles.priceInputs}>
-                <div><b>$</b><input value={form.currentPrice} inputMode="decimal" placeholder={t("valuation.currentPricePlaceholder")} onChange={(event) => { setForm({ ...form, currentPrice: event.target.value }); setPriceFromProvider(false); }} /></div>
-                <input type="date" value={form.currentPriceDate} max={todayDateString()} aria-label={t("valuation.currentPriceDate")} onChange={(event) => { setForm({ ...form, currentPriceDate: event.target.value }); setPriceFromProvider(false); }} />
+                <div><b>$</b><input value={form.currentPrice} inputMode="decimal" placeholder={t("valuation.currentPricePlaceholder")} onChange={(event) => { updateField("currentPrice", event.target.value); setPriceFromProvider(false); }} /></div>
+                <input type="date" value={form.currentPriceDate} max={todayDateString()} aria-label={t("valuation.currentPriceDate")} onChange={(event) => { updateField("currentPriceDate", event.target.value); setPriceFromProvider(false); }} />
               </div>
               <small>{priceFromProvider ? t("valuation.currentPriceProvider") : t("valuation.currentPriceManual")}</small>
             </label>
           </div>
           <div className={styles.fieldGrid}>
-            <PercentField field="growth" label={t("valuation.revenueGrowth")} form={form} setForm={setForm} source={t("valuation.growthMedianStarter")} />
-            <PercentField field="margin" label={t("valuation.operatingMargin")} form={form} setForm={setForm} source={t("valuation.historicalStarter")} />
-            <PercentField field="tax" label={t("valuation.cashTax")} form={form} setForm={setForm} source={t("valuation.manualStarter")} />
-            <PercentField field="da" label={t("valuation.daRevenue")} form={form} setForm={setForm} source={t("valuation.historicalStarter")} />
-            <PercentField field="capex" label={t("valuation.capexRevenue")} form={form} setForm={setForm} source={t("valuation.historicalStarter")} />
-            <PercentField field="nwc" label={t("valuation.nwcIncremental")} form={form} setForm={setForm} source={t("valuation.manualStarter")} />
-            <PercentField field="wacc" label="WACC" form={form} setForm={setForm} source={t("valuation.manualStarter")} />
-            <PercentField field="terminal" label={t("valuation.terminalGrowth")} form={form} setForm={setForm} source={t("valuation.manualStarter")} />
-            <label className={styles.field}><span>{t("valuation.netDebt")}</span><div><b>$</b><input value={form.netDebt} inputMode="decimal" onChange={(event) => setForm({ ...form, netDebt: event.target.value })} /></div><small>{t("valuation.netDebtHint")}</small></label>
+            <PercentField field="growth" label={t("valuation.revenueGrowth")} form={form} updateField={updateField} source={fieldSourceLabel(fieldOrigins.growth, t)} />
+            <PercentField field="margin" label={t("valuation.operatingMargin")} form={form} updateField={updateField} source={fieldSourceLabel(fieldOrigins.margin, t)} placeholder={t("valuation.requiredPlaceholder")} />
+            <PercentField field="tax" label={t("valuation.cashTax")} form={form} updateField={updateField} source={fieldSourceLabel(fieldOrigins.tax, t)} />
+            <PercentField field="da" label={t("valuation.daRevenue")} form={form} updateField={updateField} source={fieldSourceLabel(fieldOrigins.da, t)} placeholder={t("valuation.requiredPlaceholder")} />
+            <PercentField field="capex" label={t("valuation.capexRevenue")} form={form} updateField={updateField} source={fieldSourceLabel(fieldOrigins.capex, t)} />
+            <PercentField field="nwc" label={t("valuation.nwcIncremental")} form={form} updateField={updateField} source={fieldSourceLabel(fieldOrigins.nwc, t)} />
+            <PercentField field="wacc" label="WACC" form={form} updateField={updateField} source={fieldSourceLabel(fieldOrigins.wacc, t)} />
+            <PercentField field="terminal" label={t("valuation.terminalGrowth")} form={form} updateField={updateField} source={fieldSourceLabel(fieldOrigins.terminal, t)} />
+            <label className={styles.field}><span>{t("valuation.netDebt")}</span><div><b>$</b><input value={form.netDebt} inputMode="decimal" placeholder={t("valuation.requiredPlaceholder")} onChange={(event) => updateField("netDebt", event.target.value)} /></div><small>{fieldSourceLabel(fieldOrigins.netDebt, t)} · {t("valuation.netDebtHint")}</small></label>
           </div>
           <div className={styles.formNote}><Info size={14} /><p>{t("valuation.starterWarning")}</p></div>
           {error ? <p className={styles.error}><TriangleAlert size={14} />{error}</p> : null}
-          <button type="submit"><Play size={14} />{t("valuation.run")}</button>
+          <button type="submit" disabled={!canRun} aria-disabled={!canRun}><Play size={14} />{t("valuation.run")}</button>
         </form>
 
         <aside className={styles.rangePanel}>
@@ -192,7 +228,7 @@ export function CompanyValuation({ rawTicker }: { rawTicker: string }) {
         </aside>
       </section>
 
-      {view ? (
+      {view && anchors && comparableBasis ? (
         <>
           <section className={styles.sensitivitySection}>
             <header><div><h2>{t("valuation.sensitivityTitle")}</h2><p>{t("valuation.sensitivityText")}</p></div><span>{t("valuation.impliedPrice")}</span></header>
@@ -217,8 +253,13 @@ export function CompanyValuation({ rawTicker }: { rawTicker: string }) {
                 <p>{t("valuation.unavailableMultiples")}</p>
               </div>
               <form className={styles.peerForm} onSubmit={submitComparable}>
-                <label><span>{t("valuation.comparableMetric")}</span><select value={comparableMetric} onChange={(event) => { setComparableMetric(event.target.value as ComparableMetric); setComparable(undefined); }}><option value="pe">P/E</option><option value="ev-revenue">EV / Revenue</option><option value="ev-ebitda">EV / EBITDA</option></select></label>
+                <label><span>{t("valuation.comparableMetric")}</span><select value={comparableMetric} onChange={(event) => { setComparableMetric(event.target.value as ComparableMetric); setComparable(undefined); }}><option value="pe" disabled={!readiness.methods.pe.available}>P/E</option><option value="ev-revenue" disabled={!readiness.methods["ev-revenue"].available}>EV / Revenue</option><option value="ev-ebitda" disabled={!readiness.methods["ev-ebitda"].available}>EV / EBITDA</option></select></label>
                 <p>{comparableMetric === "pe" ? t("valuation.peBasis") : comparableMetric === "ev-revenue" ? t("valuation.evRevenueBasis") : t("valuation.evEbitdaBasis")}</p>
+                <ul className={styles.methodNotes}>
+                  <li>{readiness.methods.pe.available ? t("valuation.method.peAvailable") : t("valuation.method.peUnavailable")}</li>
+                  <li>{readiness.methods["ev-revenue"].available ? t("valuation.method.evRevenueAvailable") : t("valuation.method.evRevenueUnavailable")}</li>
+                  <li>{readiness.methods["ev-ebitda"].available ? t("valuation.method.evEbitdaAvailable") : t("valuation.method.evEbitdaUnavailable")}</li>
+                </ul>
                 <div className={styles.multipleInputs}>{(["low", "median", "high"] as const).map((key) => <label key={key}><span>{t(`valuation.multiple.${key}` as "valuation.multiple.low")}</span><div><input value={multiples[key]} inputMode="decimal" onChange={(event) => setMultiples({ ...multiples, [key]: event.target.value })} /><b>×</b></div></label>)}</div>
                 {comparableError ? <p className={styles.error}><TriangleAlert size={14} />{comparableError}</p> : null}
                 <button type="submit">{t("valuation.applyMultiples")}</button>
@@ -262,11 +303,27 @@ function RangeSummary({ view, t, language }: { view: ValuationView; t: Translate
 }
 
 function EmptyResult({ t }: { t: Translate }) { return <div className={styles.empty}><Calculator size={28} /><strong>{t("valuation.emptyTitle")}</strong><p>{t("valuation.emptyText")}</p></div>; }
-function Anchor({ label, value, detail }: { label: string; value: string; detail: string }) { return <div className={styles.anchor}><span>{label}</span><strong>{value}</strong><small>{detail}</small></div>; }
 function Bridge({ label, value }: { label: string; value: string }) { return <div className={styles.bridge}><span>{label}</span><strong>{value}</strong></div>; }
 
-function PercentField({ field, label, form, setForm, source }: { field: FieldKey; label: string; form: FormState; setForm: (value: FormState) => void; source: string }) {
-  return <label className={styles.field}><span>{label}</span><div><input value={form[field]} inputMode="decimal" onChange={(event) => setForm({ ...form, [field]: event.target.value })} /><b>%</b></div><small>{source}</small></label>;
+function AnchorInput({ field, label, form, updateField, source, prefix }: { field: "baseRevenue" | "dilutedShares"; label: string; form: FormState; updateField: (field: FieldKey, value: string) => void; source: string; prefix?: string }) {
+  return <label className={`${styles.anchor} ${styles.anchorInput}`}><span>{label}</span><div>{prefix ? <b>{prefix}</b> : null}<input value={form[field]} inputMode="decimal" onChange={(event) => updateField(field, event.target.value)} /></div><small>{source}</small></label>;
+}
+
+function PercentField({ field, label, form, updateField, source, placeholder }: { field: FieldKey; label: string; form: FormState; updateField: (field: FieldKey, value: string) => void; source: string; placeholder?: string }) {
+  return <label className={styles.field}><span>{label}</span><div><input value={form[field]} inputMode="decimal" placeholder={placeholder} onChange={(event) => updateField(field, event.target.value)} /><b>%</b></div><small>{source}</small></label>;
+}
+
+function ReadinessSummary({ readiness, t, language }: { readiness: ValuationReadiness; t: Translate; language: string }) {
+  const available = [readiness.anchors.baseRevenue, readiness.anchors.dilutedShares, readiness.anchors.netDebt, readiness.anchors.operatingMarginReference];
+  const da = readiness.anchors.daRevenueReference;
+  return <section className={styles.readiness}>
+    <header><div><h2>{t("valuation.readinessTitle")}</h2><p>{t("valuation.readinessText")}</p></div><span>{t("valuation.partialCoverage")}</span></header>
+    <div className={styles.readinessGrid}>
+      <div><h3>{t("valuation.availableEvidence")}</h3><ul>{available.map((item) => <li key={item.key}><CheckCircle2 size={15} /><span><b>{anchorLabel(item.key, t)}</b><small>{item.value === undefined ? t("valuation.manualRequired") : <>{anchorValue(item.key, item.value, language)} · <FinancialOriginLabel origin={item.origin === "historical-derived" ? undefined : item.origin} /></>}</small></span></li>)}</ul></div>
+      <div><h3>{t("valuation.needsReview")}</h3><ul><li><TriangleAlert size={15} /><span><b>{t("valuation.daRevenue")}</b><small>{da.status === "limited-history" ? t("valuation.limitedDa") : da.value === undefined ? t("valuation.manualRequired") : anchorOrigin(da.origin, t)}</small></span></li><li><TriangleAlert size={15} /><span><b>{t("valuation.forecastMargin")}</b><small>{(readiness.anchors.operatingMarginReference.value ?? 0) <= 0 ? t("valuation.lossMarginRequired") : t("valuation.userOwnedForecast")}</small></span></li></ul></div>
+    </div>
+    <details><summary>{t("valuation.openEvidence")}</summary><div className={styles.receipts}>{available.flatMap((item) => item.receipts).map((receipt, index) => <a key={`${receipt.accn}-${receipt.concept}-${receipt.end}-${index}`} href={receipt.sourceUrl} target="_blank" rel="noreferrer">{receipt.concept} · FY{receipt.fy} · {receipt.accn}</a>)}</div></details>
+  </section>;
 }
 
 function Sensitivity({ title, table, language }: { title: string; table: SensitivityTable; language: string }) {
@@ -279,45 +336,108 @@ function ForecastTable({ valuation, t, language }: { valuation: DcfValuation; t:
 
 function PageState({ text, error = false }: { text: string; error?: boolean }) { return <section className={styles.state}>{error ? <TriangleAlert /> : <LoaderCircle className={styles.spin} />}<h1>{text}</h1></section>; }
 
-function dcfAnchors(result: FundamentalsResult) {
-  const revenue = metric(result, "revenue");
-  const margin = metric(result, "operatingMargin");
-  const shares = metric(result, "dilutedShares");
-  if (!revenue?.available || !margin?.available || !shares?.available) return undefined;
-  const latestRevenue = revenue.observations[0];
-  const sameMargin = margin.observations.find((item) => item.fiscalYear === latestRevenue.fiscalYear) ?? margin.observations[0];
-  const sameShares = shares.observations.find((item) => item.fiscalYear === latestRevenue.fiscalYear) ?? shares.observations[0];
-  return { baseRevenue: latestRevenue.value, dilutedShares: sameShares.value, operatingMargin: sameMargin.value, fiscalYear: latestRevenue.fiscalYear };
+interface EditableAnchors { baseRevenue: number; dilutedShares: number; fiscalYear: number }
+
+function editableAnchors(readiness: ValuationReadiness, form: FormState): EditableAnchors | undefined {
+  const baseRevenue = optionalFinite(form.baseRevenue);
+  const dilutedShares = optionalFinite(form.dilutedShares);
+  if (readiness.fiscalYear === undefined || baseRevenue === undefined || dilutedShares === undefined || baseRevenue <= 0 || dilutedShares <= 0) return undefined;
+  return { baseRevenue, dilutedShares, fiscalYear: readiness.fiscalYear };
 }
 
-function suggestedForm(result: FundamentalsResult, current: FormState): FormState {
+function suggestedForm(result: FundamentalsResult, readiness: ValuationReadiness, current: FormState): FormState {
   const revenue = metric(result, "revenue");
-  const capex = metric(result, "capitalExpenditure");
-  const da = metric(result, "depreciationAndAmortization");
   const margin = metric(result, "operatingMargin");
-  const netDebt = metric(result, "netDebt")?.observations[0]?.value;
-  const growth = revenue ? medianAnnualGrowth(revenue) : undefined;
-  const medianMargin = margin ? medianSeriesValue(margin) : undefined;
-  const capexPercent = revenue && capex ? medianAlignedRatio(capex, revenue) : undefined;
-  const daPercent = revenue && da ? medianAlignedRatio(da, revenue) : undefined;
+  const latestMargin = readiness.anchors.operatingMarginReference.value;
+  const medianMargin = latestMargin !== undefined && latestMargin > 0 && margin ? medianSeriesValue(margin) : undefined;
   return {
     ...current,
-    ...(growth === undefined ? {} : { growth: (growth * 100).toFixed(1) }),
+    ...(readiness.anchors.baseRevenue.value === undefined ? {} : { baseRevenue: readiness.anchors.baseRevenue.value.toFixed(0) }),
+    ...(readiness.anchors.dilutedShares.value === undefined ? {} : { dilutedShares: readiness.anchors.dilutedShares.value.toFixed(0) }),
+    ...(readiness.anchors.netDebt.value === undefined ? {} : { netDebt: readiness.anchors.netDebt.value.toFixed(0) }),
+    ...(readiness.anchors.revenueGrowthReference.value === undefined ? {} : { growth: (readiness.anchors.revenueGrowthReference.value * 100).toFixed(1) }),
     ...(medianMargin === undefined ? {} : { margin: (medianMargin * 100).toFixed(1) }),
-    ...(capexPercent === undefined ? {} : { capex: (capexPercent * 100).toFixed(1) }),
-    ...(daPercent === undefined ? {} : { da: (daPercent * 100).toFixed(1) }),
-    ...(netDebt === undefined ? {} : { netDebt: netDebt.toFixed(0) }),
+    ...(readiness.anchors.capexRevenueReference.value === undefined ? {} : { capex: (readiness.anchors.capexRevenueReference.value * 100).toFixed(1) }),
+    ...(readiness.anchors.daRevenueReference.value === undefined ? {} : { da: (readiness.anchors.daRevenueReference.value * 100).toFixed(1) }),
+    ...(readiness.anchors.cashTaxReference.value === undefined ? {} : { tax: (readiness.anchors.cashTaxReference.value * 100).toFixed(1) }),
   };
 }
 
-function comparableValues(result: FundamentalsResult, anchors: NonNullable<ReturnType<typeof dcfAnchors>>): Record<ComparableMetric, number | undefined> {
-  const eps = metric(result, "dilutedEps")?.observations[0]?.value;
+function suggestedOrigins(result: FundamentalsResult, readiness: ValuationReadiness, current: FieldOrigins): FieldOrigins {
+  const margin = metric(result, "operatingMargin");
+  const latestMargin = readiness.anchors.operatingMarginReference.value;
+  return {
+    ...current,
+    baseRevenue: inputOrigin(readiness.anchors.baseRevenue.origin),
+    dilutedShares: inputOrigin(readiness.anchors.dilutedShares.origin),
+    netDebt: readiness.anchors.netDebt.value === undefined ? "manual-required" : inputOrigin(readiness.anchors.netDebt.origin),
+    growth: readiness.anchors.revenueGrowthReference.value === undefined ? current.growth : "historical-derived",
+    margin: latestMargin !== undefined && latestMargin > 0 && margin && medianSeriesValue(margin) !== undefined ? "historical-derived" : "manual-required",
+    da: readiness.anchors.daRevenueReference.value === undefined ? "manual-required" : "historical-derived",
+    capex: readiness.anchors.capexRevenueReference.value === undefined ? current.capex : "historical-derived",
+    tax: readiness.anchors.cashTaxReference.value === undefined ? current.tax : "historical-derived",
+  };
+}
+
+function comparableValues(result: FundamentalsResult, anchors: EditableAnchors): Record<ComparableMetric, number | undefined> {
+  const eps = metric(result, "dilutedEps")?.observations.find((item) => item.fiscalYear === anchors.fiscalYear)?.value;
   const ebitda = metric(result, "ebitda")?.observations.find((item) => item.fiscalYear === anchors.fiscalYear)?.value;
   return { pe: eps && eps > 0 ? eps : undefined, "ev-revenue": anchors.baseRevenue, "ev-ebitda": ebitda !== undefined && ebitda > 0 ? ebitda : undefined };
 }
 
-function buildAssumptions(form: FormState, anchors: NonNullable<ReturnType<typeof dcfAnchors>>): DcfAssumptions {
+function buildAssumptions(form: FormState, anchors: EditableAnchors): DcfAssumptions {
   return { baseRevenue: anchors.baseRevenue, dilutedShares: anchors.dilutedShares, forecastYears: 5, revenueGrowth: numberRate(form.growth), operatingMargin: numberRate(form.margin), cashTaxRate: numberRate(form.tax), daPercentOfRevenue: numberRate(form.da), capexPercentOfRevenue: numberRate(form.capex), nwcPercentOfIncrementalRevenue: numberRate(form.nwc), wacc: numberRate(form.wacc), terminalGrowth: numberRate(form.terminal), netDebt: parseRequiredValuationNumber(form.netDebt, "netDebt") };
+}
+
+function inputOrigin(origin: ValuationReadiness["anchors"][ValuationAnchorKey]["origin"]): ValuationInputOrigin {
+  return origin === "constructed-standard" ? "sec-constructed" : origin === "historical-derived" ? "historical-derived" : "sec-direct";
+}
+
+type ValuationAnchorKey = keyof ValuationReadiness["anchors"];
+
+function fieldSourceLabel(origin: ValuationInputOrigin, t: Translate): string {
+  if (origin === "sec-direct") return t("valuation.source.secDirect");
+  if (origin === "sec-constructed") return t("valuation.source.secConstructed");
+  if (origin === "historical-derived") return t("valuation.source.historical");
+  if (origin === "manual-required") return t("valuation.source.manualRequired");
+  if (origin === "user-entered") return t("valuation.source.userEntered");
+  return t("valuation.source.manualExample");
+}
+
+function anchorOrigin(origin: ValuationReadiness["anchors"][ValuationAnchorKey]["origin"], t: Translate): string {
+  return origin === "constructed-standard" ? t("valuation.source.secConstructed") : origin === "historical-derived" ? t("valuation.source.historical") : t("valuation.source.secDirect");
+}
+
+function anchorLabel(key: ValuationAnchorKey, t: Translate): string {
+  if (key === "baseRevenue") return t("valuation.baseRevenue");
+  if (key === "dilutedShares") return t("valuation.dilutedShares");
+  if (key === "netDebt") return t("valuation.netDebt");
+  return t("valuation.latestMargin");
+}
+
+function anchorValue(key: ValuationAnchorKey, value: number, language: string): string {
+  if (key === "operatingMarginReference") return percent(value, language);
+  if (key === "dilutedShares") return compact(value, language);
+  return money(value, language);
+}
+
+function snapshotAnchor(
+  key: "baseRevenue" | "dilutedShares" | "netDebt",
+  value: number,
+  fiscalYear: number,
+  readiness: ValuationReadiness,
+  inputOriginValue: ValuationInputOrigin,
+) {
+  const source = readiness.anchors[key];
+  const userEdited = inputOriginValue === "user-entered" || inputOriginValue === "manual-required" || inputOriginValue === "manual-example";
+  return {
+    value,
+    origin: userEdited ? "manual-user" as const : source.origin === "constructed-standard" ? "constructed-standard" as const : "direct-standard" as const,
+    fiscalYear,
+    receipts: userEdited ? [] : source.receipts,
+    userEdited,
+    assumptionOwnership: userEdited ? "user" as const : "sec-evidence" as const,
+  };
 }
 
 function shiftScenario(base: DcfAssumptions, growth: number, margin: number, wacc: number, terminal: number): DcfAssumptions { return { ...base, revenueGrowth: clamp((base.revenueGrowth as number) + growth, -0.99, 1), operatingMargin: clamp((base.operatingMargin as number) + margin, -2, 1), wacc: clamp(base.wacc + wacc, 0.001, 1), terminalGrowth: Math.min(clamp(base.terminalGrowth + terminal, -1, 1), base.wacc + wacc - 0.001) }; }
@@ -325,9 +445,7 @@ function around(value: number, step: number) { return [-2, -1, 0, 1, 2].map((off
 function finiteNumber(value: string, name: string) { return parseRequiredValuationNumber(value, name); }
 function numberRate(value: string) { return finiteNumber(value, "rate") / 100; }
 function metric(result: FundamentalsResult, key: FundamentalsMetricKey): FundamentalsSeries | undefined { return result.metrics.find((item) => item.metric === key); }
-function medianAnnualGrowth(series: FundamentalsSeries) { if (series.observations.length < 3) return undefined; const chronological = [...series.observations].sort((a, b) => a.fiscalYear - b.fiscalYear); const rates: number[] = []; for (let index = 1; index < chronological.length; index += 1) { const prior = chronological[index - 1]; const current = chronological[index]; if (prior.value > 0 && current.value > 0 && current.fiscalYear === prior.fiscalYear + 1) rates.push(current.value / prior.value - 1); } return rates.length >= 2 ? median(rates) : undefined; }
 function medianSeriesValue(series: FundamentalsSeries) { return series.observations.length >= 3 ? median(series.observations.map((item) => item.value)) : undefined; }
-function medianAlignedRatio(numerator: FundamentalsSeries, denominator: FundamentalsSeries) { const ratios: number[] = []; for (const item of numerator.observations) { const match = denominator.observations.find((other) => other.fiscalYear === item.fiscalYear && other.periodEnd === item.periodEnd); if (match && match.value > 0) ratios.push(item.value / match.value); } return ratios.length >= 3 ? median(ratios) : undefined; }
 function median(values: number[]) { const sorted = [...values].sort((a, b) => a - b); const middle = Math.floor(sorted.length / 2); return sorted.length % 2 === 1 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2; }
 function safeTicker(raw: string) { try { const value = decodeURIComponent(raw).trim().toUpperCase(); return TICKER_PATTERN.test(value) ? value : ""; } catch { return ""; } }
 function clamp(value: number, min: number, max: number) { return Math.min(max, Math.max(min, value)); }

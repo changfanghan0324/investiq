@@ -2,6 +2,7 @@
 // can reference the exact assumptions and outputs without rerunning or inventing a valuation.
 
 import type { DcfAssumptions } from "@/domain/valuation";
+import type { FinancialFactOrigin, SourceReceipt } from "@/domain/fundamentals";
 
 export interface ValuationSnapshot {
   version: 1;
@@ -9,6 +10,15 @@ export interface ValuationSnapshot {
   generatedAt: string;
   fiscalYear: number;
   assumptions: DcfAssumptions;
+  /** Optional for backward compatibility with snapshots saved before field-level provenance. */
+  anchorProvenance?: Record<"baseRevenue" | "dilutedShares" | "netDebt", {
+    value: number;
+    origin: FinancialFactOrigin;
+    fiscalYear: number;
+    receipts: SourceReceipt[];
+    userEdited: boolean;
+    assumptionOwnership: "sec-evidence" | "user";
+  }>;
   values: {
     bear: number;
     base: number;

@@ -23,5 +23,5 @@
 .tab, .tabActive { color: var(--text-secondary); font-size: calc(14px * var(--ui-font-scale, 1)); }
 .tabActive { border-color: var(--accent); color: var(--text-primary); }
 .content { width: min(100%, 1220px); margin: 0 auto; padding: 36px 24px 64px; }
-.footer { border-color: var(--border); color: var(--text-tertiary); font-size: calc(12px * var(--ui-font-scale, 1)); }
+.footer { border-color: var(--border); color: #59636f; font-size: calc(12px * var(--ui-font-scale, 1)); }
 @media (max-width: 640px) { .meta { margin-left: 0; } .content { padding: 28px 16px 48px; } }

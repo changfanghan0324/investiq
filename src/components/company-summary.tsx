@@ -20,6 +20,7 @@ import { useLanguage, type Translate, type TranslationKey } from "@/i18n/languag
 import { loadAnalysisMarketData } from "@/services/analysis-market-data";
 import { loadCompanyFundamentals } from "@/services/fundamentals-api";
 import { addYearsClamped, todayDateString } from "@/utils/date";
+import { FinancialOriginLabel } from "./financial-origin-label";
 
 import styles from "./company-summary.module.css";
 
@@ -108,7 +109,7 @@ export function CompanySummary({ rawTicker }: { rawTicker: string }) {
           <div className={styles.trendGrid}>
             <TrendCard number="1" title={t("company.revenueTrend")} series={revenue} format="money" />
             <TrendCard number="2" title={t("company.marginTrend")} series={operatingMargin} format="percent" />
-            <TrendCard number="3" title={t("company.fcfTrend")} series={freeCashFlow} format="money" constructed />
+            <TrendCard number="3" title={t("company.fcfTrend")} series={freeCashFlow} format="money" />
           </div>
 
           <section className={styles.pricePanel}>
@@ -181,12 +182,12 @@ export function CompanySummary({ rawTicker }: { rawTicker: string }) {
   );
 }
 
-function TrendCard({ number, title, series, format, constructed = false }: { number: string; title: string; series?: FundamentalsSeries; format: "money" | "percent"; constructed?: boolean }) {
+function TrendCard({ number, title, series, format }: { number: string; title: string; series?: FundamentalsSeries; format: "money" | "percent" }) {
   const { t } = useLanguage();
   const chart = [...(series?.observations ?? [])].reverse().map((item) => ({ year: `FY${item.fiscalYear}`, value: item.value }));
   return (
     <section className={styles.trendCard}>
-      <header><h2>{number}. {title}</h2>{constructed ? <span>{t("company.constructed")}</span> : null}</header>
+      <header><h2>{number}. {title}</h2><FinancialOriginLabel observation={series?.observations[0]} /></header>
       {series?.available && chart.length ? (
         <>
           <div className={styles.chart} role="img" aria-label={t("company.chartAria", { title, count: chart.length })}>
@@ -210,7 +211,7 @@ function TrendCard({ number, title, series, format, constructed = false }: { num
 function Metric({ label, value }: { label: string; value: string }) { return <div><span>{label}</span><strong>{value}</strong></div>; }
 function SummaryMetric({ label, series, format }: { label: string; series?: FundamentalsSeries; format: "money" | "percent" }) {
   const latest = series?.available ? series.observations[0] : undefined;
-  return <div><dt>{label}</dt><dd>{latest ? display(latest.value, format) : "—"}</dd><small>{latest ? `FY${latest.fiscalYear}` : ""}</small></div>;
+  return <div><dt>{label}</dt><dd>{latest ? display(latest.value, format) : "—"}</dd><small>{latest ? <>FY{latest.fiscalYear} · <FinancialOriginLabel observation={latest} /></> : ""}</small></div>;
 }
 function Takeaway({ label, text }: { label: string; text: string }) { return <div className={styles.takeaway}><strong>{label}</strong><p>{text}</p></div>; }
 function Unavailable({ text }: { text: string }) { return <div className={styles.unavailable}><TriangleAlert size={15} /><span>{text}</span></div>; }
