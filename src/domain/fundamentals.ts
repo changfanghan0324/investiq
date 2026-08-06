@@ -97,6 +97,43 @@ export interface FundamentalsObservation {
   value: number;
   /** One receipt for a directly reported metric; the components for a constructed one. */
   receipts: SourceReceipt[];
+  /** The evidence class belongs to the observation because a series may mix origins by year. */
+  origin?: FinancialFactOrigin;
+  derivation?: FinancialDerivation;
+}
+
+export type FinancialFactOrigin =
+  | 'direct-standard'
+  | 'constructed-standard'
+  | 'direct-custom-extension'
+  | 'manual-user';
+
+export type FinancialCoverageStatus =
+  | 'complete'
+  | 'limited-history'
+  | 'manual-required'
+  | 'not-meaningful'
+  | 'not-separately-reported'
+  | 'unavailable';
+
+export interface FinancialDerivation {
+  formula: string;
+  componentMetrics: FundamentalsMetricKey[];
+  componentReceipts: SourceReceipt[];
+}
+
+export type FundamentalsReasonCode =
+  | 'no-annual-standard-fact'
+  | 'components-not-aligned'
+  | 'limited-history'
+  | 'financial-issuer-gate';
+
+export interface FundamentalsCoverageSummary {
+  status: FinancialCoverageStatus;
+  availableYears: number;
+  requestedYears: number;
+  mixedOrigins: boolean;
+  reasonCode?: FundamentalsReasonCode;
 }
 
 export type FundamentalsUnit = 'USD' | 'USD/shares' | 'shares' | 'ratio';
@@ -109,6 +146,8 @@ export interface FundamentalsSeries {
   available: boolean;
   /** Latest fiscal year first. Empty when the metric is unavailable. */
   observations: FundamentalsObservation[];
+  /** Always present on normalized API output; optional for legacy in-memory fixtures. */
+  coverage?: FundamentalsCoverageSummary;
   /** Present only when `available` is false; a plain-language reason. */
   unavailableReason?: string;
 }
@@ -143,8 +182,21 @@ export interface FundamentalsResult {
   metrics: FundamentalsSeries[];
   /** Every metric that could not be produced, with a reason. */
   coverage: {
-    unavailable: Array<{ metric: FundamentalsMetricKey; reason: string }>;
+    unavailable: Array<{ metric: FundamentalsMetricKey; reason: string; reasonCode?: FundamentalsReasonCode }>;
+    reconciliations?: FundamentalsReconciliation[];
   };
+}
+
+export interface FundamentalsReconciliation {
+  metric: FundamentalsMetricKey;
+  fiscalYear: number;
+  directValue: number;
+  constructedValue: number;
+  difference: number;
+  tolerance: number;
+  status: 'aligned' | 'mismatch';
+  directReceipts: SourceReceipt[];
+  componentReceipts: SourceReceipt[];
 }
 
 // --- Metric catalog ------------------------------------------------------------
@@ -220,6 +272,7 @@ const DIRECT_METRICS: DirectMetricSpec[] = [
     basis: 'Total revenue',
     aliases: [
       { taxonomy: 'us-gaap', concept: 'RevenueFromContractWithCustomerExcludingAssessedTax' },
+      { taxonomy: 'us-gaap', concept: 'RevenueFromContractWithCustomerIncludingAssessedTax' },
       { taxonomy: 'us-gaap', concept: 'Revenues' },
       { taxonomy: 'us-gaap', concept: 'SalesRevenueNet' },
     ],
@@ -285,7 +338,6 @@ const DIRECT_METRICS: DirectMetricSpec[] = [
     aliases: [
       { taxonomy: 'us-gaap', concept: 'DepreciationDepletionAndAmortization' },
       { taxonomy: 'us-gaap', concept: 'DepreciationAndAmortization' },
-      { taxonomy: 'us-gaap', concept: 'DepreciationDepletionAndAmortizationPropertyPlantAndEquipment' },
     ],
   },
   {
@@ -464,6 +516,30 @@ const COMMERCIAL_PAPER_SPEC: DirectMetricSpec = {
   aliases: [{ taxonomy: 'us-gaap', concept: 'CommercialPaper' }],
 };
 
+const DEPRECIATION_COMPONENT_SPEC: DirectMetricSpec = {
+  key: 'depreciationAndAmortization',
+  kind: 'duration',
+  unit: 'USD',
+  basis: 'Depreciation component',
+  nonNegative: true,
+  aliases: [
+    { taxonomy: 'us-gaap', concept: 'Depreciation' },
+    { taxonomy: 'us-gaap', concept: 'DepreciationDepletionAndAmortizationPropertyPlantAndEquipment' },
+  ],
+};
+
+const AMORTIZATION_COMPONENT_SPEC: DirectMetricSpec = {
+  key: 'depreciationAndAmortization',
+  kind: 'duration',
+  unit: 'USD',
+  basis: 'Amortization component',
+  nonNegative: true,
+  aliases: [
+    { taxonomy: 'us-gaap', concept: 'AmortizationOfIntangibleAssets' },
+    { taxonomy: 'us-gaap', concept: 'FiniteLivedIntangibleAssetsAmortizationExpense' },
+  ],
+};
+
 // --- Selection internals -------------------------------------------------------
 
 interface SelectedObservation {
@@ -472,6 +548,8 @@ interface SelectedObservation {
   value: number;
   /** One receipt for a direct metric; both component receipts for a constructed one. */
   receipts: SourceReceipt[];
+  origin?: FinancialFactOrigin;
+  derivation?: FinancialDerivation;
 }
 
 /** A qualifying fact tagged with the precedence rank of the alias it came from. */
@@ -506,6 +584,26 @@ export function buildFundamentals(
   for (const spec of DIRECT_METRICS) {
     selected.set(spec.key, selectDirectMetric(facts, spec, identity.cikNumber));
   }
+
+  const isKnownNonFinancialIssuer =
+    identity.sicCode !== undefined && !(identity.sicCode >= 6000 && identity.sicCode <= 6999);
+  const directRevenue = selected.get('revenue') ?? [];
+  const revenueComponents = isKnownNonFinancialIssuer
+    ? constructRevenueFromGrossProfitAndCostOfRevenue(
+        selected.get('grossProfit') ?? [],
+        selected.get('costOfRevenue') ?? [],
+      )
+    : [];
+  selected.set('revenue', mergeDirectWithFallback(directRevenue, revenueComponents));
+
+  const directDa = selected.get('depreciationAndAmortization') ?? [];
+  const constructedDa = isKnownNonFinancialIssuer
+    ? constructDepreciationAndAmortization(
+        selectDirectMetric(facts, DEPRECIATION_COMPONENT_SPEC, identity.cikNumber),
+        selectDirectMetric(facts, AMORTIZATION_COMPONENT_SPEC, identity.cikNumber),
+      )
+    : [];
+  selected.set('depreciationAndAmortization', mergeDirectWithFallback(directDa, constructedDa));
   selected.set(
     'debtCurrent',
     includeAlignedCommercialPaper(
@@ -529,7 +627,7 @@ export function buildFundamentals(
 
   // 3. Emit direct series constrained to the window (latest year first).
   const metrics: FundamentalsSeries[] = [];
-  const unavailable: Array<{ metric: FundamentalsMetricKey; reason: string }> = [];
+  const unavailable: Array<{ metric: FundamentalsMetricKey; reason: string; reasonCode: FundamentalsReasonCode }> = [];
   const windowed = new Map<FundamentalsMetricKey, SelectedObservation[]>();
 
   for (const spec of DIRECT_METRICS) {
@@ -537,7 +635,7 @@ export function buildFundamentals(
       .filter((obs) => inWindow(obs.fiscalYear))
       .sort((a, b) => b.fiscalYear - a.fiscalYear);
     windowed.set(spec.key, observations);
-    metrics.push(toSeries(spec.key, spec.unit, spec.basis, observations, REASON_NO_ANNUAL, unavailable));
+    metrics.push(toSeries(spec.key, spec.unit, spec.basis, observations, REASON_NO_ANNUAL, 'no-annual-standard-fact', unavailable));
   }
 
   // 4. Constructed metrics from aligned component observations.
@@ -546,7 +644,7 @@ export function buildFundamentals(
     windowed.get('revenue') ?? [],
   );
   metrics.push(
-    toSeries('operatingMargin', 'ratio', 'Operating income ÷ revenue', operatingMargin, REASON_MARGIN, unavailable),
+    toSeries('operatingMargin', 'ratio', 'Operating income ÷ revenue', operatingMargin, REASON_MARGIN, 'components-not-aligned', unavailable),
   );
 
   const ebitda = constructSum(
@@ -560,6 +658,7 @@ export function buildFundamentals(
       'Operating income + depreciation and amortization',
       ebitda,
       REASON_EBITDA,
+      'components-not-aligned',
       unavailable,
     ),
   );
@@ -575,6 +674,7 @@ export function buildFundamentals(
       'Current interest-bearing debt + noncurrent debt',
       totalDebt,
       REASON_NO_ANNUAL,
+      'components-not-aligned',
       unavailable,
     ),
   );
@@ -590,6 +690,7 @@ export function buildFundamentals(
       'Current interest-bearing debt + noncurrent debt − cash and cash equivalents; marketable securities excluded',
       netDebt,
       REASON_NET_DEBT,
+      'components-not-aligned',
       unavailable,
     ),
   );
@@ -605,6 +706,7 @@ export function buildFundamentals(
       'Operating cash flow − capital expenditures',
       freeCashFlow,
       REASON_FCF,
+      'components-not-aligned',
       unavailable,
     ),
   );
@@ -633,7 +735,10 @@ export function buildFundamentals(
     disclaimer: FUNDAMENTALS_DISCLAIMER,
     fiscalYears,
     metrics,
-    coverage: { unavailable },
+    coverage: {
+      unavailable,
+      reconciliations: reconcileDirectAndConstructedRevenue(directRevenue, revenueComponents),
+    },
   };
 }
 
@@ -643,12 +748,28 @@ function toSeries(
   basis: string,
   observations: SelectedObservation[],
   reason: string,
-  unavailable: Array<{ metric: FundamentalsMetricKey; reason: string }>,
+  reasonCode: FundamentalsReasonCode,
+  unavailable: Array<{ metric: FundamentalsMetricKey; reason: string; reasonCode: FundamentalsReasonCode }>,
 ): FundamentalsSeries {
   if (observations.length === 0) {
-    unavailable.push({ metric, reason });
-    return { metric, unit, basis, available: false, observations: [], unavailableReason: reason };
+    unavailable.push({ metric, reason, reasonCode });
+    return {
+      metric,
+      unit,
+      basis,
+      available: false,
+      observations: [],
+      unavailableReason: reason,
+      coverage: {
+        status: 'unavailable',
+        availableYears: 0,
+        requestedYears: FUNDAMENTALS_YEARS,
+        mixedOrigins: false,
+        reasonCode,
+      },
+    };
   }
+  const origins = new Set(observations.map((observation) => observation.origin));
   return {
     metric,
     unit,
@@ -659,7 +780,16 @@ function toSeries(
       periodEnd: obs.periodEnd,
       value: obs.value,
       receipts: obs.receipts,
+      origin: obs.origin,
+      ...(obs.derivation ? { derivation: obs.derivation } : {}),
     })),
+    coverage: {
+      status: observations.length >= FUNDAMENTALS_YEARS ? 'complete' : 'limited-history',
+      availableYears: observations.length,
+      requestedYears: FUNDAMENTALS_YEARS,
+      mixedOrigins: origins.size > 1,
+      ...(observations.length >= FUNDAMENTALS_YEARS ? {} : { reasonCode: 'limited-history' as const }),
+    },
   };
 }
 
@@ -721,6 +851,7 @@ function selectDirectMetric(
       periodEnd: winner.fact.end as string,
       value: winner.fact.val as number,
       receipts: [toReceipt(winner, cikNumber)],
+      origin: 'direct-standard',
     });
   }
   return observations;
@@ -821,6 +952,12 @@ function constructOperatingMargin(
       periodEnd: income.periodEnd,
       value: income.value / rev.value,
       receipts: [...income.receipts, ...rev.receipts],
+      origin: 'constructed-standard',
+      derivation: {
+        formula: 'operatingIncome / revenue',
+        componentMetrics: ['operatingIncome', 'revenue'],
+        componentReceipts: [...income.receipts, ...rev.receipts],
+      },
     });
   }
   return out;
@@ -846,6 +983,12 @@ function constructFreeCashFlow(
       periodEnd: ocf.periodEnd,
       value: ocf.value - capexObs.value,
       receipts: [...ocf.receipts, ...capexObs.receipts],
+      origin: 'constructed-standard',
+      derivation: {
+        formula: 'operatingCashFlow - capitalExpenditure',
+        componentMetrics: ['operatingCashFlow', 'capitalExpenditure'],
+        componentReceipts: [...ocf.receipts, ...capexObs.receipts],
+      },
     });
   }
   return out;
@@ -865,6 +1008,12 @@ function constructSum(
       periodEnd: leftObservation.periodEnd,
       value: leftObservation.value + rightObservation.value,
       receipts: [...leftObservation.receipts, ...rightObservation.receipts],
+      origin: 'constructed-standard',
+      derivation: {
+        formula: 'operatingIncome + depreciationAndAmortization',
+        componentMetrics: ['operatingIncome', 'depreciationAndAmortization'],
+        componentReceipts: [...leftObservation.receipts, ...rightObservation.receipts],
+      },
     });
   }
   return out;
@@ -884,6 +1033,12 @@ function constructInstantDifference(
       periodEnd: leftObservation.periodEnd,
       value: leftObservation.value - rightObservation.value,
       receipts: [...leftObservation.receipts, ...rightObservation.receipts],
+      origin: 'constructed-standard',
+      derivation: {
+        formula: 'totalDebt - cashAndEquivalents',
+        componentMetrics: ['totalDebt', 'cashAndEquivalents'],
+        componentReceipts: [...leftObservation.receipts, ...rightObservation.receipts],
+      },
     });
   }
   return out;
@@ -903,6 +1058,12 @@ function constructInstantSum(
       periodEnd: leftObservation.periodEnd,
       value: leftObservation.value + rightObservation.value,
       receipts: [...leftObservation.receipts, ...rightObservation.receipts],
+      origin: 'constructed-standard',
+      derivation: {
+        formula: 'debtCurrent + longTermDebtNoncurrent',
+        componentMetrics: ['debtCurrent', 'longTermDebtNoncurrent'],
+        componentReceipts: [...leftObservation.receipts, ...rightObservation.receipts],
+      },
     });
   }
   return out;
@@ -931,22 +1092,130 @@ function includeAlignedCommercialPaper(
       periodEnd: debtObservation.periodEnd,
       value: debtObservation.value + paperObservation.value,
       receipts: [...debtObservation.receipts, ...paperObservation.receipts],
+      origin: 'constructed-standard' as const,
+      derivation: {
+        formula: 'longTermDebtCurrent + commercialPaper',
+        componentMetrics: ['debtCurrent'] as FundamentalsMetricKey[],
+        componentReceipts: [...debtObservation.receipts, ...paperObservation.receipts],
+      },
     };
   });
 }
 
-function sameAnnualPeriod(left: SelectedObservation, right: SelectedObservation): boolean {
+/**
+ * Safe depth-one fallback for a missing direct revenue period. Only directly reported
+ * standard facts from the same filing accession and exact annual period may be added.
+ */
+export function constructRevenueFromGrossProfitAndCostOfRevenue(
+  grossProfit: FundamentalsObservation[],
+  costOfRevenue: FundamentalsObservation[],
+): FundamentalsObservation[] {
+  const costsByYear = indexByFiscalYear(costOfRevenue);
+  const output: FundamentalsObservation[] = [];
+  for (const gross of grossProfit) {
+    const cost = costsByYear.get(gross.fiscalYear);
+    if (!cost || !sameAnnualPeriod(gross, cost)) continue;
+    if (gross.origin !== 'direct-standard' || cost.origin !== 'direct-standard') continue;
+    if (gross.receipts[0]?.unit !== 'USD' || cost.receipts[0]?.unit !== 'USD') continue;
+    if (!(cost.value >= 0)) continue;
+    const value = gross.value + cost.value;
+    if (!Number.isFinite(value) || !(value > 0)) continue;
+    const componentReceipts = [...gross.receipts, ...cost.receipts];
+    output.push({
+      fiscalYear: gross.fiscalYear,
+      periodEnd: gross.periodEnd,
+      value,
+      receipts: componentReceipts,
+      origin: 'constructed-standard',
+      derivation: {
+        formula: 'grossProfit + costOfRevenue',
+        componentMetrics: ['grossProfit', 'costOfRevenue'],
+        componentReceipts,
+      },
+    });
+  }
+  return output;
+}
+
+/** Direct combined D&A is merged first; this function supplies only missing periods. */
+export function constructDepreciationAndAmortization(
+  depreciation: FundamentalsObservation[],
+  amortization: FundamentalsObservation[],
+): FundamentalsObservation[] {
+  const amortizationByYear = indexByFiscalYear(amortization);
+  const output: FundamentalsObservation[] = [];
+  for (const depreciationObservation of depreciation) {
+    const amortizationObservation = amortizationByYear.get(depreciationObservation.fiscalYear);
+    if (!amortizationObservation || !sameAnnualPeriod(depreciationObservation, amortizationObservation)) continue;
+    if (depreciationObservation.origin !== 'direct-standard' || amortizationObservation.origin !== 'direct-standard') continue;
+    if (depreciationObservation.receipts[0]?.unit !== 'USD' || amortizationObservation.receipts[0]?.unit !== 'USD') continue;
+    if (depreciationObservation.value < 0 || amortizationObservation.value < 0) continue;
+    const value = depreciationObservation.value + amortizationObservation.value;
+    if (!Number.isFinite(value)) continue;
+    const componentReceipts = [...depreciationObservation.receipts, ...amortizationObservation.receipts];
+    output.push({
+      fiscalYear: depreciationObservation.fiscalYear,
+      periodEnd: depreciationObservation.periodEnd,
+      value,
+      receipts: componentReceipts,
+      origin: 'constructed-standard',
+      derivation: {
+        formula: 'depreciation + amortization',
+        componentMetrics: ['depreciationAndAmortization'],
+        componentReceipts,
+      },
+    });
+  }
+  return output;
+}
+
+function mergeDirectWithFallback(
+  direct: SelectedObservation[],
+  fallback: FundamentalsObservation[],
+): SelectedObservation[] {
+  const directYears = new Set(direct.map((observation) => observation.fiscalYear));
+  return [...direct, ...fallback.filter((observation) => !directYears.has(observation.fiscalYear))];
+}
+
+function reconcileDirectAndConstructedRevenue(
+  direct: SelectedObservation[],
+  constructed: FundamentalsObservation[],
+): FundamentalsReconciliation[] {
+  const constructedByYear = indexByFiscalYear(constructed);
+  const output: FundamentalsReconciliation[] = [];
+  for (const directObservation of direct) {
+    const constructedObservation = constructedByYear.get(directObservation.fiscalYear);
+    if (!constructedObservation || !sameAnnualPeriod(directObservation, constructedObservation)) continue;
+    const difference = directObservation.value - constructedObservation.value;
+    const tolerance = Math.max(1, Math.abs(directObservation.value) * 0.000001);
+    output.push({
+      metric: 'revenue',
+      fiscalYear: directObservation.fiscalYear,
+      directValue: directObservation.value,
+      constructedValue: constructedObservation.value,
+      difference,
+      tolerance,
+      status: Math.abs(difference) <= tolerance ? 'aligned' : 'mismatch',
+      directReceipts: directObservation.receipts,
+      componentReceipts: constructedObservation.receipts,
+    });
+  }
+  return output;
+}
+
+function sameAnnualPeriod(left: FundamentalsObservation, right: FundamentalsObservation): boolean {
   const leftReceipt = left.receipts[0];
   const rightReceipt = right.receipts[0];
   return (
     left.periodEnd === right.periodEnd &&
     leftReceipt?.start !== undefined &&
-    leftReceipt.start === rightReceipt?.start
+    leftReceipt.start === rightReceipt?.start &&
+    leftReceipt.accn === rightReceipt?.accn
   );
 }
 
-function indexByFiscalYear(observations: SelectedObservation[]): Map<number, SelectedObservation> {
-  const map = new Map<number, SelectedObservation>();
+function indexByFiscalYear<T extends FundamentalsObservation>(observations: T[]): Map<number, T> {
+  const map = new Map<number, T>();
   for (const obs of observations) map.set(obs.fiscalYear, obs);
   return map;
 }
