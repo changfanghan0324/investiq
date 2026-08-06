@@ -245,11 +245,19 @@ describe('FSLY normalization coverage regression', () => {
     assert.equal(da.observations[0].origin, 'constructed-standard');
     assert.equal(da.observations[0].receipts.length, 2);
 
-    const incomplete = companyFacts({ 'us-gaap': {
+    const depreciationOnly = companyFacts({ 'us-gaap': {
       Revenues: { units: { USD: [annual(2025, 100)] } },
-      Depreciation: { units: { USD: [annual(2025, 8)] } },
+      DepreciationDepletionAndAmortizationPropertyPlantAndEquipment: { units: { USD: [annual(2025, 8)] } },
     } });
-    assert.equal(series(buildFundamentals(incomplete, identity({ sicCode: 7372 })), 'depreciationAndAmortization').available, false);
+    assert.equal(series(buildFundamentals(depreciationOnly, identity({ sicCode: 7372 })), 'depreciationAndAmortization').available, false);
+  });
+
+  it('fails closed for constructed metrics whose annual components come from different accessions', () => {
+    const facts = companyFacts({ 'us-gaap': {
+      Revenues: { units: { USD: [annual(2025, 100)] } },
+      OperatingIncomeLoss: { units: { USD: [{ ...annual(2025, 20), accn: 'different-accession' }] } },
+    } });
+    assert.equal(series(buildFundamentals(facts, identity({ sicCode: 7372 })), 'operatingMargin').available, false);
   });
 });
 

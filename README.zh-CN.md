@@ -57,6 +57,7 @@ market-price comparison，也不提供投资建议。
 
 - 按经济期间选择 SEC 年度事实，并保留 accession receipts。
 - 五年 revenue、operating margin、earnings、EPS、cash flow 与 constructed FCF。
+- Observation-level 来源标记、直接事实优先、严格的 Revenue/D&A 构建规则，以及支持部分覆盖的估值准备流程。
 - Unlevered FCFF DCF、明确的 EV-to-equity bridge 与 5×5 sensitivity。
 - Price/total-return basis 不在跨证券分析中混用。
 - 样本足够时提供 CAGR、volatility、Sharpe、Sortino、beta、alpha、historical VaR、drawdown、
@@ -69,7 +70,8 @@ market-price comparison，也不提供投资建议。
 ## 公开演示限制
 
 - 公开市场示例为合成数据，不是真实证券历史。
-- SEC 可用性和 filing taxonomy 会影响公司研究。
+- SEC 可用性和 filing taxonomy 会影响公司研究。系统提供 best-effort 标准化覆盖，并明确标示
+  直接 SEC 数据、由已报告组成项构建、用户手动输入或不可用；通用 custom-extension parser 仍未实现。
 - 未批准公开展示权及 durable provider quota 前，不启用公开 live-market 数据。
 - 缺少权威 sector source 时不显示 sector analytics。
 - 本产品用于研究与教育，不构成投资建议或 suitability assessment。

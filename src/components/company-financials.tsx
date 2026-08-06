@@ -38,6 +38,7 @@ export function CompanyFinancials({ rawTicker }: { rawTicker: string }) {
   const ebitda = metric(result, "ebitda");
   const operatingMargin = metric(result, "operatingMargin");
   const operatingCashFlow = metric(result, "operatingCashFlow");
+  const latestCompanyFiscalYear = result.fiscalYears[0];
   const ratios = buildCompanyFinancialAnalysis(result);
   const ratio = (key: CompanyRatioKey) => ratios.find((item) => item.metric === key);
 
@@ -51,17 +52,17 @@ export function CompanyFinancials({ rawTicker }: { rawTicker: string }) {
       <section className={styles.group}>
         <GroupHeader number="1" title={t("financials.growthTitle")} text={t("financials.growthText")} />
         <div className={styles.metricGrid}>
-          <FinancialMetric label={t("company.metricRevenue")} series={revenue} format="money" t={t} />
-          <FinancialMetric label={t("company.metricEbitda")} series={ebitda} format="money" t={t} />
-          <FinancialMetric label={t("company.metricDilutedEps")} series={eps} format="perShare" t={t} />
-          <FinancialMetric label={t("company.metricFreeCashFlow")} series={fcf} format="money" t={t} />
+          <FinancialMetric label={t("company.metricRevenue")} series={revenue} format="money" t={t} latestCompanyFiscalYear={latestCompanyFiscalYear} />
+          <FinancialMetric label={t("company.metricEbitda")} series={ebitda} format="money" t={t} latestCompanyFiscalYear={latestCompanyFiscalYear} />
+          <FinancialMetric label={t("company.metricDilutedEps")} series={eps} format="perShare" t={t} latestCompanyFiscalYear={latestCompanyFiscalYear} />
+          <FinancialMetric label={t("company.metricFreeCashFlow")} series={fcf} format="money" t={t} latestCompanyFiscalYear={latestCompanyFiscalYear} />
         </div>
       </section>
 
       <section className={styles.group}>
         <GroupHeader number="2" title={t("financials.profitabilityTitle")} text={t("financials.profitabilityText")} />
         <div className={styles.metricGrid}>
-          <FinancialMetric label={t("company.metricOperatingMargin")} series={operatingMargin} format="percent" t={t} />
+          <FinancialMetric label={t("company.metricOperatingMargin")} series={operatingMargin} format="percent" t={t} latestCompanyFiscalYear={latestCompanyFiscalYear} />
           <RatioMetric label={t("financials.grossMargin")} series={ratio("grossMargin")} />
           <RatioMetric label={t("financials.netMargin")} series={ratio("netMargin")} />
           <RatioMetric label={t("financials.roe")} series={ratio("returnOnEquity")} />
@@ -74,7 +75,7 @@ export function CompanyFinancials({ rawTicker }: { rawTicker: string }) {
         <section className={styles.group}>
           <GroupHeader number="3" title={t("financials.healthTitle")} text={t("financials.healthText")} />
           <div className={styles.metricGridCompact}>
-            <FinancialMetric label={t("company.metricOperatingCashFlow")} series={operatingCashFlow} format="money" t={t} />
+            <FinancialMetric label={t("company.metricOperatingCashFlow")} series={operatingCashFlow} format="money" t={t} latestCompanyFiscalYear={latestCompanyFiscalYear} />
             <RatioMetric label={t("financials.debtEquity")} series={ratio("debtToEquity")} />
             <RatioMetric label={t("financials.currentRatio")} series={ratio("currentRatio")} />
             <RatioMetric label={t("financials.quickRatio")} series={ratio("quickRatio")} />
@@ -124,7 +125,7 @@ export function CompanyFinancials({ rawTicker }: { rawTicker: string }) {
 
 function GroupHeader({ number, title, text }: { number: string; title: string; text: string }) { return <header className={styles.groupHeader}><span>{number}</span><div><h2>{title}</h2><p>{text}</p></div></header>; }
 
-function FinancialMetric({ label, series, format, t }: { label: string; series?: FundamentalsSeries; format: Format; t: Translate }) {
+function FinancialMetric({ label, series, format, t, latestCompanyFiscalYear }: { label: string; series?: FundamentalsSeries; format: Format; t: Translate; latestCompanyFiscalYear?: number }) {
   if (!series?.available || !series.observations.length) return <UnavailableMetric label={label} text={t("company.metricUnavailable")} />;
   const latest = series.observations[0];
   const oldest = series.observations.at(-1)!;
@@ -134,7 +135,7 @@ function FinancialMetric({ label, series, format, t }: { label: string; series?:
     <article className={styles.metric}>
       <header><span>{label}</span><FinancialOriginLabel observation={latest} /></header>
       <strong>{formatValue(latest.value, format)}</strong>
-      <p>FY{latest.fiscalYear}</p>
+      <p>FY{latest.fiscalYear}{latestCompanyFiscalYear !== undefined && latest.fiscalYear < latestCompanyFiscalYear ? ` · ${t("financials.olderEvidence", { year: latestCompanyFiscalYear })}` : ""}</p>
       <div><span>{format === "percent" ? t("financials.periodChange") : t("financials.periodGrowth")}</span><b>{periodValue}</b></div>
       <details><summary>{t("financials.formula")}</summary><p>{financialBasis(series.metric, t)}</p></details>
     </article>

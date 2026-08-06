@@ -314,13 +314,13 @@ function PercentField({ field, label, form, updateField, source, placeholder }: 
 }
 
 function ReadinessSummary({ readiness, t, language }: { readiness: ValuationReadiness; t: Translate; language: string }) {
-  const available = [readiness.anchors.baseRevenue, readiness.anchors.dilutedShares, readiness.anchors.netDebt, readiness.anchors.operatingMarginReference];
   const da = readiness.anchors.daRevenueReference;
+  const available = [readiness.anchors.baseRevenue, readiness.anchors.dilutedShares, readiness.anchors.netDebt, readiness.anchors.operatingMarginReference, ...(da.value === undefined ? [] : [da])];
   return <section className={styles.readiness}>
     <header><div><h2>{t("valuation.readinessTitle")}</h2><p>{t("valuation.readinessText")}</p></div><span>{t("valuation.partialCoverage")}</span></header>
     <div className={styles.readinessGrid}>
-      <div><h3>{t("valuation.availableEvidence")}</h3><ul>{available.map((item) => <li key={item.key}><CheckCircle2 size={15} /><span><b>{anchorLabel(item.key, t)}</b><small>{item.value === undefined ? t("valuation.manualRequired") : <>{anchorValue(item.key, item.value, language)} · <FinancialOriginLabel origin={item.origin === "historical-derived" ? undefined : item.origin} /></>}</small></span></li>)}</ul></div>
-      <div><h3>{t("valuation.needsReview")}</h3><ul><li><TriangleAlert size={15} /><span><b>{t("valuation.daRevenue")}</b><small>{da.status === "limited-history" ? t("valuation.limitedDa") : da.value === undefined ? t("valuation.manualRequired") : anchorOrigin(da.origin, t)}</small></span></li><li><TriangleAlert size={15} /><span><b>{t("valuation.forecastMargin")}</b><small>{(readiness.anchors.operatingMarginReference.value ?? 0) <= 0 ? t("valuation.lossMarginRequired") : t("valuation.userOwnedForecast")}</small></span></li></ul></div>
+      <div><h3>{t("valuation.availableEvidence")}</h3><ul>{available.map((item) => <li key={item.key}><CheckCircle2 size={15} /><span><b>{anchorLabel(item.key, t)}</b><small>{item.value === undefined ? t("valuation.manualRequired") : <>{anchorValue(item.key, item.value, language)} · {item.origin === "historical-derived" ? t("valuation.source.historical") : <FinancialOriginLabel origin={item.origin} />}</>}</small></span></li>)}</ul></div>
+      <div><h3>{t("valuation.needsReview")}</h3><ul>{da.value === undefined ? <li><TriangleAlert size={15} /><span><b>{t("valuation.daRevenue")}</b><small>{da.status === "limited-history" ? t("valuation.limitedDa") : t("valuation.manualRequired")}</small></span></li> : null}<li><TriangleAlert size={15} /><span><b>{t("valuation.forecastMargin")}</b><small>{(readiness.anchors.operatingMarginReference.value ?? 0) <= 0 ? t("valuation.lossMarginRequired") : t("valuation.userOwnedForecast")}</small></span></li></ul></div>
     </div>
     <details><summary>{t("valuation.openEvidence")}</summary><div className={styles.receipts}>{available.flatMap((item) => item.receipts).map((receipt, index) => <a key={`${receipt.accn}-${receipt.concept}-${receipt.end}-${index}`} href={receipt.sourceUrl} target="_blank" rel="noreferrer">{receipt.concept} · FY{receipt.fy} · {receipt.accn}</a>)}</div></details>
   </section>;
@@ -346,7 +346,6 @@ function editableAnchors(readiness: ValuationReadiness, form: FormState): Editab
 }
 
 function suggestedForm(result: FundamentalsResult, readiness: ValuationReadiness, current: FormState): FormState {
-  const revenue = metric(result, "revenue");
   const margin = metric(result, "operatingMargin");
   const latestMargin = readiness.anchors.operatingMarginReference.value;
   const medianMargin = latestMargin !== undefined && latestMargin > 0 && margin ? medianSeriesValue(margin) : undefined;
@@ -404,19 +403,16 @@ function fieldSourceLabel(origin: ValuationInputOrigin, t: Translate): string {
   return t("valuation.source.manualExample");
 }
 
-function anchorOrigin(origin: ValuationReadiness["anchors"][ValuationAnchorKey]["origin"], t: Translate): string {
-  return origin === "constructed-standard" ? t("valuation.source.secConstructed") : origin === "historical-derived" ? t("valuation.source.historical") : t("valuation.source.secDirect");
-}
-
 function anchorLabel(key: ValuationAnchorKey, t: Translate): string {
   if (key === "baseRevenue") return t("valuation.baseRevenue");
   if (key === "dilutedShares") return t("valuation.dilutedShares");
   if (key === "netDebt") return t("valuation.netDebt");
+  if (key === "daRevenueReference") return t("valuation.daRevenue");
   return t("valuation.latestMargin");
 }
 
 function anchorValue(key: ValuationAnchorKey, value: number, language: string): string {
-  if (key === "operatingMarginReference") return percent(value, language);
+  if (key === "operatingMarginReference" || key === "daRevenueReference" || key === "capexRevenueReference" || key === "cashTaxReference" || key === "revenueGrowthReference") return percent(value, language);
   if (key === "dilutedShares") return compact(value, language);
   return money(value, language);
 }

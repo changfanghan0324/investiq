@@ -42,4 +42,19 @@ describe('valuation readiness', () => {
     assert.equal(readiness.anchors.dilutedShares.reasonCode, 'exact-fiscal-year-missing');
     assert.equal(readiness.methods.dcf.available, false);
   });
+
+  it('describes the cash-tax reference as tax divided by pretax income', () => {
+    const facts = fslyCompanyFacts();
+    const revenueFacts = facts.facts?.['us-gaap']?.RevenueFromContractWithCustomerIncludingAssessedTax?.units?.USD;
+    assert.ok(revenueFacts);
+    const usGaap = facts.facts?.['us-gaap'];
+    assert.ok(usGaap);
+    usGaap.IncomeTaxExpenseBenefit = { units: { USD: revenueFacts.map((fact) => ({ ...fact, val: 20 })) } };
+    usGaap.IncomeLossFromContinuingOperationsBeforeIncomeTaxesExtraordinaryItemsNoncontrollingInterest = {
+      units: { USD: revenueFacts.map((fact) => ({ ...fact, val: 100 })) },
+    };
+    const readiness = buildValuationReadiness(buildFundamentals(facts, FSLY_IDENTITY));
+    assert.equal(readiness.anchors.cashTaxReference.formula, 'incomeTaxExpense / pretaxIncome median');
+    assert.equal(readiness.anchors.cashTaxReference.value, 0.2);
+  });
 });

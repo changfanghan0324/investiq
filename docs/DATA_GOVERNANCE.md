@@ -1,6 +1,6 @@
 # Data governance
 
-Last reviewed: 2026-08-04
+Last reviewed: 2026-08-06
 
 ## Evidence classes
 
@@ -13,6 +13,12 @@ Last reviewed: 2026-08-04
 | Licensed live market history | Provider data only when credentials, rights, and controls are ready | Disabled publicly today |
 | Synthetic public-demo data | Deterministic workflow sample, not ticker history | Compare, Portfolio, DCA, Market Context |
 | Unavailable | Missing, misaligned, unlicensed, or failed evidence | Shown as unavailable, never zero |
+
+Fundamental observations follow one disclosed precedence ladder: (1) direct standard SEC fact,
+(2) approved accounting-identity construction, (3) validated custom-extension fact when a
+feature-flagged parser exists, (4) explicit user assumption, and (5) unavailable. The current release
+does not implement a general custom-extension parser. Origin is stored per observation because one
+series may legitimately mix direct and constructed fiscal years.
 
 ## Public deployment rule
 
@@ -29,6 +35,15 @@ assistant context must say that the series is synthetic and not actual market hi
 - Missing facts never become zero.
 - Balance-sheet components must share one date; duration facts must share one economic period.
 - Constructed values retain receipts for every component.
+- Revenue may be constructed as gross profit plus cost of revenue only for a known non-financial
+  issuer, exact annual start/end, USD unit, one accession, non-negative cost, and positive finite result.
+- Direct revenue always wins. A parallel construction is retained only as a reconciliation diagnostic;
+  mismatch tolerance is the greater of one dollar or one part per million of direct revenue.
+- A combined D&A fact wins over separate depreciation plus amortization. Missing components never
+  become zero, PP&E depreciation alone is never labeled combined D&A, and fewer than three aligned
+  observations cannot be called a historical starter.
+- Every constructed duration metric requires a single annual period and accession. Divergent-accession
+  components fail closed instead of borrowing across filings.
 - SEC facts retain form, accession, filing date, fiscal year/period, start/end dates, unit, and source
   URL as applicable.
 - Amendments and duplicate filings are selected by documented deterministic rules.

@@ -69,6 +69,8 @@ _English desktop capture · 2026-08-04 · source snapshot `99c1222`._
 - Five-year revenue, operating-margin, earnings, EPS, cash-flow, and constructed-FCF evidence.
 - Unlevered FCFF DCF with an explicit EV-to-equity bridge and 5×5 sensitivities.
 - Reported, constructed, and analyst-owned assumptions shown as different evidence classes.
+- Observation-level provenance, direct-fact precedence, strict revenue/D&A constructions, and
+  partial-coverage valuation readiness for issuers whose standardized SEC histories are incomplete.
 - Price/total-return basis selection that never mixes bases within a cross-security analysis.
 - CAGR, volatility, Sharpe, Sortino, beta, alpha, historical VaR, drawdown, attribution,
   concentration, correlation, and historical rebalancing scenarios when samples support them.
@@ -87,7 +89,9 @@ _English desktop capture · 2026-08-04 · source snapshot `99c1222`._
 ## Public demo limitations
 
 - Public market examples are synthetic and are not actual security history.
-- SEC availability and filing taxonomy quality can affect company research.
+- SEC availability and filing taxonomy quality can affect company research. Coverage is best effort;
+  values disclose whether they are direct SEC facts, constructed from reported components, manually
+  supplied, or unavailable. General filing-specific custom-extension parsing remains unsupported.
 - Public live-market use remains disabled until display rights and durable provider quota controls
   are approved.
 - Sector analytics remain unavailable where no authoritative sector source exists.

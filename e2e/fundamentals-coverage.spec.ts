@@ -1,20 +1,20 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
 
-import { FSLY_IDENTITY, fslyCompanyFacts } from '@/domain/fixtures/fundamentals-fixtures';
+import { AAPL_IDENTITY, FSLY_IDENTITY, aaplDirectRevenueFixture, fslyCompanyFacts } from '@/domain/fixtures/fundamentals-fixtures';
 import { buildFundamentals } from '@/domain/fundamentals';
 
 const fsly = buildFundamentals(fslyCompanyFacts(), FSLY_IDENTITY);
+const aapl = buildFundamentals(aaplDirectRevenueFixture(), AAPL_IDENTITY);
 
 test.beforeEach(async ({ page }) => {
-  await page.route('**/api/fundamentals**', (route) => route.fulfill({
-    status: 200,
-    contentType: 'application/json',
-    body: JSON.stringify(fsly),
-  }));
+  await page.route('**/api/fundamentals**', (route) => {
+    const ticker = new URL(route.request().url()).searchParams.get('ticker');
+    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(ticker === 'AAPL' ? aapl : fsly) });
+  });
 });
 
-test('FSLY partial coverage stays usable and requires loss-making assumptions', async ({ page }, testInfo) => {
+test('FSLY partial coverage stays usable and requires loss-making assumptions', async ({ page }) => {
   await page.goto('/company/FSLY/valuation');
 
   await expect(page.getByRole('heading', { name: 'Valuation setup' })).toBeVisible();
@@ -46,12 +46,11 @@ test('FSLY partial coverage stays usable and requires loss-making assumptions', 
   await expect(method.locator('option[value="pe"]')).toHaveAttribute('disabled', '');
   await expect(page.getByText(/P\/E unavailable: aligned diluted EPS is zero or negative/)).toBeVisible();
 
+  await page.goto('/company/FSLY/financials');
+  await expect(page.getByText('FY2021 · Older evidence — latest company year is FY2025')).toBeVisible();
+
   expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBe(0);
 
-  if (process.env.INVESTIQ_CAPTURE_AUDIT === '1') {
-    const suffix = testInfo.project.name === 'mobile-320' ? 'mobile' : 'desktop';
-    await page.screenshot({ path: `docs/audit/fundamentals-coverage/after/fsly-valuation-${suffix}.png`, fullPage: true });
-  }
 });
 
 test('partial-coverage UI is bilingual, scalable, keyboard reachable, and axe-clean', async ({ page }, testInfo) => {
@@ -71,4 +70,23 @@ test('partial-coverage UI is bilingual, scalable, keyboard reachable, and axe-cl
 
   const results = await new AxeBuilder({ page }).analyze();
   expect(results.violations.filter((violation) => violation.impact === 'critical' || violation.impact === 'serious')).toEqual([]);
+});
+
+test('captures the fundamentals coverage audit set', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'chromium' || process.env.INVESTIQ_CAPTURE_AUDIT !== '1', 'capture-only audit');
+  const captures = [
+    { route: '/company/FSLY', name: 'fsly-summary' },
+    { route: '/company/FSLY/financials', name: 'fsly-financials' },
+    { route: '/company/FSLY/valuation', name: 'fsly-valuation' },
+    { route: '/company/AAPL/valuation', name: 'aapl-valuation' },
+  ];
+  for (const viewport of [{ width: 1440, height: 1000, suffix: 'desktop' }, { width: 390, height: 844, suffix: 'mobile' }]) {
+    await page.setViewportSize(viewport);
+    for (const capture of captures) {
+      await page.goto(capture.route);
+      await page.waitForTimeout(800);
+      await expect(page.locator('#main-content')).not.toContainText('temporarily unavailable');
+      await page.screenshot({ path: `docs/audit/fundamentals-coverage/after/${capture.name}-${viewport.suffix}.png`, fullPage: false });
+    }
+  }
 });

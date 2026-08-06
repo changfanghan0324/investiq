@@ -147,20 +147,29 @@ function historicalRatioAnchor(
   key: 'daRevenueReference' | 'capexRevenueReference' | 'cashTaxReference',
   numerator: FundamentalsSeries | undefined,
   denominator: FundamentalsSeries | undefined,
+  denominatorLabel = 'revenue',
 ): ValuationAnchorState {
   const observations: FundamentalsObservation[] = [];
   const ratios: number[] = [];
   for (const item of numerator?.observations ?? []) {
-    const match = denominator?.observations.find((candidate) => candidate.fiscalYear === item.fiscalYear && candidate.periodEnd === item.periodEnd);
+    const itemReceipt = item.receipts[0];
+    const match = denominator?.observations.find((candidate) => {
+      const candidateReceipt = candidate.receipts[0];
+      return candidate.fiscalYear === item.fiscalYear
+        && candidate.periodEnd === item.periodEnd
+        && itemReceipt?.start !== undefined
+        && itemReceipt.start === candidateReceipt?.start
+        && itemReceipt.accn === candidateReceipt?.accn;
+    });
     if (!match || !(match.value > 0)) continue;
     ratios.push(item.value / match.value);
     observations.push(item);
   }
-  return historicalAnchor(key, ratios, observations, `${numerator?.metric ?? key} / revenue median`);
+  return historicalAnchor(key, ratios, observations, `${numerator?.metric ?? key} / ${denominatorLabel} median`);
 }
 
 function historicalTaxAnchor(tax: FundamentalsSeries | undefined, pretax: FundamentalsSeries | undefined): ValuationAnchorState {
-  return historicalRatioAnchor('cashTaxReference', tax, pretax);
+  return historicalRatioAnchor('cashTaxReference', tax, pretax, 'pretaxIncome');
 }
 
 function historicalAnchor(
