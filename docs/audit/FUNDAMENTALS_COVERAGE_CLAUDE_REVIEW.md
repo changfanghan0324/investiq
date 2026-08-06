@@ -86,3 +86,9 @@ P2 test-fidelity notes: AAPL no longer duplicates the FSLY revenue-identity prec
 PP&E-depreciation-plus-amortization combination could receive its own named test, and the AAPL fixture
 does not exercise the separately tested commercial-paper composition path. None changes production
 selection behavior or blocks this PR.
+
+Post-sign-off preview verification found that live FSLY has more safe D&A coverage than the deliberately
+limited offline fixture: aligned direct `Depreciation` and `AmortizationOfIntangibleAssets` pairs support
+a historical median. It also exposed that receipt links displayed SEC filing `fy` metadata for restated
+periods. The final follow-up preserves `fy` in provenance but displays the economic year from `end`, with
+a regression test; this is a presentation correction and does not alter selection or calculations.

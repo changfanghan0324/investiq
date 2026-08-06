@@ -11,9 +11,11 @@ and a reconciliation diagnostic; it does not replace the filed direct fact.
 
 FSLY's valuation workspace now exposes field-level readiness. FY2025 base revenue ($624,018,000),
 diluted shares (146,902,000), constructed net debt ($181,276,000), and the -19.1% operating-margin
-reference remain visible. Forecast margin and D&A stay blank and user-owned because the latest margin
-is non-positive and D&A has fewer than three aligned observations. EV/Revenue is the default suitable
-comparable; P/E is disabled because aligned diluted EPS is negative.
+reference remain visible. Forecast margin stays blank and user-owned because the latest margin is
+non-positive. The deterministic fixture keeps D&A limited to one observation to prove the manual-input
+state; the live preview finds enough strictly aligned depreciation-plus-amortization pairs to calculate
+a 13.9% historical median. EV/Revenue is the default suitable comparable; P/E is disabled because
+aligned diluted EPS is negative.
 
 ## Financial-integrity record
 
@@ -31,7 +33,7 @@ comparable; P/E is disabled because aligned diluted EPS is negative.
 
 - TypeScript: passed.
 - ESLint: passed with zero errors and zero warnings.
-- Unit tests: 34 files / 653 tests passed.
+- Unit tests: 34 files / 654 tests passed.
 - Playwright: 29 passed / 17 intentional cross-project or capture-only skips.
 - Targeted FSLY workflow: desktop and mobile passed.
 - Accessibility: Simplified Chinese, 145% text scaling, keyboard reachability and axe critical/serious
@@ -47,8 +49,10 @@ The `before/` and `after/` directories each contain desktop 1440×1000 and mobil
 - FSLY Valuation
 - AAPL Valuation
 
-The after set confirms the partial-readiness card, direct/constructed provenance labels, editable anchor
-ownership, loss-making method suitability and older-evidence warning without horizontal overflow.
+The fixture-backed after set confirms the partial-readiness card, direct/constructed provenance labels,
+editable anchor ownership, limited-D&A behavior, loss-making method suitability and older-evidence
+warning without horizontal overflow. The deployed preview was separately checked against live SEC data;
+its safely constructed D&A history is broader than the deliberately limited fixture.
 
 ## Independent review
 
@@ -60,8 +64,10 @@ source of financial facts.
 ## Limits
 
 - No general SEC custom-extension parser is included; unsupported extensions remain unavailable.
-- FSLY combined D&A remains limited to one annual observation, so the UI asks the user for a forecast
-  assumption and marks FY2021 EBITDA as older evidence.
+- The offline FSLY acceptance fixture deliberately limits combined D&A to one annual observation, so it
+  proves the manual-assumption and older-evidence state. Live SEC data currently supplies at least three
+  strictly aligned depreciation-plus-amortization observations and therefore produces a historical D&A
+  median; availability may change with future filings.
 - Reconciliation records are diagnostic metadata; a future release may surface mismatch warnings in
   the UI.
 - The curated offline fixture is regression evidence, not a live EDGAR export or independent source.

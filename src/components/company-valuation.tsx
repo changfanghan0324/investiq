@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Calculator, CheckCircle2, Database, Info, LoaderCircle, Play, TriangleAlert } from "lucide-react";
 
-import type { FundamentalsMetricKey, FundamentalsResult, FundamentalsSeries } from "@/domain/fundamentals";
+import { receiptEconomicYear, type FundamentalsMetricKey, type FundamentalsResult, type FundamentalsSeries } from "@/domain/fundamentals";
 import { buildValuationReadiness, type ValuationReadiness } from "@/domain/valuation-readiness";
 import {
   ValuationError,
@@ -322,7 +322,7 @@ function ReadinessSummary({ readiness, t, language }: { readiness: ValuationRead
       <div><h3>{t("valuation.availableEvidence")}</h3><ul>{available.map((item) => <li key={item.key}><CheckCircle2 size={15} /><span><b>{anchorLabel(item.key, t)}</b><small>{item.value === undefined ? t("valuation.manualRequired") : <>{anchorValue(item.key, item.value, language)} · {item.origin === "historical-derived" ? t("valuation.source.historical") : <FinancialOriginLabel origin={item.origin} />}</>}</small></span></li>)}</ul></div>
       <div><h3>{t("valuation.needsReview")}</h3><ul>{da.value === undefined ? <li><TriangleAlert size={15} /><span><b>{t("valuation.daRevenue")}</b><small>{da.status === "limited-history" ? t("valuation.limitedDa") : t("valuation.manualRequired")}</small></span></li> : null}<li><TriangleAlert size={15} /><span><b>{t("valuation.forecastMargin")}</b><small>{(readiness.anchors.operatingMarginReference.value ?? 0) <= 0 ? t("valuation.lossMarginRequired") : t("valuation.userOwnedForecast")}</small></span></li></ul></div>
     </div>
-    <details><summary>{t("valuation.openEvidence")}</summary><div className={styles.receipts}>{available.flatMap((item) => item.receipts).map((receipt, index) => <a key={`${receipt.accn}-${receipt.concept}-${receipt.end}-${index}`} href={receipt.sourceUrl} target="_blank" rel="noreferrer">{receipt.concept} · FY{receipt.fy} · {receipt.accn}</a>)}</div></details>
+    <details><summary>{t("valuation.openEvidence")}</summary><div className={styles.receipts}>{available.flatMap((item) => item.receipts).map((receipt, index) => <a key={`${receipt.accn}-${receipt.concept}-${receipt.end}-${index}`} href={receipt.sourceUrl} target="_blank" rel="noreferrer">{receipt.concept} · FY{receiptEconomicYear(receipt)} · {receipt.accn}</a>)}</div></details>
   </section>;
 }
 

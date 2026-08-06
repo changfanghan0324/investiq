@@ -90,6 +90,11 @@ export interface SourceReceipt {
   sourceUrl: string;
 }
 
+/** Economic period year for display; SEC `fy` can describe the filing, not a restated fact's end year. */
+export function receiptEconomicYear(receipt: SourceReceipt): number {
+  return Number.parseInt(receipt.end.slice(0, 4), 10);
+}
+
 export interface FundamentalsObservation {
   fiscalYear: number;
   /** Period end (fiscal year end) the value describes. */

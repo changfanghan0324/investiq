@@ -14,6 +14,8 @@ The executable offline fixture is `src/domain/fixtures/fundamentals-fixtures.ts`
 - AAPL validates direct alias precedence. JPM identity validates the SIC financial-issuer gate.
 
 This fixture is regression evidence, not a live data pipeline or a substitute for the official filing.
+Its one-year D&A coverage is intentional: it preserves the limited-history/manual-input regression even
+when the current live Company Facts payload can construct additional aligned D&A observations.
 The primary evidence is Fastly's FY2025 10-K filing and filing index:
 
 - https://www.sec.gov/Archives/edgar/data/1517413/000151741326000053/fsly-20251231.htm

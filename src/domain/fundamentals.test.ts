@@ -9,6 +9,7 @@ import { describe, it } from 'vitest';
 import {
   FUNDAMENTALS_DISCLAIMER,
   buildFundamentals,
+  receiptEconomicYear,
   secFilingIndexUrl,
   type CompanyFacts,
   type FundamentalsIdentityInput,
@@ -76,6 +77,14 @@ function series(result: FundamentalsResult, key: FundamentalsMetricKey): Fundame
 }
 
 describe('concept alias precedence', () => {
+  it('uses the receipt period end year instead of filing FY metadata for display', () => {
+    const revenue = series(buildFundamentals(companyFacts({ 'us-gaap': {
+      Revenues: { units: { USD: [{ ...annual(2023, 100), fy: 2025 }] } },
+    } }), identity()), 'revenue');
+    assert.equal(revenue.observations[0].receipts[0].fy, 2025);
+    assert.equal(receiptEconomicYear(revenue.observations[0].receipts[0]), 2023);
+  });
+
   it('prefers the highest-precedence revenue tag present in a fiscal year', () => {
     const facts = companyFacts({
       'us-gaap': {
