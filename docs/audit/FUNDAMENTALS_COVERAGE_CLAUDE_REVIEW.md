@@ -77,3 +77,12 @@ PR` pending the following concrete issues:
 The first review also called the uncommitted working tree a release blocker. That was procedural, not a
 code defect; all reviewed implementation, governance and audit artifacts are committed before the PR is
 created. The branch remains unmerged.
+
+## Final sign-off
+
+After inspecting commit `46bff2b`, Claude confirmed that every prior P0 and P1 was resolved and that no
+new P0 or P1 was introduced. Final verdict: **READY FOR PR — DO NOT MERGE**. It retained three optional
+P2 test-fidelity notes: AAPL no longer duplicates the FSLY revenue-identity precedence case, the valid
+PP&E-depreciation-plus-amortization combination could receive its own named test, and the AAPL fixture
+does not exercise the separately tested commercial-paper composition path. None changes production
+selection behavior or blocks this PR.
