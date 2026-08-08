@@ -1,6 +1,6 @@
-# License decision — owner approval required
+# License decision
 
-Status: **No license selected; no open-source permission granted.**
+Status: **MIT selected for the repository code and documentation as part of v1.0.0 preparation.**
 
 | Option | Reuse rights | Attribution / warranty | Patent terms | Portfolio implication |
 | --- | --- | --- | --- | --- |
@@ -8,7 +8,11 @@ Status: **No license selected; no open-source permission granted.**
 | Apache-2.0 | Broad use, modification, redistribution | Preserve notices/changes; no warranty | Express patent license and termination | Clearer patent terms; more obligations and text |
 | All Rights Reserved / no license | No reuse permission beyond applicable law | Copyright notice; no warranty grant | No patent license | Protects portfolio work but limits outside contribution/reuse |
 
-The code license cannot grant rights to SEC presentation, vendor market data, trademarks, or other
-third-party material. The owner must choose deliberately and add the matching LICENSE before a final
-v1.0 release. Until then, all rights are reserved.
+## Decision record
 
+MIT is used because the recruiter-facing repository is intended to be inspectable and easy to reuse,
+while keeping the legal scope narrow: this is a license for the code and documentation in this
+repository, not a grant to redistribute SEC content, vendor market data, trademarks, or other
+third-party assets. Those rights and display restrictions remain in force independently.
+
+The root [LICENSE](../LICENSE) contains the standard MIT text and copyright notice for Fang Han Chang.

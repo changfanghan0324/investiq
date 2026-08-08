@@ -700,7 +700,7 @@ export function StockComparison() {
           </fieldset>
 
           <fieldset className={styles.periodField}>
-            <legend>{locale.startsWith("zh") ? "期间" : "Period"}</legend>
+            <legend>{t("compare.periodLabel")}</legend>
             <div className={styles.periodChoices}>
               {([1, 3, 5, "custom"] as PeriodChoice[]).map((choice) => (
                 <button
@@ -710,7 +710,7 @@ export function StockComparison() {
                   onClick={() => selectPeriod(choice)}
                   aria-pressed={period === choice}
                 >
-                  {choice === "custom" ? (locale.startsWith("zh") ? "自定义" : "Custom") : `${choice}Y`}
+                  {choice === "custom" ? t("compare.customPeriod") : `${choice}Y`}
                 </button>
               ))}
             </div>
@@ -748,7 +748,7 @@ export function StockComparison() {
           ) : null}
 
           <details className={styles.advancedSettings}>
-            <summary>{locale.startsWith("zh") ? "高级设置" : "Advanced settings"}</summary>
+            <summary>{t("compare.advancedTitle")}</summary>
             <div className={styles.advancedBody}>
               <div className={styles.controlField}>
                 <label htmlFor="compare-risk-free">{t("compare.riskFreeLabel")}</label>
@@ -766,7 +766,7 @@ export function StockComparison() {
                 />
                 {errorFor("riskFree") ? <p className={styles.fieldError}>{t(errorFor("riskFree")!.messageKey, errorFor("riskFree")!.params)}</p> : null}
               </div>
-              <p>{locale.startsWith("zh") ? "结果使用共同日期窗口，并要求至少 60 个共同观测值。基准、收益口径和样本说明会随结果显示。" : "Results use a common date window and require at least 60 shared observations. Benchmark, return-basis, and sample details appear with the results."}</p>
+              <p>{t("compare.advancedText")}</p>
             </div>
           </details>
 
@@ -786,10 +786,10 @@ export function StockComparison() {
               </span>
             </button>
             <button type="button" className={styles.exampleButton} onClick={loadExample}>
-              {locale.startsWith("zh") ? "载入 AAPL 与 MSFT 示例" : "Load AAPL vs MSFT example"}
+              {t("compare.loadExample")}
             </button>
             {analysisReadiness !== "ready" ? (
-              <p className={styles.modeLine}>{locale.startsWith("zh") ? "使用合成数据，并非真实市场历史。" : "Uses synthetic data, not actual market history."}</p>
+              <p className={styles.modeLine}>{t("compare.syntheticNotice")}</p>
             ) : null}
           </div>
         </form>

@@ -12,6 +12,10 @@ analytics in one reproducible research workflow.
 [Completed AAPL Research Case](https://investiq-eight-xi.vercel.app/case-study/aapl) ·
 [中文说明](README.zh-CN.md)
 
+**v1.0.0 release preparation:** the public demo is intentionally read-only, synthetic for market
+examples, and fail-closed when SEC or licensed-provider prerequisites are unavailable. CI runs
+quality and browser/accessibility checks as separate, deduplicated jobs on every pull request.
+
 ![InvestIQ home with public-demo disclosure](docs/assets/home-desktop.png)
 
 _English desktop capture · 2026-08-04 · source snapshot `99c1222`._
@@ -86,6 +90,19 @@ _English desktop capture · 2026-08-04 · source snapshot `99c1222`._
 - Vitest contracts, isolated Playwright flows, axe checks, mobile/text-scale checks, and production
   build validation. Exact final counts are recorded in the release PR after CI.
 
+## Review and governance
+
+- [Final production audit](docs/audit/FINAL_PRODUCTION_AUDIT.md) records runtime, security, and
+  operational findings.
+- [SEC data validation](docs/audit/SEC_DATA_VALIDATION.md) records AAPL, FSLY, financial-issuer,
+  loss-making, and unavailable-field coverage.
+- [CI hardening](docs/audit/CI_HARDENING.md) explains the split quality/browser workflow and cache
+  strategy.
+- [Structured usability evaluation](docs/audit/USABILITY_RESULTS.md) reports five representative
+  task walkthroughs and labels proxy findings separately from human research.
+- Methodology, SEC selection rules, financial-model contracts, and data governance are treated as
+  reviewable product contracts; missing data remains unavailable rather than being backfilled.
+
 ## Public demo limitations
 
 - Public market examples are synthetic and are not actual security history.
@@ -155,7 +172,7 @@ npm run test:e2e
 - [AI-assisted development](docs/AI_ASSISTED_DEVELOPMENT.md)
 - [Usability protocol](docs/usability/README.md)
 - [Release checklist](docs/RELEASE_CHECKLIST.md) and [draft release notes](docs/RELEASE_NOTES_V1.md)
-- [License decision](docs/LICENSE_DECISION.md)
+- [License decision](docs/LICENSE_DECISION.md) and [MIT license](LICENSE)
 
 ## Screenshot gallery
 
@@ -180,9 +197,10 @@ approves them.
 
 ## License and release status
 
-No open-source license has been granted. Unless and until the owner selects a license, all rights are
-reserved; third-party data and vendor rights are excluded. See [License Decision](docs/LICENSE_DECISION.md).
+The application source is released under the [MIT License](LICENSE). This license applies to the
+repository code and documentation only; SEC presentation, vendor market data, trademarks, and other
+third-party material remain subject to their own rights and display terms. See the [license decision](docs/LICENSE_DECISION.md).
 
-This branch is a **v1.0 release candidate**, not a final release. No tag, release, or merge is implied.
-Owner license approval, participant testing, preview/CI review, merge approval, and release approval
-remain manual gates.
+The repository is prepared for the **v1.0.0** release. The reviewed pull request, production
+promotion, and final GitHub release publication remain explicit delivery gates so the released SHA
+can be verified against the deployed application.

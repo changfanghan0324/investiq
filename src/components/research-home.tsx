@@ -14,12 +14,11 @@ const TICKER_PATTERN = /^[A-Z0-9.-]{1,12}$/;
 const RECENT_RESEARCH_KEY = "investiq-recent-research";
 
 export function ResearchHome() {
-  const { language, t } = useLanguage();
+  const { t } = useLanguage();
   const router = useRouter();
   const [query, setQuery] = useState("AAPL");
   const [error, setError] = useState("");
   const [recent, setRecent] = useState<string[]>([]);
-  const zh = language === "zh-CN";
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -58,11 +57,11 @@ export function ResearchHome() {
       <div className={styles.page}>
         <section className={styles.hero} aria-labelledby="research-heading">
           <div className={styles.heroCopy}>
-            <h1 id="research-heading">{zh ? "基于 SEC 申报文件的公司研究" : "Company research built from SEC filings."}</h1>
-            <p>{zh ? "查看财务表现、测试估值假设，并理解投资组合风险。" : "Review financial performance, test valuation assumptions, and understand portfolio risk."}</p>
+            <h1 id="research-heading">{t("research.heroTitle")}</h1>
+            <p>{t("research.heroSubtitle")}</p>
           </div>
           <form className={styles.searchForm} onSubmit={openResearch} noValidate>
-            <label htmlFor="home-ticker">{zh ? "股票代码" : "Ticker"}</label>
+            <label htmlFor="home-ticker">{t("research.tickerLabel")}</label>
             <div className={styles.searchRow}>
               <input
                 id="home-ticker"
@@ -77,40 +76,40 @@ export function ResearchHome() {
                   if (error) setError("");
                 }}
               />
-              <button type="submit">{zh ? "研究公司" : "Research company"}</button>
+              <button type="submit">{t("research.searchAction")}</button>
             </div>
             {error ? <p className={styles.formError} id="research-error" role="alert">{error}</p> : null}
             <div className={styles.heroLinks}>
-              <Link href="/case-study/aapl">{zh ? "查看 AAPL 示例" : "View the AAPL example"}</Link>
-              <Link href="/methodology">{zh ? "阅读方法说明" : "Read methodology"}</Link>
+              <Link href="/case-study/aapl">{t("research.viewCaseStudy")}</Link>
+              <Link href="/methodology">{t("research.readMethodology")}</Link>
             </div>
           </form>
         </section>
 
         <section className={styles.dataTruth} aria-labelledby="data-truth-heading">
-          <h2 id="data-truth-heading">{zh ? "本公开演示使用的数据" : "Data used in this public demo"}</h2>
+          <h2 id="data-truth-heading">{t("research.publicDemoDataTitle")}</h2>
           <dl>
-            <div><dt>{zh ? "公司财务数据" : "Company financials"}</dt><dd>{zh ? "真实 SEC 申报文件" : "Real SEC filings"}</dd></div>
-            <div><dt>{zh ? "市场示例" : "Market examples"}</dt><dd>{zh ? "合成数据——并非 AAPL、MSFT、SPY 或其他证券的真实市场历史" : "Synthetic data—not actual AAPL, MSFT, SPY, or other market history"}</dd></div>
-            <div><dt>{zh ? "缺失字段" : "Missing fields"}</dt><dd>{zh ? "保持不可用，绝不以零替代" : "Left unavailable and never replaced with zero"}</dd></div>
+            <div><dt>{t("research.companyFinancials")}</dt><dd>{t("research.realSecFilings")}</dd></div>
+            <div><dt>{t("research.marketExamples")}</dt><dd>{t("research.syntheticMarketHistory")}</dd></div>
+            <div><dt>{t("research.missingFields")}</dt><dd>{t("research.missingFieldsText")}</dd></div>
           </dl>
         </section>
 
         <section className={styles.researchTools} aria-labelledby="research-tools-heading">
-          <h2 id="research-tools-heading">{zh ? "研究工具" : "Research tools"}</h2>
+          <h2 id="research-tools-heading">{t("research.toolsTitle")}</h2>
           <div className={styles.toolGrid}>
-            <article><h3>{zh ? "公司财务" : "Company Financials"}</h3><p>{zh ? "查看收入、利润率、现金流与财务健康状况。" : "Review revenue, margins, cash flow, and financial health."}</p><Link href="/company/AAPL/financials">{zh ? "查看财务" : "Open financials"}</Link></article>
-            <article><h3>{zh ? "估值" : "Valuation"}</h3><p>{zh ? "测试 DCF 假设与敏感性。" : "Test DCF assumptions and sensitivity."}</p><Link href="/company/AAPL/valuation">{zh ? "打开估值" : "Open valuation"}</Link></article>
-            <article><h3>{zh ? "投资组合" : "Portfolio"}</h3><p>{zh ? "衡量回报、回撤、相关性与集中度。" : "Measure return, drawdown, correlation, and concentration."}</p><Link href="/portfolio">{zh ? "建立投资组合" : "Build a portfolio"}</Link></article>
+            <article><h3>{t("research.financialsTool")}</h3><p>{t("research.financialsToolText")}</p><Link href="/company/AAPL/financials">{t("research.openFinancials")}</Link></article>
+            <article><h3>{t("research.valuationTool")}</h3><p>{t("research.valuationToolText")}</p><Link href="/company/AAPL/valuation">{t("research.openValuation")}</Link></article>
+            <article><h3>{t("research.portfolioTool")}</h3><p>{t("research.portfolioToolText")}</p><Link href="/portfolio">{t("research.buildPortfolio")}</Link></article>
           </div>
         </section>
 
         <footer className={styles.footer}>
-          <div><strong>{zh ? "由 Fang Han Chang（Peter Chang）构建" : "Built by Fang Han Chang (Peter Chang)"}</strong><p>{zh ? "金融背景 · 即将入读波士顿大学 MSBA" : "Finance background · Incoming Boston University MSBA student"}</p></div>
+          <div><strong>{t("research.ownerFooter")}</strong><p>{t("research.ownerFooterText")}</p></div>
           <nav aria-label={t("research.footerLinksAria")}>
             <a href={publicProfile.repository} target="_blank" rel="noreferrer">GitHub</a>
-            <Link href="/about">{zh ? "关于" : "About"}</Link>
-            <Link href="/methodology">{zh ? "方法说明" : "Methodology"}</Link>
+            <Link href="/about">{t("research.aboutLink")}</Link>
+            <Link href="/methodology">{t("research.methodologyLink")}</Link>
           </nav>
         </footer>
       </div>

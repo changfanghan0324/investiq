@@ -1,8 +1,10 @@
-import type { Metadata } from "next";
-
 import { EquityReport } from "@/components/equity-report";
+import { companyPageMetadata } from "@/config/site-metadata";
 
-export const metadata: Metadata = { title: "Equity Research Report" };
+export async function generateMetadata({ params }: { params: Promise<{ ticker: string }> }) {
+  const { ticker } = await params;
+  return companyPageMetadata({ ticker, section: "Equity Research Report", path: `/company/${encodeURIComponent(ticker.toUpperCase())}/report` });
+}
 
 export default async function EquityReportRoute({ params }: { params: Promise<{ ticker: string }> }) {
   const { ticker } = await params;
