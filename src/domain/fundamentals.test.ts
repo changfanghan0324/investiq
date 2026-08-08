@@ -9,6 +9,7 @@ import { describe, it } from 'vitest';
 import {
   FUNDAMENTALS_DISCLAIMER,
   buildFundamentals,
+  receiptEconomicYear,
   secFilingIndexUrl,
   type CompanyFacts,
   type FundamentalsIdentityInput,
@@ -17,6 +18,13 @@ import {
   type FundamentalsSeries,
   type SecFact,
 } from '@/domain/fundamentals';
+import {
+  AAPL_IDENTITY,
+  FSLY_IDENTITY,
+  JPM_IDENTITY,
+  aaplDirectRevenueFixture,
+  fslyCompanyFacts,
+} from '@/domain/fixtures/fundamentals-fixtures';
 
 type Taxonomies = NonNullable<CompanyFacts['facts']>;
 
@@ -69,6 +77,14 @@ function series(result: FundamentalsResult, key: FundamentalsMetricKey): Fundame
 }
 
 describe('concept alias precedence', () => {
+  it('uses the receipt period end year instead of filing FY metadata for display', () => {
+    const revenue = series(buildFundamentals(companyFacts({ 'us-gaap': {
+      Revenues: { units: { USD: [{ ...annual(2023, 100), fy: 2025 }] } },
+    } }), identity()), 'revenue');
+    assert.equal(revenue.observations[0].receipts[0].fy, 2025);
+    assert.equal(receiptEconomicYear(revenue.observations[0].receipts[0]), 2023);
+  });
+
   it('prefers the highest-precedence revenue tag present in a fiscal year', () => {
     const facts = companyFacts({
       'us-gaap': {
@@ -105,7 +121,7 @@ describe('concept alias precedence', () => {
     assert.equal(byYear.get(2022)?.receipts[0].concept, 'Revenues');
   });
 
-  it('prefers comprehensive D&A over the PP&E-only depreciation tag', () => {
+  it('prefers comprehensive D&A over separate depreciation and amortization components', () => {
     const facts = companyFacts({
       'us-gaap': {
         Revenues: { units: { USD: [annual(2023, 1_000)] } },
@@ -113,6 +129,7 @@ describe('concept alias precedence', () => {
         DepreciationDepletionAndAmortizationPropertyPlantAndEquipment: {
           units: { USD: [annual(2023, 50)] },
         },
+        AmortizationOfIntangibleAssets: { units: { USD: [annual(2023, 30)] } },
       },
     });
 
@@ -163,6 +180,93 @@ describe('concept alias precedence', () => {
     const precedence = series(buildFundamentals(precedenceFacts, identity()), 'interestExpense');
     assert.equal(precedence.observations[0].value, 8);
     assert.equal(precedence.observations[0].receipts[0].concept, 'InterestExpense');
+  });
+});
+
+describe('FSLY normalization coverage regression', () => {
+  it('selects Fastly direct standard revenue and reconciles the accounting identity', () => {
+    const output = buildFundamentals(fslyCompanyFacts(), FSLY_IDENTITY);
+    const revenue = series(output, 'revenue');
+    assert.deepEqual(revenue.observations.map((observation) => observation.value), [
+      624_018_000, 543_676_000, 505_988_000, 432_725_000, 354_330_000,
+    ]);
+    assert.ok(revenue.observations.every((observation) => observation.origin === 'direct-standard'));
+    assert.ok(revenue.observations.every((observation) => observation.receipts.length === 1));
+    assert.ok(revenue.observations.every((observation) => observation.receipts[0].concept === 'RevenueFromContractWithCustomerIncludingAssessedTax'));
+    assert.equal(revenue.coverage?.status, 'complete');
+    assert.equal(output.coverage.reconciliations?.length, 5);
+    assert.ok(output.coverage.reconciliations?.every((item) => item.status === 'aligned' && item.difference === 0));
+    const margin = series(output, 'operatingMargin');
+    assert.equal(margin.observations[0].origin, 'constructed-standard');
+    assert.ok(Math.abs(margin.observations[0].value - (-119_000_000 / 624_018_000)) < 1e-12);
+  });
+
+  it('constructs revenue only when the direct concept is absent and retains both receipts', () => {
+    const output = buildFundamentals(fslyCompanyFacts(false), FSLY_IDENTITY);
+    const revenue = series(output, 'revenue');
+    assert.deepEqual(revenue.observations.map((observation) => observation.value), [
+      624_018_000, 543_676_000, 505_988_000, 432_725_000, 354_330_000,
+    ]);
+    assert.ok(revenue.observations.every((observation) => observation.origin === 'constructed-standard'));
+    assert.ok(revenue.observations.every((observation) => observation.receipts.length === 2));
+    assert.ok(revenue.observations.every((observation) => observation.derivation?.formula === 'grossProfit + costOfRevenue'));
+    assert.equal(output.coverage.unavailable.some((item) => item.metric === 'revenue'), false);
+  });
+
+  it('keeps AAPL direct revenue and does not construct manufacturing-style revenue for a financial issuer', () => {
+    const aapl = buildFundamentals(aaplDirectRevenueFixture(), AAPL_IDENTITY);
+    assert.equal(series(aapl, 'revenue').observations[0].origin, 'direct-standard');
+    assert.equal(series(aapl, 'revenue').observations[0].receipts.length, 1);
+
+    const jpm = buildFundamentals(fslyCompanyFacts(false), JPM_IDENTITY);
+    assert.equal(series(jpm, 'revenue').available, false);
+    assert.equal(series(jpm, 'operatingMargin').available, false);
+  });
+
+  it('fails closed when revenue components come from different accessions', () => {
+    const facts = fslyCompanyFacts(false);
+    const costs = facts.facts?.['us-gaap']?.CostOfRevenue?.units?.USD;
+    assert.ok(costs);
+    costs[0] = { ...costs[0], accn: 'different-accession' };
+    const revenue = series(buildFundamentals(facts, FSLY_IDENTITY), 'revenue');
+    assert.equal(revenue.observations.some((observation) => observation.fiscalYear === 2025), false);
+  });
+
+  it('uses direct combined D&A first, otherwise requires both aligned components', () => {
+    const direct = companyFacts({ 'us-gaap': {
+      Revenues: { units: { USD: [annual(2025, 100)] } },
+      DepreciationAndAmortization: { units: { USD: [annual(2025, 12)] } },
+      Depreciation: { units: { USD: [annual(2025, 8)] } },
+      AmortizationOfIntangibleAssets: { units: { USD: [annual(2025, 4)] } },
+    } });
+    const directOutput = buildFundamentals(direct, identity({ sicCode: 7372 }));
+    assert.equal(series(directOutput, 'depreciationAndAmortization').observations[0].origin, 'direct-standard');
+    assert.equal(series(directOutput, 'depreciationAndAmortization').observations[0].receipts.length, 1);
+
+    const constructed = companyFacts({ 'us-gaap': {
+      Revenues: { units: { USD: [annual(2025, 100)] } },
+      Depreciation: { units: { USD: [annual(2025, 8)] } },
+      AmortizationOfIntangibleAssets: { units: { USD: [annual(2025, 4)] } },
+    } });
+    const constructedOutput = buildFundamentals(constructed, identity({ sicCode: 7372 }));
+    const da = series(constructedOutput, 'depreciationAndAmortization');
+    assert.equal(da.observations[0].value, 12);
+    assert.equal(da.observations[0].origin, 'constructed-standard');
+    assert.equal(da.observations[0].receipts.length, 2);
+
+    const depreciationOnly = companyFacts({ 'us-gaap': {
+      Revenues: { units: { USD: [annual(2025, 100)] } },
+      DepreciationDepletionAndAmortizationPropertyPlantAndEquipment: { units: { USD: [annual(2025, 8)] } },
+    } });
+    assert.equal(series(buildFundamentals(depreciationOnly, identity({ sicCode: 7372 })), 'depreciationAndAmortization').available, false);
+  });
+
+  it('fails closed for constructed metrics whose annual components come from different accessions', () => {
+    const facts = companyFacts({ 'us-gaap': {
+      Revenues: { units: { USD: [annual(2025, 100)] } },
+      OperatingIncomeLoss: { units: { USD: [{ ...annual(2025, 20), accn: 'different-accession' }] } },
+    } });
+    assert.equal(series(buildFundamentals(facts, identity({ sicCode: 7372 })), 'operatingMargin').available, false);
   });
 });
 

@@ -53,11 +53,12 @@ describe('final portfolio release contracts', () => {
     expect(read('docs/usability/RESULTS_TEMPLATE.csv').trim().split('\n')).toHaveLength(1);
   });
 
-  it('keeps the recruiter README concise and explicitly non-final', () => {
+  it('keeps the recruiter README concise and release-scoped', () => {
     const english = read('README.md');
     expect(english.trim().split('\n').length).toBeLessThanOrEqual(250);
-    expect(english).toContain('v1.0 release candidate');
-    expect(english).toContain('No open-source license has been granted');
-    expect(read('README.zh-CN.md')).toContain('v1.0 release candidate');
+    expect(english).toContain('v1.0.0');
+    expect(english).toContain('MIT License');
+    expect(existsSync(resolve(root, 'LICENSE'))).toBe(true);
+    expect(read('README.zh-CN.md')).toContain('v1.0.0');
   });
 });

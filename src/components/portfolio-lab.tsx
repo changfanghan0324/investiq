@@ -983,7 +983,7 @@ export function PortfolioLab() {
     <AppShell>
       <div className={styles.page}>
         <div className={styles.pageHead}>
-          <h1>{locale.startsWith("zh") ? "建立投资组合" : "Build a portfolio"}</h1>
+          <h1>{t("portfolioLab.buildTitle")}</h1>
           <p className={styles.subtitle}>{t(showSyntheticNotice ? "portfolioLab.subtitleSynthetic" : "portfolioLab.subtitle")}</p>
           {(run || running) ? <p className={styles.quietStatus} role="status" aria-live="polite">{statusText}</p> : null}
         </div>
@@ -1106,7 +1106,7 @@ export function PortfolioLab() {
 
           <div className={styles.basicSettings}>
             <fieldset className={styles.periodField}>
-              <legend>{locale.startsWith("zh") ? "期间" : "Period"}</legend>
+              <legend>{t("portfolioLab.periodLabel")}</legend>
               <div className={styles.periodChoices}>
                 {([1, 3, 5, "custom"] as PeriodChoice[]).map((choice) => (
                   <button
@@ -1116,7 +1116,7 @@ export function PortfolioLab() {
                     onClick={() => selectPeriod(choice)}
                     aria-pressed={period === choice}
                   >
-                    {choice === "custom" ? (locale.startsWith("zh") ? "自定义" : "Custom") : `${choice}Y`}
+                    {choice === "custom" ? t("portfolioLab.customPeriod") : `${choice}Y`}
                   </button>
                 ))}
               </div>
@@ -1145,14 +1145,14 @@ export function PortfolioLab() {
           </div>
 
           <details className={styles.advancedSettings}>
-            <summary>{locale.startsWith("zh") ? "高级设置" : "Advanced settings"}</summary>
+            <summary>{t("portfolioLab.advancedTitle")}</summary>
             <div className={styles.advancedBody}>
               <div className={styles.controlField}>
                 <label htmlFor="portfolio-risk-free">{t("portfolioLab.riskFreeLabel")}</label>
                 <input id="portfolio-risk-free" type="number" inputMode="decimal" step="0.1" min={0} max={RISK_FREE_PERCENT_LIMIT} className={styles.control} value={form.riskFreePercent} onChange={(event) => updateField("riskFreePercent", event.target.value)} aria-invalid={errorFor("riskFree") ? true : undefined} />
                 {errorFor("riskFree") ? <p className={styles.fieldError}>{t(errorFor("riskFree")!.messageKey, errorFor("riskFree")!.params)}</p> : null}
               </div>
-              <p>{locale.startsWith("zh") ? "基准、收益口径、再平衡、VaR 与风险背景会在结果和方法说明中展示。" : "Benchmark, return basis, rebalancing, VaR, and Risk Context remain available with the results and methodology."}</p>
+              <p>{t("portfolioLab.advancedText")}</p>
             </div>
           </details>
 
@@ -1162,9 +1162,9 @@ export function PortfolioLab() {
               <span>{running ? t("portfolioLab.running") : analysisReadiness === "unavailable" ? t("analysisDemo.run") : t("portfolioLab.run")}</span>
             </button>
             <button type="button" className={styles.exampleButton} onClick={loadThreeHoldingExample}>
-              {locale.startsWith("zh") ? "载入三项持仓示例" : "Load a three-holding example"}
+              {t("portfolioLab.loadExample")}
             </button>
-            {analysisReadiness !== "ready" ? <p className={styles.modeLine}>{locale.startsWith("zh") ? "使用合成数据，并非真实市场历史。" : "Uses synthetic data, not actual market history."}</p> : null}
+            {analysisReadiness !== "ready" ? <p className={styles.modeLine}>{t("portfolioLab.syntheticNotice")}</p> : null}
           </div>
         </form>
 
@@ -1278,7 +1278,7 @@ export function PortfolioLab() {
 
             <HeadlineMetrics view={view} locale={locale} t={t} />
             <details className={styles.alternativeMethods}>
-              <summary>{locale.startsWith("zh") ? "探索其他历史权重示例" : "Explore alternative historical weight examples"}</summary>
+              <summary>{t("portfolioLab.alternativesTitle")}</summary>
               <div className={styles.alternativeActions}>
                 <button type="button" className={styles.equalButton} onClick={applyEqualWeights}>
                   <Scale size={13} aria-hidden="true" />

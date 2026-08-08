@@ -1,6 +1,6 @@
 # InvestIQ methodology
 
-Last reviewed: 2026-08-04
+Last reviewed: 2026-08-06
 
 This document defines the analytical basis shown by InvestIQ. UI copy can summarize it but cannot
 change it. Pure domain code and tests are authoritative for calculations.
@@ -53,9 +53,18 @@ CSV and PDF exports inherit the result's data mode. Synthetic exports say `Synth
 series` and `Not actual market history`. The AI drawer receives a compact calculated summary; it does
 not receive authority to recompute, alter, recommend, or convert synthetic output into ticker history.
 
+## Partial SEC fundamentals coverage
+
+Each annual observation records whether it is a direct standard SEC fact or a deterministic
+construction. Direct facts always win. Revenue can fall back to aligned direct gross profit plus cost
+of revenue, and combined D&A can fall back to aligned direct depreciation plus amortization, only
+under the accession/period/unit/issuer gates in [SEC selection rules](SEC_SELECTION_RULES.md).
+Valuation readiness is field-level: available anchors remain usable, limited history is disclosed, and
+missing forecast inputs remain explicit user assumptions. P/E is suppressed for non-positive EPS;
+EV/Revenue or EV/EBITDA is selected only when its aligned inputs are meaningful.
+
 ## Further contracts
 
 - [Financial model contracts](FINANCIAL_MODEL_CONTRACTS.md)
 - [SEC selection rules](SEC_SELECTION_RULES.md)
 - [Known limitations](KNOWN_LIMITATIONS.md)
-

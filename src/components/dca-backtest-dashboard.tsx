@@ -18,7 +18,6 @@ import {
   Download,
   Info,
   LoaderCircle,
-  MoreVertical,
   PanelLeftClose,
   PanelLeftOpen,
   Pencil,
@@ -79,7 +78,7 @@ const intervalOptions: Array<{ labelKey: TranslationKey; value: IntervalUnit }> 
 ];
 
 export function DcaBacktestDashboard() {
-  const { locale, t } = useLanguage();
+  const { t } = useLanguage();
   const { readiness } = useServiceReadiness();
   const health = readiness.dca;
   const [input, setInput] = useState<PortfolioInput>(createDefaultInput);
@@ -232,15 +231,14 @@ export function DcaBacktestDashboard() {
     <AppShell>
       <div className={styles.appShell}>
       <header className={styles.quietPageHead}>
-        <h1>{locale.startsWith("zh") ? "测试定期投资计划" : "Test a recurring investment plan"}</h1>
-        <p>{locale.startsWith("zh") ? "设定投入金额、频率与期间，然后查看历史结果。" : "Set an amount, frequency, and period, then review the historical result."}</p>
+        <h1>{t("dca.title")}</h1>
+        <p>{t("dca.subtitle")}</p>
         <span>{health === "ready" ? t("header.liveCapability") : t("header.publicDemoAvailable")}</span>
       </header>
 
       <div className={`${styles.dashboardGrid} ${setupCollapsed ? styles.setupCollapsed : ""}`}>
         <aside className={`${styles.builder} ${setupCollapsed ? styles.builderCollapsed : ""}`} aria-label={t("builder.setup")}>
           <BuilderHeader
-            holdings={input.positions.length}
             name={portfolioName}
             collapsed={setupCollapsed}
             onRename={renamePortfolio}
@@ -309,8 +307,8 @@ export function DcaBacktestDashboard() {
             <p className={styles.helperText}>{t("date.nonTrading")}</p>
 
             <details className={styles.advancedAssumptions}>
-              <summary>{locale.startsWith("zh") ? "高级假设" : "Advanced assumptions"}</summary>
-              <p className={styles.advancedIntro}>{locale.startsWith("zh") ? "券商费用、税金、股数订单、股息与期末清仓" : "Broker fees, taxes, share orders, dividends, and end liquidation"}</p>
+              <summary>{t("dca.advancedTitle")}</summary>
+              <p className={styles.advancedIntro}>{t("dca.advancedText")}</p>
             <div className={styles.builderDivider} />
             <SectionLabel icon={<ShieldCheck size={14} />} title={t("tax.section")} />
             <Field label={t("tax.basis")}>
@@ -463,10 +461,10 @@ export function DcaBacktestDashboard() {
                 {loadingMode ? <LoaderCircle size={17} className={styles.spin} /> : <Play size={15} aria-hidden="true" />}
               </span>
               <span className={styles.runLabel}>
-                {loadingMode ? t("run.calculating") : health === "checking" ? t("run.checking") : health === "ready" ? t("run.liveBacktest") : locale.startsWith("zh") ? "运行示例" : "Run demo"}
+                {loadingMode ? t("run.calculating") : health === "checking" ? t("run.checking") : health === "ready" ? t("run.liveBacktest") : t("run.demo")}
               </span>
             </button>
-            <p className={styles.dataModeLine}>{health === "ready" ? (locale.startsWith("zh") ? "使用可用的真实市场数据。" : "Uses available live market data.") : (locale.startsWith("zh") ? "此公开示例使用合成数据，并非真实 AAPL 历史。" : "This public demo uses synthetic data, not actual AAPL history.")}</p>
+            <p className={styles.dataModeLine}>{health === "ready" ? t("run.liveDataAvailable") : t("run.syntheticDataNotice")}</p>
           </div>
         </aside>
 
@@ -490,13 +488,13 @@ export function DcaBacktestDashboard() {
         {selected && report ? (
           <aside className={styles.resultActions} aria-label={t("audit.summaryAria")}>
             <button type="button" onClick={() => setAssistantOpen(true)} disabled={readiness.assistant !== "ready"}>
-              <MessageSquare size={15} aria-hidden="true" /> {locale.startsWith("zh") ? "说明结果" : "Explain results"}
+              <MessageSquare size={15} aria-hidden="true" /> {t("run.explainResults")}
             </button>
             <button type="button" onClick={exportPdf}>
               <Download size={15} aria-hidden="true" /> {t("header.exportPdf")}
             </button>
             <details>
-              <summary>{locale.startsWith("zh") ? "结果详情" : "Result details"}</summary>
+              <summary>{t("run.resultDetails")}</summary>
               <InsightsRail result={selected} report={report} holdingResults={holdingResults} />
             </details>
           </aside>
@@ -518,13 +516,11 @@ export function DcaBacktestDashboard() {
 }
 
 function BuilderHeader({
-  holdings,
   name,
   collapsed,
   onRename,
   onToggle,
 }: {
-  holdings: number;
   name: string;
   collapsed: boolean;
   onRename: (name: string) => void;
@@ -602,7 +598,6 @@ function BuilderHeader({
             </button>
           </div>
         )}
-        <button type="button" aria-label={t("builder.holdingsAria", { count: holdings })} title={t("builder.holdingsTitle", { count: holdings })}><MoreVertical size={16} /></button>
       </div>
     </div>
   );
@@ -651,7 +646,7 @@ function HoldingEditor({
               placeholder={t("holding.tickerPlaceholder")}
               onChange={(event) => onChange({ ticker: event.target.value.toUpperCase().replace(/[^A-Z0-9.-]/g, "") })}
             />
-            <small>{companyLabel(position.ticker, t)}</small>
+            <small>{position.ticker ? t("holding.companyCode", { ticker: position.ticker }) : t("holding.enterTicker")}</small>
           </label>
         </div>
         {removable ? (
@@ -777,7 +772,7 @@ function ResultsWorkspace({
         </div>
         <div className={styles.resultContext}>
           <button type="button" aria-label={t("result.details")} title={`${portfolioTitle(holdingResults.map((item) => item.ticker))} · ${result.startDate} ${t("date.to")} ${result.endDate}`}><Info size={16} /></button>
-          <p>{result.startDate} — {result.endDate} · {t("builder.holdingsTitle", { count: result.holdingsCount })} · {formatLocalizedDuration(result.durationDays, t)}</p>
+          <p>{result.startDate} — {result.endDate} · {t(result.holdingsCount === 1 ? "run.holding" : "run.holdings", { count: result.holdingsCount })} · {formatLocalizedDuration(result.durationDays, t)}</p>
         </div>
       </div>
 
@@ -943,7 +938,7 @@ function AssistantDrawer({
   mode: ResultMode;
   onClose: () => void;
 }) {
-  const { locale, t } = useLanguage();
+  const { t } = useLanguage();
   const [messages, setMessages] = useState<AssistantMessage[]>([]);
   const [question, setQuestion] = useState("");
   const [loading, setLoading] = useState(false);
@@ -987,7 +982,7 @@ function AssistantDrawer({
         aria-label={t("ai.dialog")}
       >
         <div className={styles.drawerHeader}>
-          <div><span><MessageSquare size={16} /></span><div><strong>{locale.startsWith("zh") ? "说明结果" : "Explain results"}</strong><small>{t("ai.subtitle")}</small></div></div>
+          <div><span><MessageSquare size={16} /></span><div><strong>{t("run.explainResults")}</strong><small>{t("ai.subtitle")}</small></div></div>
           <button type="button" aria-label={t("ai.close")} onClick={onClose}><X size={18} /></button>
         </div>
         <div className={styles.aiGuardrail}><ShieldCheck size={15} /><span>{t("ai.guardrail")}</span></div>
@@ -1027,7 +1022,7 @@ function AssistantDrawer({
           />
           <div><span>{question.length}/500</span><button type="submit" disabled={!question.trim() || loading}>{t("ai.ask")} <ArrowRight size={14} /></button></div>
         </form>
-        <p className={styles.explanationReceipt}>{locale.startsWith("zh") ? "此说明基于页面中显示的报告生成，不会修改任何计算结果。" : "This explanation is generated from the displayed report. It does not change any calculation."}</p>
+        <p className={styles.explanationReceipt}>{t("run.explanationReceipt")}</p>
       </motion.aside>
     </motion.div>
   );
@@ -1337,20 +1332,6 @@ function isValidDateString(value: string) {
 function portfolioTitle(tickers: string[]): string {
   if (tickers.length <= 4) return tickers.join(" · ");
   return `${tickers.slice(0, 4).join(" · ")} +${tickers.length - 4}`;
-}
-
-function companyLabel(ticker: string, t: Translate): string {
-  const names: Record<string, string> = {
-    AAPL: "Apple Inc.",
-    GOOG: "Alphabet Inc., Class C",
-    GOOGL: "Alphabet Inc., Class A",
-    MSFT: "Microsoft Corporation",
-    NVDA: "NVIDIA Corporation",
-    SPY: "SPDR S&P 500 ETF Trust",
-    SOXL: "Direxion Semiconductor Bull 3X",
-    RYCEY: "Rolls-Royce Holdings ADR",
-  };
-  return names[ticker.trim().toUpperCase()] ?? t("holding.unknownCompany");
 }
 
 function selectResult(report: PortfolioReport | undefined, mode: ResultMode): PortfolioAggregateResult | undefined {

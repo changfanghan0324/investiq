@@ -11,6 +11,9 @@ InvestIQ 在一个可复现的研究流程中连接 SEC 官方申报证据、明
 [完整 AAPL 研究案例](https://investiq-eight-xi.vercel.app/case-study/aapl) ·
 [English](README.md)
 
+**v1.0.0 发布准备：**公开演示为只读；市场示例明确使用合成数据；SEC 或已授权数据服务的前置
+条件不可用时会安全停止。CI 将质量检查与浏览器/无障碍检查拆成去重后的两项工作，并在每个 PR 上运行。
+
 ![带有公开演示说明的 InvestIQ 首页](docs/assets/home-mobile.png)
 
 _移动端截图 · 2026-08-04 · 来源快照 `99c1222`。_
@@ -57,6 +60,7 @@ market-price comparison，也不提供投资建议。
 
 - 按经济期间选择 SEC 年度事实，并保留 accession receipts。
 - 五年 revenue、operating margin、earnings、EPS、cash flow 与 constructed FCF。
+- Observation-level 来源标记、直接事实优先、严格的 Revenue/D&A 构建规则，以及支持部分覆盖的估值准备流程。
 - Unlevered FCFF DCF、明确的 EV-to-equity bridge 与 5×5 sensitivity。
 - Price/total-return basis 不在跨证券分析中混用。
 - 样本足够时提供 CAGR、volatility、Sharpe、Sortino、beta、alpha、historical VaR、drawdown、
@@ -69,7 +73,8 @@ market-price comparison，也不提供投资建议。
 ## 公开演示限制
 
 - 公开市场示例为合成数据，不是真实证券历史。
-- SEC 可用性和 filing taxonomy 会影响公司研究。
+- SEC 可用性和 filing taxonomy 会影响公司研究。系统提供 best-effort 标准化覆盖，并明确标示
+  直接 SEC 数据、由已报告组成项构建、用户手动输入或不可用；通用 custom-extension parser 仍未实现。
 - 未批准公开展示权及 durable provider quota 前，不启用公开 live-market 数据。
 - 缺少权威 sector source 时不显示 sector analytics。
 - 本产品用于研究与教育，不构成投资建议或 suitability assessment。
@@ -124,7 +129,9 @@ npm run test:e2e
 - [AI 协作说明](docs/AI_ASSISTED_DEVELOPMENT.md)
 - [真人可用性测试协议](docs/usability/README.md)
 - [发布检查表](docs/RELEASE_CHECKLIST.md)与[发布说明草案](docs/RELEASE_NOTES_V1.md)
-- [License 决策](docs/LICENSE_DECISION.md)
+- [License 决策](docs/LICENSE_DECISION.md)与 [MIT License](LICENSE)
+- [生产审计](docs/audit/FINAL_PRODUCTION_AUDIT.md)、[SEC 数据验证](docs/audit/SEC_DATA_VALIDATION.md)、
+  [CI 加固](docs/audit/CI_HARDENING.md)与[结构化可用性评估](docs/audit/USABILITY_RESULTS.md)
 
 ## 作者、License 与发布状态
 
@@ -133,6 +140,6 @@ M.S. in Business Analytics。[GitHub](https://github.com/changfanghan0324) ·
 [Repository](https://github.com/changfanghan0324/investiq) ·
 [Methodology](https://investiq-eight-xi.vercel.app/methodology)
 
-LinkedIn、公开 email 与 résumé 在 owner 核准前不显示。当前未授予开源 license；owner 选择前保留
-所有权利，且不包含第三方数据与 vendor rights。本分支是 **v1.0 release candidate**，不是正式发布；
-不得据此视为已 merge、tag 或 release。
+LinkedIn、公开 email 与 résumé 在 owner 核准前不显示。仓库代码与文档采用 [MIT License](LICENSE)，
+但不包含第三方数据、SEC 展示权、vendor rights 或商标授权。本仓库已准备 **v1.0.0**；合并、生产
+升级与 GitHub Release 仍需以可验证的 reviewed SHA 为最终交付闸门。

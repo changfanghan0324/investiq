@@ -1,7 +1,10 @@
-import type { Metadata } from "next";
 import { CompanyFinancials } from "@/components/company-financials";
+import { companyPageMetadata } from "@/config/site-metadata";
 
-export const metadata: Metadata = { title: "Company Financials" };
+export async function generateMetadata({ params }: { params: Promise<{ ticker: string }> }) {
+  const { ticker } = await params;
+  return companyPageMetadata({ ticker, section: "Company Financials", path: `/company/${encodeURIComponent(ticker.toUpperCase())}/financials` });
+}
 
 export default async function CompanyFinancialsRoute({ params }: { params: Promise<{ ticker: string }> }) {
   const { ticker } = await params;
