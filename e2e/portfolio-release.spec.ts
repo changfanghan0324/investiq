@@ -122,14 +122,43 @@ test("analysis workspaces expose unavailable live data as synthetic mode", async
   }));
 
   await page.goto("/compare");
-  await expect(page.getByRole("region", { name: "Synthetic public-demo data" })).toBeVisible();
-  await expect(page.getByText("Data source: Synthetic public-demo series · Not actual market history")).toBeVisible();
+  await expect(page.getByRole("region", { name: "Public Demo Market Data" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Public Demo Market Data" }).getByText("This page uses synthetic market series for demonstration.", { exact: false })).toBeVisible();
   await expect(page.getByRole("button", { name: "Run synthetic demo", exact: true })).toBeEnabled();
 
   await page.goto("/portfolio");
-  await expect(page.getByRole("region", { name: "Synthetic public-demo data" })).toBeVisible();
-  await expect(page.getByText("Data source: Synthetic public-demo series · Not actual market history")).toBeVisible();
+  await expect(page.getByRole("region", { name: "Public Demo Market Data" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Public Demo Market Data" }).getByText("This page uses synthetic market series for demonstration.", { exact: false })).toBeVisible();
   await expect(page.getByRole("button", { name: "Run synthetic demo", exact: true })).toBeEnabled();
+});
+
+test("synthetic market routes keep disclosure, provenance, and honest labels together", async ({ page }) => {
+  await page.route("**/api/health", (route) => route.fulfill({
+    status: 503,
+    contentType: "application/json",
+    body: JSON.stringify({ status: "unavailable", services: { priceAnalysis: "unavailable", dca: "unavailable", assistant: "ready", database: "configured" } }),
+  }));
+
+  await page.goto("/market");
+  await expect(page.getByRole("heading", { name: "Illustrative Market Data" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Public Demo Market Data" }).getByRole("paragraph")).toContainText("This page uses synthetic market series for demonstration.");
+  await expect(page.getByTestId("market-data-provenance")).toBeVisible();
+
+  for (const route of ["/compare", "/portfolio"]) {
+    await page.goto(route);
+    await page.getByRole("button", { name: "Run synthetic demo", exact: true }).click();
+    await expect(page.getByTestId("market-data-provenance")).toBeVisible();
+    await expect(page.getByRole("region", { name: "Public Demo Market Data" }).getByRole("paragraph")).toContainText("This page uses synthetic market series for demonstration.");
+    await expect(page.locator("body")).not.toContainText("Current Price");
+    await expect(page.locator("body")).not.toContainText("Historical Performance");
+  }
+
+  await page.goto("/tools/dca");
+  await page.getByRole("button", { name: "Run demo", exact: true }).click();
+  await expect(page.getByTestId("market-data-provenance")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Demo Market History Results" })).toBeVisible();
+  await expect(page.locator("body")).not.toContainText("Current Price");
+  await expect(page.locator("body")).not.toContainText("Historical Performance");
 });
 
 test("320px contract has no horizontal overflow on primary release routes", async ({ page }, testInfo) => {
@@ -173,8 +202,8 @@ test("DCA result workspace has no prohibited ARIA attributes", async ({ page }) 
 
   await page.goto("/tools/dca");
   await page.getByRole("button", { name: "Run demo" }).click();
-  await expect(page.getByRole("heading", { name: "Portfolio performance" })).toBeVisible();
-  await expect(page.getByRole("region", { name: "Synthetic public-demo data" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Demo Market History Results" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Public Demo Market Data" })).toBeVisible();
   await expect(page.getByRole("group", { name: "Report scenario" }).getByRole("button", { name: "Synthetic series" })).toBeVisible();
   await page.waitForTimeout(400);
 
@@ -265,7 +294,7 @@ test("synthetic CSV and PDF downloads retain public-demo provenance", async ({ p
 
   await page.goto("/tools/dca");
   await page.getByRole("button", { name: "Run demo" }).click();
-  await expect(page.getByRole("heading", { name: "Portfolio performance" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Demo Market History Results" })).toBeVisible();
   const pdfEvent = page.waitForEvent("download");
   await page.getByRole("button", { name: "Export PDF" }).click();
   const pdf = await pdfEvent;

@@ -36,6 +36,25 @@ _English desktop capture · 2026-08-04 · source snapshot `99c1222`._
 Synthetic series demonstrate the workflow only. They do not describe historical performance of the
 ticker labels shown.
 
+### Synthetic market-data contract
+
+Every public route that consumes the demo market adapter (`/market`, `/compare`, `/portfolio`,
+`/tools/dca`, and the company price-risk context) renders a persistent **Public Demo Market Data**
+disclosure. The disclosure is paired with a provenance receipt containing:
+
+```ts
+{
+  sourceType: "synthetic" | "licensed-live",
+  provider: string,
+  generatedAt: string,
+  disclaimer: string,
+}
+```
+
+Synthetic surfaces use the labels **Synthetic Price Series**, **Illustrative Market Data**,
+**Demo Market History**, and **Synthetic Return Example**. They do not use current-price or
+historical-performance wording, and no market-data provider is connected in the public demo.
+
 ## The problem
 
 Investment research often separates filing evidence, model assumptions, risk analytics, and the

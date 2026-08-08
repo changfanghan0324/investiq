@@ -50,6 +50,10 @@ function security(ticker: string, prices: PriceBar[], overrides: Partial<MarketD
     source: 'demo',
     fetchedAt: '2026-07-27T00:00:00.000Z',
     provenance: {
+      sourceType: 'synthetic',
+      provider: 'InvestIQ deterministic demo generator',
+      generatedAt: '2026-07-27T00:00:00.000Z',
+      disclaimer: 'This page uses synthetic market series for demonstration. It does not represent actual historical prices or investment performance.',
       priceProvider: 'demo',
       priceBasis: 'split-adjusted',
       fetchedAt: '2026-07-27T00:00:00.000Z',
@@ -86,6 +90,10 @@ function coveredHolding(
     marketData: security(ticker, prices, {
       source: 'yahoo',
       provenance: {
+        sourceType: 'licensed-live',
+        provider: 'Yahoo Finance',
+        generatedAt: '2026-07-27T00:00:00.000Z',
+        disclaimer: 'Licensed market history fetched from the configured provider; coverage and corporate-action treatment remain provider-scoped.',
         priceProvider: 'yahoo',
         priceBasis: 'split-adjusted',
         lastCompletedSession: dates[dates.length - 1],

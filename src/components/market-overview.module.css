@@ -293,6 +293,14 @@
   letter-spacing: -0.015em;
 }
 
+.cardPriceLabel {
+  flex-basis: 100%;
+  color: var(--muted);
+  font-size: calc(9.5px * var(--ui-font-scale, 1));
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
 .cardReturn {
   display: flex;
   flex-direction: column;

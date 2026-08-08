@@ -109,6 +109,7 @@ interface SymbolRow {
   bars?: PriceBar[];
   summary?: PriceWindowSummary;
   source?: MarketData["source"];
+  provenance?: MarketData["provenance"];
   /** Message produced by the service; already human-readable. */
   error?: string;
   /** Locally generated failure, translated at render time. */
@@ -125,6 +126,7 @@ interface LoadOutcome {
   bars?: PriceBar[];
   summary?: PriceWindowSummary;
   source?: MarketData["source"];
+  provenance?: MarketData["provenance"];
   error?: string;
   errorKey?: TranslationKey;
 }
@@ -146,7 +148,7 @@ async function loadSymbolWindow(symbol: string, range: DateRange): Promise<LoadO
     });
     const bars = trailingWindow(data.prices, range.from);
     if (bars.length === 0) return { errorKey: "market.errorEmptyWindow" };
-    return { name: data.name, bars, summary: summarizePriceWindow(bars), source: data.source };
+    return { name: data.name, bars, summary: summarizePriceWindow(bars), source: data.source, provenance: data.provenance };
   } catch (error) {
     if (error instanceof MarketDataError) return { error: error.message };
     if (error instanceof AnalyticsError) return { errorKey: "market.errorEmptyWindow" };
@@ -164,6 +166,7 @@ function applyOutcome(row: SymbolRow, outcome: LoadOutcome): SymbolRow {
       bars: outcome.bars,
       summary: outcome.summary,
       source: outcome.source,
+      provenance: outcome.provenance,
     };
   }
   return {
@@ -270,6 +273,7 @@ export function MarketOverview() {
   const failedRows = useMemo(() => rows.filter((row) => row.status === "error"), [rows]);
   const readyRows = useMemo(() => rows.filter((row) => row.status === "ready"), [rows]);
   const isDemo = readyRows.some((row) => row.source === "demo");
+  const demoProvenance = readyRows.find((row) => row.source === "demo")?.provenance;
 
   const colorBySymbol = useMemo(() => {
     const map = new Map<string, string>();
@@ -362,10 +366,10 @@ export function MarketOverview() {
           <i className={isLoading ? styles.statusDotLoading : styles.statusDot} aria-hidden="true" />
           {isLoading
             ? loadingSymbol
-              ? t("market.loadingSymbol", { symbol: loadingSymbol })
-              : t("market.statusLoading")
+              ? t(isDemo ? "market.loadingSymbolSynthetic" : "market.loadingSymbol", { symbol: loadingSymbol })
+              : t(isDemo ? "market.statusLoadingSynthetic" : "market.statusLoading")
             : loadedAt
-              ? t("market.statusLoaded", { time: formatTimestamp(loadedAt, locale) })
+              ? t(isDemo ? "market.statusLoadedSynthetic" : "market.statusLoaded", { time: formatTimestamp(loadedAt, locale) })
               : t("market.statusIdle")}
         </p>
       }
@@ -383,14 +387,14 @@ export function MarketOverview() {
     >
       <div className={styles.page}>
         <div className={styles.pageHead}>
-          <h1>{t("market.title")}</h1>
+          <h1>{t(isDemo ? "market.titleSynthetic" : "market.title")}</h1>
           <p className={styles.subtitle}>{t(isDemo ? "market.subtitleSynthetic" : "market.subtitle")}</p>
           <p className={styles.windowLine}>
             {range ? t("market.window", { from: formatDate(range.from, locale), to: formatDate(range.to, locale) }) : t("market.windowPending")}
           </p>
         </div>
 
-        {isDemo ? <EvidenceModeNotice id="market-demo-title" /> : null}
+        {isDemo ? <EvidenceModeNotice id="market-demo-title" provenance={demoProvenance} /> : null}
 
         {!isDemo ? <div className={styles.explainers}>
           <Explainer titleKey="market.etfProxyTitle" bodyKey="market.etfProxy" />
@@ -440,7 +444,7 @@ export function MarketOverview() {
         <div className={styles.grid}>
           <section className={`${styles.panel} ${styles.watchlistPanel}`} aria-labelledby="market-watchlist">
             <header className={styles.panelHead}>
-              <h2 id="market-watchlist">{t("market.watchlist")}</h2>
+              <h2 id="market-watchlist">{t(isDemo ? "market.watchlistSynthetic" : "market.watchlist")}</h2>
               <span className={styles.count}>{watchlist.length}/{MAX_WATCHLIST_SYMBOLS}</span>
             </header>
 
@@ -514,8 +518,8 @@ export function MarketOverview() {
             <section className={styles.panel} aria-labelledby="market-performance">
               <header className={styles.panelHead}>
                 <div>
-                  <h2 id="market-performance">{t("market.performance")}</h2>
-                  <p className={styles.panelSub}>{t("market.chartSubtitle")}</p>
+                  <h2 id="market-performance">{t(isDemo ? "market.performanceSynthetic" : "market.performance")}</h2>
+                  <p className={styles.panelSub}>{t(isDemo ? "market.chartSubtitleSynthetic" : "market.chartSubtitle")}</p>
                 </div>
               </header>
 
@@ -542,7 +546,7 @@ export function MarketOverview() {
 
               {chartData.length > 1 ? (
                 <>
-                  <div className={styles.chartCanvas} role="img" aria-label={t("market.chartAria")}>
+                  <div className={styles.chartCanvas} role="img" aria-label={t(isDemo ? "market.chartAriaSynthetic" : "market.chartAria")}>
                     <ResponsiveContainer width="100%" height="100%">
                       <LineChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                         <CartesianGrid stroke="rgba(120, 123, 134, 0.15)" vertical={false} />
@@ -583,19 +587,19 @@ export function MarketOverview() {
                     </ResponsiveContainer>
                   </div>
                   <p className={styles.caption}>
-                    {t("market.chartCaption", { date: formatDate(chartSeries[0].date, locale) })}
+                    {t(isDemo ? "market.chartCaptionSynthetic" : "market.chartCaption", { date: formatDate(chartSeries[0].date, locale) })}
                   </p>
                 </>
               ) : (
                 <p className={styles.emptyState}>
-                  {isLoading ? t("market.statusLoading") : t("market.chartEmpty")}
+                  {isLoading ? t(isDemo ? "market.statusLoadingSynthetic" : "market.statusLoading") : t("market.chartEmpty")}
                 </p>
               )}
             </section>
 
             <section className={styles.panel} aria-labelledby="market-analytics">
               <header className={styles.panelHead}>
-                <h2 id="market-analytics">{t("market.analyticsTitle")}</h2>
+                <h2 id="market-analytics">{t(isDemo ? "market.analyticsSynthetic" : "market.analyticsTitle")}</h2>
               </header>
               <MetricsTable
                 rows={rows}
@@ -603,13 +607,14 @@ export function MarketOverview() {
                 t={t}
                 ariaLabel={t("market.tableWatchlistAria")}
                 colors={colorBySymbol}
+                synthetic={isDemo}
               />
             </section>
           </div>
 
           <section className={`${styles.panel} ${styles.riskPanel}`} aria-labelledby="market-risk">
             <header className={styles.panelHead}>
-              <h2 id="market-risk">{t("market.risk")}</h2>
+              <h2 id="market-risk">{t(isDemo ? "market.riskSynthetic" : "market.risk")}</h2>
             </header>
 
             {risk ? (
@@ -707,16 +712,17 @@ function BenchmarkCard({
       {summary ? (
         <>
           <div className={styles.cardPrimary}>
+            <span className={styles.cardPriceLabel}>{t(row.source === "demo" ? "market.colSyntheticPrice" : "market.colLastClose")}</span>
             <strong>{formatPrice(summary.close, locale)}</strong>
             <div className={styles.cardReturn}>
-              <span>{t("market.priceReturnLabel")}</span>
+              <span>{t(row.source === "demo" ? "market.syntheticReturnLabel" : "market.priceReturnLabel")}</span>
               <ReturnValue value={summary.priceReturn} locale={locale} t={t} />
             </div>
           </div>
           <Sparkline bars={row.bars ?? []} accent={accent} />
           <dl className={styles.cardFooter}>
             <div>
-              <dt>{t("market.totalReturnLabel")}</dt>
+              <dt>{t(row.source === "demo" ? "market.syntheticTotalReturnLabel" : "market.totalReturnLabel")}</dt>
               <dd>
                 {summary.totalReturn === undefined ? (
                   <NotAvailable t={t} />
@@ -778,12 +784,14 @@ function MetricsTable({
   t,
   ariaLabel,
   colors,
+  synthetic,
 }: {
   rows: SymbolRow[];
   locale: string;
   t: Translate;
   ariaLabel: string;
   colors: Map<string, string>;
+  synthetic: boolean;
 }) {
   return (
     <div className={styles.tableWrap} role="region" aria-label={ariaLabel} tabIndex={0}>
@@ -791,8 +799,8 @@ function MetricsTable({
         <thead>
           <tr>
             <th scope="col">{t("result.ticker")}</th>
-            <th scope="col">{t("market.colLastClose")}</th>
-            <th scope="col">{t("metric.oneYearReturn")}</th>
+            <th scope="col">{t(synthetic ? "market.colSyntheticPrice" : "market.colLastClose")}</th>
+            <th scope="col">{t(synthetic ? "market.syntheticReturnLabel" : "metric.oneYearReturn")}</th>
             <th scope="col">{t("metric.volatility")}</th>
             <th scope="col">{t("result.maxDrawdown")}</th>
             <th scope="col">{t("market.colSessions")}</th>

@@ -72,6 +72,22 @@ test('partial-coverage UI is bilingual, scalable, keyboard reachable, and axe-cl
   expect(results.violations.filter((violation) => violation.impact === 'critical' || violation.impact === 'serious')).toEqual([]);
 });
 
+test('company price-risk context is explicitly synthetic when licensed history is unavailable', async ({ page }) => {
+  await page.route('**/api/health', (route) => route.fulfill({
+    status: 503,
+    contentType: 'application/json',
+    body: JSON.stringify({ status: 'unavailable', services: { priceAnalysis: 'unavailable', dca: 'unavailable', assistant: 'unavailable', database: 'not-configured' } }),
+  }));
+
+  await page.goto('/company/AAPL');
+  await page.locator('details > summary').first().click();
+  await expect(page.getByRole('heading', { name: 'Synthetic Price Series and risk example' })).toBeVisible();
+  await expect(page.getByTestId('market-data-provenance')).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Public Demo Market Data' }).getByRole('paragraph')).toContainText('This page uses synthetic market series for demonstration.');
+  await expect(page.locator('body')).not.toContainText('Current Price');
+  await expect(page.locator('body')).not.toContainText('Historical Performance');
+});
+
 test('captures the fundamentals coverage audit set', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'chromium' || process.env.INVESTIQ_CAPTURE_AUDIT !== '1', 'capture-only audit');
   const captures = [

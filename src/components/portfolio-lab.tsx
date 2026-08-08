@@ -866,6 +866,7 @@ export function PortfolioLab() {
   const view = assembled?.view;
   const isDemoRun = run?.holdings.some((load) => load.data?.source === "demo") ?? false;
   const showSyntheticNotice = analysisReadiness === "unavailable" || isDemoRun;
+  const demoProvenance = run?.holdings.find((load) => load.data?.source === "demo")?.data?.provenance;
   const rebalancingAnalysis = useMemo(() => {
     const currentView = assembled?.view;
     if (!currentView) return undefined;
@@ -983,12 +984,12 @@ export function PortfolioLab() {
     <AppShell>
       <div className={styles.page}>
         <div className={styles.pageHead}>
-          <h1>{t("portfolioLab.buildTitle")}</h1>
+          <h1>{t(showSyntheticNotice ? "portfolioLab.buildTitleSynthetic" : "portfolioLab.buildTitle")}</h1>
           <p className={styles.subtitle}>{t(showSyntheticNotice ? "portfolioLab.subtitleSynthetic" : "portfolioLab.subtitle")}</p>
           {(run || running) ? <p className={styles.quietStatus} role="status" aria-live="polite">{statusText}</p> : null}
         </div>
 
-        {showSyntheticNotice ? <EvidenceModeNotice id="portfolio-demo-title" /> : null}
+        {showSyntheticNotice ? <EvidenceModeNotice id="portfolio-demo-title" provenance={demoProvenance} /> : null}
 
         <form className={styles.controls} onSubmit={handleSubmit} aria-label={t("portfolioLab.controlsTitle")}>
           <fieldset className={styles.holdingFields}>
@@ -1276,7 +1277,7 @@ export function PortfolioLab() {
               </section>
             ) : null}
 
-            <HeadlineMetrics view={view} locale={locale} t={t} />
+            <HeadlineMetrics view={view} locale={locale} t={t} synthetic={isDemoRun} />
             <details className={styles.alternativeMethods}>
               <summary>{t("portfolioLab.alternativesTitle")}</summary>
               <div className={styles.alternativeActions}>
@@ -1310,7 +1311,7 @@ export function PortfolioLab() {
                 <section className={styles.panel} aria-labelledby="portfolio-chart-title">
                   <header className={styles.panelHead}>
                     <div>
-                      <h2 id="portfolio-chart-title">{t("portfolioLab.chartTitle")}</h2>
+                      <h2 id="portfolio-chart-title">{t(isDemoRun ? "portfolioLab.chartTitleSynthetic" : "portfolioLab.chartTitle")}</h2>
                       <p className={styles.panelSub}>
                         {t("portfolioLab.chartWindow", {
                           from: formatDate(view.window.startDate, locale),
@@ -1340,7 +1341,7 @@ export function PortfolioLab() {
                           onClick={() => setChartTab(tab.id)}
                           onKeyDown={(event) => handleTabKeys(event, index)}
                         >
-                          {t(tab.labelKey)}
+                          {t(isDemoRun && tab.id === "cumulative" ? "portfolioLab.tabCumulativeSynthetic" : tab.labelKey)}
                         </button>
                       );
                     })}
@@ -1382,7 +1383,9 @@ export function PortfolioLab() {
                       withBenchmark={benchmarkSeries !== undefined}
                       locale={locale}
                       ariaLabel={t(
-                        chartTab === "value" ? "portfolioLab.chartValueAria" : "portfolioLab.chartCumulativeAria",
+                        chartTab === "value"
+                          ? "portfolioLab.chartValueAria"
+                          : isDemoRun ? "portfolioLab.chartCumulativeAriaSynthetic" : "portfolioLab.chartCumulativeAria",
                         {
                           from: formatDate(view.window.startDate, locale),
                           to: formatDate(view.window.endDate, locale),
@@ -1396,7 +1399,7 @@ export function PortfolioLab() {
                       {t(
                         chartTab === "value"
                           ? "portfolioLab.chartValueCaption"
-                          : "portfolioLab.chartCumulativeCaption",
+                          : isDemoRun ? "portfolioLab.chartCumulativeCaptionSynthetic" : "portfolioLab.chartCumulativeCaption",
                         {
                           date: formatDate(view.window.startDate, locale),
                           amount: formatMoney(view.allocatedCapital, locale),
@@ -1433,7 +1436,7 @@ export function PortfolioLab() {
                     </button>
                   </header>
 
-                  <AttributionTable view={view} locale={locale} t={t} />
+                  <AttributionTable view={view} locale={locale} t={t} synthetic={isDemoRun} />
 
                   <p className={styles.footnote}>{t("portfolioLab.attributionDriftNote")}</p>
                   <p className={styles.footnote}>{t("portfolioLab.dashMeaning")}</p>
@@ -1724,17 +1727,19 @@ function HeadlineMetrics({
   view,
   locale,
   t,
+  synthetic,
 }: {
   view: PortfolioLabViewModel;
   locale: string;
   t: Translate;
+  synthetic: boolean;
 }) {
   const drawdown = view.maxDrawdown;
 
   return (
     <section className={styles.headline} aria-labelledby="portfolio-headline-title">
       <h2 id="portfolio-headline-title" className={styles.headlineTitle}>
-        {t("portfolioLab.headlineTitle")}
+        {t(synthetic ? "portfolioLab.headlineTitleSynthetic" : "portfolioLab.headlineTitle")}
       </h2>
       <p className={styles.headlineSub}>
         {t("portfolioLab.headlineSub", {
@@ -1911,17 +1916,19 @@ function AttributionTable({
   view,
   locale,
   t,
+  synthetic,
 }: {
   view: PortfolioLabViewModel;
   locale: string;
   t: Translate;
+  synthetic: boolean;
 }) {
   const columns: Array<{ key: string; label: string }> = [
     { key: "allocation", label: t("portfolioLab.colInitialAllocation") },
     { key: "shares", label: t("portfolioLab.colShares") },
     { key: "initialWeight", label: t("portfolioLab.colInitialWeight") },
     { key: "finalWeight", label: t("portfolioLab.colFinalWeight") },
-    { key: "priceReturn", label: t("portfolioLab.colPriceReturn") },
+    { key: "priceReturn", label: t(synthetic ? "portfolioLab.colSyntheticReturn" : "portfolioLab.colPriceReturn") },
     { key: "contributionDollars", label: t("portfolioLab.colContributionDollars") },
     { key: "contributionPoints", label: t("portfolioLab.colContributionPoints") },
   ];
