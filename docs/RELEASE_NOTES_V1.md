@@ -20,11 +20,11 @@ synthetic demo series, not actual ticker history. DCF uses the documented unleve
 never incorporates market price. Tests cover financial definitions, data lineage, disclosure,
 accessibility, exports, and isolated browser workflows.
 
-Local release validation at source commit `c6b649c` passed 34 Vitest files / 654 tests, TypeScript,
+Local release validation at source commit `4be2aef` passed 34 Vitest files / 654 tests, TypeScript,
 ESLint, production build, and isolated Playwright with 29 passed / 17 project-specific skips / 0
 failures. Axe reported no critical/serious violations in tested home, case, and DCA flows; 320 px,
 145% text, English/Chinese, blocked storage, print overflow, capability states, and CSV/PDF synthetic
-provenance passed. The pull-request CI run `31278064408` passed both the quality and browser jobs on
+provenance passed. The pull-request CI run `31278203611` passed both the quality and browser jobs on
 the same SHA. Known limitations are maintained in [KNOWN_LIMITATIONS.md](KNOWN_LIMITATIONS.md).
 
 The structured usability review is a five-person proxy walkthrough and is explicitly not presented as
