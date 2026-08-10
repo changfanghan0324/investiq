@@ -17,7 +17,7 @@ export function ModelGuardHome() {
             <p className={styles.lede}>{t("modelguard.homeSubtitle")}</p>
             <div className={styles.actions}>
               <Link className={styles.primaryButton} href="/workspace">{t("modelguard.uploadAction")}</Link>
-              <Link className={styles.secondaryButton} href="/workspace?sample=clean">{t("modelguard.sampleAction")}</Link>
+              <a className={styles.secondaryButton} href="/workspace?sample=clean">{t("modelguard.sampleAction")}</a>
             </div>
             <p className={styles.privacyLine}>{t("modelguard.privacyLine")}</p>
           </div>
