@@ -35,6 +35,14 @@ routes were removed. The active navigation is Audit, Templates, Methodology, Abo
 - Playwright ModelGuard smoke suite: 7 passed, 1 mobile accessibility duplicate skipped; no API,
   SEC, finance, or analytics requests observed during local workbook audit.
 
+## Delivery evidence
+
+- Migration branch: `codex/modelguard-in-place-migration`
+- Pull request: [#11 — pivot public demo to local ModelGuard audit](https://github.com/changfanghan0324/investiq/pull/11) (intentionally not merged)
+- Vercel preview: [investiq-git-codex-modelguard-cf8712](https://investiq-git-codex-modelguard-cf8712-cpeter0814-3476s-projects.vercel.app)
+- GitHub Browser, Quality, Vercel, and Vercel Preview Comments checks: passed.
+- Production alias remains on the pre-migration deployment; no production promotion was performed.
+
 ## Claude review record
 
 No Claude CLI or callable Claude reasoning/review tool was available in this environment. No Claude
