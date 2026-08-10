@@ -35,9 +35,21 @@ surfaces are retired from the active runtime. The rollback point is the annotate
 
 ## Rule families
 
-The current rule catalogue covers formula error tokens, missing sheets/cells, uncached formulas,
-hardcoded forecast cells, hidden worksheets, blocked external links, and DCF terminal-growth
-coherence. See [the full rule catalogue](docs/MODELGUARD_RULE_CATALOG.md).
+The current catalogue has 33 published rules: 6 spreadsheet/linkage checks, 5 accounting
+reconciliations, 11 DCF controls, 5 scenario controls, and 6 assumption-governance checks. The
+clean golden workbook passes all 33; the error golden workbook deliberately remains `Not ready`.
+Every mapped rule reports passed, failed, not-applicable, or cannot-verify rather than filling a
+missing value with an inference. See [the full rule catalogue](docs/MODELGUARD_RULE_CATALOG.md).
+
+## Deterministic review and conversational tools
+
+ModelGuard and conversational AI tools serve different review needs. ModelGuard publishes a fixed
+rule set, produces the same result for the same workbook, points to cells and periods, and keeps
+the workbook and receipt in the local session. A conversational tool can be useful for exploring
+questions, drafting explanations, or testing alternative ideas, but its responses are not a
+substitute for a cell-level receipt and must be validated against the workbook and its sources.
+ModelGuard is intentionally complementary rather than a claim that one workflow replaces the
+other.
 
 ## Historical InvestIQ note
 

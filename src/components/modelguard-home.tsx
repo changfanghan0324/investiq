@@ -24,8 +24,8 @@ export function ModelGuardHome() {
           <div className={styles.heroPanel} aria-label={t("modelguard.localOnly")}>
             <div className={styles.panelRule} />
             <span className={styles.panelLabel}>{t("modelguard.localOnly")}</span>
-            <strong>0</strong>
-            <p>{t("modelguard.localOnlyText")}</p>
+            <strong>{t("modelguard.localOnlyCount")}</strong>
+            <p>{t("modelguard.localOnlySession")}</p>
           </div>
         </section>
 

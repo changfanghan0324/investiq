@@ -19,21 +19,39 @@ routes were removed. The active navigation is Audit, Templates, Methodology, Abo
   ranges, and a 20-second parse budget.
 - SHA-256 receipt, sheet visibility, merged ranges, named ranges, formulas, cached values, and
   external-link metadata.
-- Deterministic cell-specific rules for formula errors, missing sheets/cells, uncached formulas,
-  hardcoded forecast cells, hidden sheets, blocked external links, and DCF terminal growth.
-- Issue explorer with severity summary, observed/expected values, version compare, and local
-  JSON/CSV/PDF exports.
+- Deterministic cell-specific rules with stable IDs, severity, status, period, observed/expected
+  values, difference/tolerance, why-it-matters, and how-to-verify guidance.
+- 33-rule catalogue: 6 spreadsheet/linkage, 5 accounting, 11 DCF, 5 scenario, and 6 assumption
+  governance rules. Accounting controls cover statement tie-outs, debt-to-balance-sheet mapping,
+  diluted shares, FCFF identity, DCF bridges, scenario connectivity, and assumption ownership.
+- Issue explorer with critical/high/medium/passed/cannot-verify summary, All/Critical/DCF filters,
+  version findings classified as new/resolved/persisting, and local JSON/CSV/PDF exports.
 - English and Simplified Chinese, keyboard focus, mobile layout, text scaling, and reduced-motion
   support.
 
 ## Test evidence
 
-- TypeScript: passed.
-- ESLint: passed.
-- Vitest: 37 files, 665 tests passed.
+- TypeScript: passed (`tsc --noEmit --incremental false`).
+- ESLint: passed with no warnings.
+- Vitest: 38 files, 670 tests passed, including finance-rule pass/fail/unavailable and tolerance-boundary coverage.
 - Next static build: passed; all generated application routes are static.
-- Playwright ModelGuard smoke suite: 7 passed, 1 mobile accessibility duplicate skipped; no API,
-  SEC, finance, or analytics requests observed during local workbook audit.
+- Playwright ModelGuard suite: 11 passed, 1 mobile accessibility duplicate skipped; the suite
+  covers clean/error golden workbooks, rule IDs, filters, local exports, clear-session behavior,
+  version comparison, redirects, bilingual scaling, axe, and zero API/SEC/finance/analytics
+  requests.
+
+## Golden workbook evidence
+
+- `modelguard-clean-model.xlsx`: 0 critical, 0 high, 0 medium, 51 period/check passes, 0
+  cannot-verify; model status `Ready for review`.
+- `modelguard-error-model.xlsx`: 8 critical, 21 high, 12 medium, 1 info, 18 passes, 9
+  cannot-verify; model status `Not ready`. Seeded Rule IDs are recorded in
+  [the error manifest](../samples/ERROR_MODEL_MANIFEST.md). The terminal-value formula is
+  explicitly `cannot-verify` when WACC is not above terminal growth; ModelGuard does not force a
+  calculation through an invalid denominator.
+- Version 1 → Version 2 resolves no findings, persists no findings, and reports one cell-level
+  change (`Inputs!B5`, 0.08 → 0.10). The same report shape also classifies finding keys as new,
+  resolved, or persisting when audited versions contain issues.
 
 ## Delivery evidence
 

@@ -12,16 +12,53 @@ test("home communicates the local-only ModelGuard workflow", async ({ page }) =>
   expect(requests.filter((url) => /\/api\/|sec\.gov|query1\.finance|analytics/i.test(url))).toEqual([]);
 });
 
-test("workspace accepts a sample workbook without network calls", async ({ page }) => {
+test("clean sample is ready for review without network calls", async ({ page }) => {
   const requests: string[] = [];
   page.on("request", (request) => requests.push(request.url()));
   await page.goto("/workspace");
   await expect(page.getByRole("heading", { name: "Model audit workspace" })).toBeVisible();
   await expect(page.getByText("XLSX only")).toBeVisible();
+  await page.locator("#workbook-file").setInputFiles("public/samples/modelguard-clean-model.xlsx");
+  await expect(page.getByRole("heading", { name: "Issue explorer" })).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByText("Ready for review")).toBeVisible();
+  const summary = page.locator('[class*="summaryGrid"]');
+  await expect(summary.locator("strong").nth(0)).toHaveText("0");
+  await expect(summary.locator("strong").nth(1)).toHaveText("0");
+  expect(requests.filter((url) => /\/api\/|sec\.gov|query1\.finance|analytics/i.test(url))).toEqual([]);
+});
+
+test("error sample exposes finance rule IDs and local exports", async ({ page }) => {
+  await page.goto("/workspace");
   await page.locator("#workbook-file").setInputFiles("public/samples/modelguard-error-model.xlsx");
   await expect(page.getByRole("heading", { name: "Issue explorer" })).toBeVisible({ timeout: 20_000 });
-  await expect(page.getByText("FORMULA_MISSING_CELL")).toBeVisible();
-  expect(requests.filter((url) => /\/api\/|sec\.gov|query1\.finance|analytics/i.test(url))).toEqual([]);
+  await expect(page.getByText("MG-STR-004").first()).toBeVisible();
+  await expect(page.getByText("MG-ACC-001").first()).toBeVisible();
+  await expect(page.getByText("MG-DCF-007").first()).toBeVisible();
+  await expect(page.getByText("MG-SCN-001").first()).toBeVisible();
+  await page.getByRole("button", { name: "DCF" }).click();
+  await expect(page.getByText("MG-DCF-007").first()).toBeVisible();
+  await expect(page.getByText("MG-ACC-001").first()).toBeHidden();
+  await page.getByRole("button", { name: "All" }).click();
+  for (const label of ["Export JSON", "Export CSV", "Export PDF"]) {
+    const download = page.waitForEvent("download");
+    await page.getByRole("button", { name: label }).click();
+    await expect((await download).suggestedFilename()).toMatch(/modelguard-audit\.(json|csv|pdf)$/);
+  }
+  await page.getByRole("button", { name: "Clear this session" }).click();
+  await expect(page.getByRole("heading", { name: "Issue explorer" })).toBeHidden();
+});
+
+test("version compare classifies findings and exports cell changes", async ({ page }) => {
+  await page.goto("/workspace");
+  await page.locator("#before-version").setInputFiles("public/samples/modelguard-version-1.xlsx");
+  await page.locator("#after-version").setInputFiles("public/samples/modelguard-version-2.xlsx");
+  await expect(page.getByRole("button", { name: "Version compare" })).toBeEnabled({ timeout: 20_000 });
+  await page.getByRole("button", { name: "Version compare" }).click();
+  await expect(page.getByText("New findings")).toBeVisible();
+  await expect(page.getByText("Changes:")).toBeVisible();
+  const download = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Export CSV" }).last().click();
+  await expect((await download).suggestedFilename()).toBe("modelguard-version-findings.csv");
 });
 
 test("active routes are bilingual, keyboard reachable, and axe-clean", async ({ page }, testInfo) => {

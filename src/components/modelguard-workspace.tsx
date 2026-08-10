@@ -2,9 +2,9 @@
 
 import { useCallback, useRef, useState } from "react";
 import { AppShell } from "@/components/app-shell";
-import { compareWorkbooks, type AuditReport, type VersionChange } from "@/domain/modelguard-audit";
+import { compareAuditFindings, compareWorkbooks, type AuditReport, type VersionChange, type VersionFindingChange } from "@/domain/modelguard-audit";
 import type { ParsedWorkbook } from "@/domain/modelguard-schema";
-import { auditReportToCsv, auditReportToJson, auditReportToPdf, versionChangesToCsv } from "@/services/modelguard-exports";
+import { auditReportToCsv, auditReportToJson, auditReportToPdf, versionChangesToCsv, versionFindingsToCsv } from "@/services/modelguard-exports";
 import { useLanguage } from "@/i18n/language";
 import styles from "./modelguard-page.module.css";
 
@@ -22,7 +22,11 @@ export function ModelGuardWorkspace() {
   const [report, setReport] = useState<AuditReport | null>(null);
   const [beforeVersion, setBeforeVersion] = useState<ParsedWorkbook | null>(null);
   const [afterVersion, setAfterVersion] = useState<ParsedWorkbook | null>(null);
+  const [beforeVersionReport, setBeforeVersionReport] = useState<AuditReport | null>(null);
+  const [afterVersionReport, setAfterVersionReport] = useState<AuditReport | null>(null);
   const [versionChanges, setVersionChanges] = useState<VersionChange[]>([]);
+  const [versionFindings, setVersionFindings] = useState<VersionFindingChange[]>([]);
+  const [issueFilter, setIssueFilter] = useState<"all" | "critical" | "dcf">("all");
   const workerRef = useRef<Worker | null>(null);
 
   const clearSession = useCallback(() => {
@@ -35,7 +39,11 @@ export function ModelGuardWorkspace() {
     setReport(null);
     setBeforeVersion(null);
     setAfterVersion(null);
+    setBeforeVersionReport(null);
+    setAfterVersionReport(null);
     setVersionChanges([]);
+    setVersionFindings([]);
+    setIssueFilter("all");
     workerRef.current?.terminate();
     workerRef.current = null;
     if (inputRef.current) inputRef.current.value = "";
@@ -96,9 +104,10 @@ export function ModelGuardWorkspace() {
     const bytes = await candidate.arrayBuffer();
     await new Promise<void>((resolve) => {
       const worker = new Worker(new URL("../workers/model-audit.worker.ts", import.meta.url), { type: "module" });
-      worker.onmessage = (event: MessageEvent<{ type: "complete"; workbook: ParsedWorkbook } | { type: "error" }>) => {
+      worker.onmessage = (event: MessageEvent<{ type: "complete"; workbook: ParsedWorkbook; report: AuditReport } | { type: "error" }>) => {
         if (event.data.type === "complete") {
-          if (side === "before") setBeforeVersion(event.data.workbook); else setAfterVersion(event.data.workbook);
+          if (side === "before") { setBeforeVersion(event.data.workbook); setBeforeVersionReport(event.data.report); }
+          else { setAfterVersion(event.data.workbook); setAfterVersionReport(event.data.report); }
         }
         worker.terminate(); resolve();
       };
@@ -107,8 +116,11 @@ export function ModelGuardWorkspace() {
   }, []);
 
   const runVersionCompare = useCallback(() => {
-    if (beforeVersion && afterVersion) setVersionChanges(compareWorkbooks(beforeVersion, afterVersion));
-  }, [afterVersion, beforeVersion]);
+    if (beforeVersion && afterVersion && beforeVersionReport && afterVersionReport) {
+      setVersionChanges(compareWorkbooks(beforeVersion, afterVersion));
+      setVersionFindings(compareAuditFindings(beforeVersionReport, afterVersionReport));
+    }
+  }, [afterVersion, afterVersionReport, beforeVersion, beforeVersionReport]);
 
   return (
     <AppShell>
@@ -147,13 +159,17 @@ export function ModelGuardWorkspace() {
               <label htmlFor="before-version">{t("modelguard.versionBefore")}<input id="before-version" type="file" accept=".xlsx" onChange={(event) => void parseVersion(event.target.files?.[0], "before")} /></label>
               <label htmlFor="after-version">{t("modelguard.versionAfter")}<input id="after-version" type="file" accept=".xlsx" onChange={(event) => void parseVersion(event.target.files?.[0], "after")} /></label>
             </div>
-            <button className={styles.smallButton} type="button" disabled={!beforeVersion || !afterVersion} onClick={runVersionCompare}>{t("modelguard.versionCompare")}</button>
-            {versionChanges.length ? <><p className={styles.notice}>{t("modelguard.changes")}: {versionChanges.length}</p><button className={styles.smallButton} type="button" onClick={() => { const url = URL.createObjectURL(new Blob([versionChangesToCsv(versionChanges)], { type: "text/csv;charset=utf-8" })); const link = document.createElement("a"); link.href = url; link.download = "modelguard-version-changes.csv"; link.click(); URL.revokeObjectURL(url); }}>{t("modelguard.exportCsv")}</button></> : null}
+            <button className={styles.smallButton} type="button" disabled={!beforeVersion || !afterVersion || !beforeVersionReport || !afterVersionReport} onClick={runVersionCompare}>{t("modelguard.versionCompare")}</button>
+            {versionChanges.length || versionFindings.length ? <>
+              <div className={styles.versionSummary} aria-live="polite"><span>{t("modelguard.versionNew")}: <strong>{versionFindings.filter((change) => change.status === "new").length}</strong></span><span>{t("modelguard.versionResolved")}: <strong>{versionFindings.filter((change) => change.status === "resolved").length}</strong></span><span>{t("modelguard.versionPersisting")}: <strong>{versionFindings.filter((change) => change.status === "persisting").length}</strong></span><span>{t("modelguard.changes")}: <strong>{versionChanges.length}</strong></span></div>
+              <div className={styles.sampleActions}><button className={styles.smallButton} type="button" onClick={() => { const url = URL.createObjectURL(new Blob([versionChangesToCsv(versionChanges)], { type: "text/csv;charset=utf-8" })); const link = document.createElement("a"); link.href = url; link.download = "modelguard-version-changes.csv"; link.click(); URL.revokeObjectURL(url); }}>{t("modelguard.exportCsv")}</button><button className={styles.smallButton} type="button" onClick={() => { const url = URL.createObjectURL(new Blob([versionFindingsToCsv(versionFindings)], { type: "text/csv;charset=utf-8" })); const link = document.createElement("a"); link.href = url; link.download = "modelguard-version-findings.csv"; link.click(); URL.revokeObjectURL(url); }}>{t("modelguard.exportCsv")}</button></div>
+              <ul className={styles.versionFindings}>{versionFindings.map((change) => <li key={`${change.status}-${change.ruleId}-${change.sheet ?? "workbook"}-${change.address ?? ""}-${change.period ?? ""}`}><span className={`${styles.severity} ${styles[`severity${change.severity}`]}`}>{t(`modelguard.version${change.status[0].toUpperCase()}${change.status.slice(1)}` as "modelguard.versionNew" | "modelguard.versionResolved" | "modelguard.versionPersisting")}</span> <code>{change.ruleId}</code> {change.sheet ? `${change.sheet}!${change.address ?? ""}` : t("modelguard.workbook")}{change.period ? ` · ${change.period}` : ""}</li>)}</ul>
+            </> : null}
           </section>
 
           {report ? <section className={styles.reportSection} aria-labelledby="issue-explorer-title">
             <div className={styles.reportHeader}>
-              <div><p className={styles.eyebrow}>{t("modelguard.reportLabel")}</p><h2 id="issue-explorer-title">{t("modelguard.issueExplorer")}</h2></div>
+              <div><p className={styles.eyebrow}>{t("modelguard.reportLabel")}</p><h2 id="issue-explorer-title">{t("modelguard.issueExplorer")}</h2><p className={styles.modelStatus}>{t("modelguard.modelStatus")}: <strong>{report.modelStatus}</strong></p></div>
               <div className={styles.sampleActions}>
                 <button className={styles.smallButton} type="button" onClick={() => download("modelguard-audit.json", auditReportToJson(report), "application/json")}>{t("modelguard.exportJson")}</button>
                 <button className={styles.smallButton} type="button" onClick={() => download("modelguard-audit.csv", auditReportToCsv(report), "text/csv;charset=utf-8")}>{t("modelguard.exportCsv")}</button>
@@ -162,13 +178,22 @@ export function ModelGuardWorkspace() {
             </div>
             <div className={styles.summaryGrid}>
               <div><span>{t("modelguard.critical")}</span><strong>{report.summary.critical}</strong></div>
-              <div><span>{t("modelguard.warning")}</span><strong>{report.summary.warning}</strong></div>
-              <div><span>{t("modelguard.info")}</span><strong>{report.summary.info}</strong></div>
+              <div><span>{t("modelguard.high")}</span><strong>{report.summary.high}</strong></div>
+              <div><span>{t("modelguard.medium")}</span><strong>{report.summary.medium}</strong></div>
+              <div><span>{t("modelguard.passed")}</span><strong>{report.summary.passed}</strong></div>
+              <div><span>{t("modelguard.cannotVerify")}</span><strong>{report.summary.cannotVerify}</strong></div>
+              <div><span>{t("modelguard.notApplicable")}</span><strong>{report.summary.notApplicable}</strong></div>
             </div>
-            {report.issues.length ? <div className={styles.issueList}>{report.issues.map((issue) => <article className={styles.issue} key={issue.id}>
-              <div className={styles.issueTop}><span className={`${styles.severity} ${styles[`severity${issue.severity}`]}`}>{t(`modelguard.${issue.severity}` as "modelguard.critical" | "modelguard.warning" | "modelguard.info")}</span><code>{issue.ruleId}</code></div>
+            <div className={styles.filterBar} role="group" aria-label={t("modelguard.issueExplorer")}>
+              <button className={issueFilter === "all" ? styles.filterActive : styles.filterButton} type="button" onClick={() => setIssueFilter("all")}>{t("modelguard.filterAll")}</button>
+              <button className={issueFilter === "critical" ? styles.filterActive : styles.filterButton} type="button" onClick={() => setIssueFilter("critical")}>{t("modelguard.filterCritical")}</button>
+              <button className={issueFilter === "dcf" ? styles.filterActive : styles.filterButton} type="button" onClick={() => setIssueFilter("dcf")}>{t("modelguard.filterDcf")}</button>
+            </div>
+            {report.issues.filter((issue) => issueFilter === "all" || (issueFilter === "critical" ? issue.severity === "critical" : issue.category === "dcf")).length ? <div className={styles.issueList}>{report.issues.filter((issue) => issueFilter === "all" || (issueFilter === "critical" ? issue.severity === "critical" : issue.category === "dcf")).map((issue) => <article className={styles.issue} key={issue.id}>
+              <div className={styles.issueTop}><span className={`${styles.severity} ${styles[`severity${issue.severity}`]}`}>{t(`modelguard.${issue.severity}` as "modelguard.critical" | "modelguard.high" | "modelguard.medium" | "modelguard.warning" | "modelguard.info")}</span><code>{issue.ruleId}</code></div>
               <h3>{issue.title}</h3><p>{issue.message}</p>
-              <dl><div><dt>{t("modelguard.location")}</dt><dd>{issue.sheet ? `${issue.sheet}!${issue.address ?? ""}` : t("modelguard.workbook")}</dd></div>{issue.observed ? <div><dt>{t("modelguard.observed")}</dt><dd>{issue.observed}</dd></div> : null}{issue.expected ? <div><dt>{t("modelguard.expected")}</dt><dd>{issue.expected}</dd></div> : null}</dl>
+              <dl><div><dt>{t("modelguard.location")}</dt><dd>{issue.sheet ? `${issue.sheet}!${issue.address ?? ""}` : t("modelguard.workbook")}</dd></div>{issue.period ? <div><dt>{t("modelguard.period")}</dt><dd>{issue.period}</dd></div> : null}{issue.observed ? <div><dt>{t("modelguard.observed")}</dt><dd>{issue.observed}</dd></div> : null}{issue.expected ? <div><dt>{t("modelguard.expected")}</dt><dd>{issue.expected}</dd></div> : null}{issue.difference ? <div><dt>{t("modelguard.difference")}</dt><dd>{issue.difference}</dd></div> : null}{issue.tolerance ? <div><dt>{t("modelguard.tolerance")}</dt><dd>{issue.tolerance}</dd></div> : null}</dl>
+              {issue.whyItMatters ? <details className={styles.issueDetails}><summary>{t("modelguard.whyItMatters")}</summary><p>{issue.whyItMatters}</p><p>{t("modelguard.howToVerify")}: {issue.howToVerify}</p></details> : null}
             </article>)}</div> : <p className={styles.notice}>{t("modelguard.noIssues")}</p>}
           </section> : null}
         </section>
