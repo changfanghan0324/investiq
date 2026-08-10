@@ -13,6 +13,35 @@ test("home communicates the local-only ModelGuard workflow", async ({ page }) =>
   expect(requests.filter((url) => /\/api\/|sec\.gov|query1\.finance|analytics/i.test(url))).toEqual([]);
 });
 
+test("Try sample model runs the bundled clean audit without a file picker", async ({ page }) => {
+  const requests: string[] = [];
+  page.on("request", (request) => requests.push(request.url()));
+  await page.goto("/");
+  await page.getByRole("link", { name: "Try the sample model" }).click();
+  await expect(page).toHaveURL(/\/workspace\?sample=clean$/);
+  await expect(page.getByText("Sample model", { exact: true })).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByText("Synthetic fictional company")).toBeVisible();
+  await expect(page.getByText("Ready for review").first()).toBeVisible({ timeout: 20_000 });
+  const summary = page.locator('[class*="summaryGrid"]');
+  await expect(summary.locator("strong").nth(0)).toHaveText("0");
+  await expect(summary.locator("strong").nth(1)).toHaveText("0");
+  await expect(summary.locator("strong").nth(3)).toHaveText("51");
+  await expect(page.locator("#workbook-file")).toHaveCount(0);
+  await page.reload();
+  await expect(page.getByText("Ready for review").first()).toBeVisible({ timeout: 20_000 });
+  await page.getByRole("button", { name: "Upload your own model" }).click();
+  await expect(page).toHaveURL(/\/workspace$/);
+  await expect(page.locator("#workbook-file")).toHaveCount(1);
+  expect(requests.filter((url) => /\/api\/|sec\.gov|query1\.finance|analytics/i.test(url))).toEqual([]);
+});
+
+test("unknown sample IDs fail safely without loading an arbitrary path", async ({ page }) => {
+  await page.goto("/workspace?sample=not-a-real-sample");
+  await expect(page.getByText("This sample is not available.")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Upload your own model" })).toBeVisible();
+  await expect(page.locator("#workbook-file")).toHaveCount(0);
+});
+
 test("clean sample is ready for review without network calls", async ({ page }) => {
   const requests: string[] = [];
   page.on("request", (request) => requests.push(request.url()));

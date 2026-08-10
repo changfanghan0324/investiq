@@ -4,6 +4,7 @@ import type { ParsedWorkbook, WorkbookProvenance } from "@/domain/modelguard-sch
 
 type ParseMessage = { type: "parse"; input: ArrayBuffer; fileName: string; provenance?: WorkbookProvenance };
 type CancelMessage = { type: "cancel" };
+type ProgressMessage = { type: "phase"; phase: "reading" | "validating" | "auditing" };
 
 const scope = self as unknown as {
   onmessage: ((event: MessageEvent<ParseMessage | CancelMessage>) => void) | null;
@@ -18,7 +19,10 @@ scope.onmessage = async (event: MessageEvent<ParseMessage | CancelMessage>) => {
   }
   cancelled = false;
   try {
+    scope.postMessage({ type: "phase", phase: "reading" } satisfies ProgressMessage);
     const parsed = await workbookParser.parse(event.data.input, { fileName: event.data.fileName, provenance: event.data.provenance });
+    scope.postMessage({ type: "phase", phase: "validating" } satisfies ProgressMessage);
+    scope.postMessage({ type: "phase", phase: "auditing" } satisfies ProgressMessage);
     const report = auditWorkbook(parsed);
     if (!cancelled) scope.postMessage({ type: "complete", workbook: parsed, report } satisfies { type: "complete"; workbook: ParsedWorkbook; report: AuditReport });
   } catch (error) {

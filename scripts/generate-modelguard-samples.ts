@@ -1,5 +1,5 @@
 import ExcelJS from "exceljs";
-import { readFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 const root = process.cwd();
@@ -118,6 +118,14 @@ async function save(workbook: ExcelJS.Workbook, name: string): Promise<void> {
   await workbook.xlsx.writeFile(path.join(samples, name));
 }
 
+async function bundleCleanSample(): Promise<void> {
+  const bytes = await readFile(path.join(samples, "modelguard-clean-model.xlsx"));
+  const encoded = bytes.toString("base64");
+  const chunks = encoded.match(/.{1,100}/g) ?? [];
+  const source = `/** Generated from public/samples/modelguard-clean-model.xlsx. Do not hand-edit. */\nexport const MODEL_GUARD_CLEAN_SAMPLE_BASE64 =\n  ${chunks.map((chunk) => `"${chunk}"`).join(" +\n  ")};\n`;
+  await writeFile(path.join(root, "src", "data", "modelguard-sample-clean.ts"), source);
+}
+
 async function main(): Promise<void> {
   const clean = await openSample("modelguard-clean-model.xlsx");
   setCleanResults(clean);
@@ -133,6 +141,7 @@ async function main(): Promise<void> {
   const error = await openSample("modelguard-clean-model.xlsx");
   setErrorSeeds(error);
   await save(error, "modelguard-error-model.xlsx");
+  await bundleCleanSample();
 }
 
 void main();

@@ -19,6 +19,10 @@ routes were removed. The active navigation is Audit, Templates, Methodology, Abo
   ranges, and a 20-second parse budget.
 - SHA-256 receipt, sheet visibility, merged ranges, named ranges, formulas, cached values, and
   external-link metadata.
+- Home `Try the sample model` lazily loads a build-time bundled clean workbook, sends it through
+  the same Web Worker parser and deterministic audit engine as a user file, and labels the result
+  `Sample model · Synthetic fictional company`. Unknown sample IDs fail closed without arbitrary
+  asset paths; `Upload your own model` exits sample mode.
 - Deterministic cell-specific rules with stable IDs, severity, status, period, observed/expected
   values, difference/tolerance, why-it-matters, and how-to-verify guidance.
 - 33-rule catalogue: 6 spreadsheet/linkage, 5 accounting, 11 DCF, 5 scenario, and 6 assumption
@@ -35,10 +39,10 @@ routes were removed. The active navigation is Audit, Templates, Methodology, Abo
 - ESLint: passed with no warnings.
 - Vitest: 39 files, 675 tests passed, including finance-rule pass/fail/unavailable, version-finding, tolerance-boundary, and real-workbook-shaped smoke coverage.
 - Next static build: passed; all generated application routes are static.
-- Playwright ModelGuard suite: 11 passed, 1 mobile accessibility duplicate skipped; the suite
-  covers clean/error golden workbooks, rule IDs, filters, local exports, clear-session behavior,
-  version comparison, redirects, bilingual scaling, axe, and zero API/SEC/finance/analytics
-  requests.
+- Playwright ModelGuard suite: 15 passed, 1 mobile accessibility duplicate skipped; the suite
+  covers the bundled sample CTA and reload/exit flow, unknown sample IDs, clean/error golden
+  workbooks, rule IDs, filters, local exports, clear-session behavior, version comparison,
+  redirects, bilingual scaling, axe, and zero API/SEC/finance/analytics requests.
 
 ## Golden workbook evidence
 

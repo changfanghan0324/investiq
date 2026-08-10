@@ -1,14 +1,33 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { compareAuditFindings, compareWorkbooks, type AuditReport, type VersionChange, type VersionFindingChange } from "@/domain/modelguard-audit";
-import type { ParsedWorkbook } from "@/domain/modelguard-schema";
+import type { ParsedWorkbook, WorkbookProvenance } from "@/domain/modelguard-schema";
 import { auditReportToCsv, auditReportToJson, auditReportToPdf, versionChangesToCsv, versionFindingsToCsv } from "@/services/modelguard-exports";
 import { useLanguage } from "@/i18n/language";
 import styles from "./modelguard-page.module.css";
 
 const MAX_BYTES = 20 * 1024 * 1024;
+type SamplePhase = "idle" | "preparing" | "reading" | "validating" | "auditing" | "complete" | "error";
+type WorkerMessage =
+  | { type: "phase"; phase: "reading" | "validating" | "auditing" }
+  | { type: "complete"; workbook: ParsedWorkbook; report: AuditReport }
+  | { type: "error"; message: string };
+
+const SAMPLE_PROVENANCE: WorkbookProvenance = {
+  sourceType: "sample-local",
+  provider: "ModelGuard sample library",
+  generatedAt: "2026-08-10T00:00:00.000Z",
+  disclaimer: "Synthetic fictional company workbook bundled with ModelGuard for demonstration. It is not live financial data or investment advice.",
+};
+
+function decodeBase64(source: string): ArrayBuffer {
+  const binary = atob(source);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
+  return bytes.buffer;
+}
 
 export function ModelGuardWorkspace() {
   const { t } = useLanguage();
@@ -27,7 +46,11 @@ export function ModelGuardWorkspace() {
   const [versionChanges, setVersionChanges] = useState<VersionChange[]>([]);
   const [versionFindings, setVersionFindings] = useState<VersionFindingChange[]>([]);
   const [issueFilter, setIssueFilter] = useState<"all" | "critical" | "dcf">("all");
+  const [sampleMode, setSampleMode] = useState(false);
+  const [samplePhase, setSamplePhase] = useState<SamplePhase>("idle");
+  const [sampleError, setSampleError] = useState<string | null>(null);
   const workerRef = useRef<Worker | null>(null);
+  const sampleStartedRef = useRef(false);
 
   const clearSession = useCallback(() => {
     setFileName(null);
@@ -44,10 +67,56 @@ export function ModelGuardWorkspace() {
     setVersionChanges([]);
     setVersionFindings([]);
     setIssueFilter("all");
+    setSampleMode(false);
+    setSamplePhase("idle");
+    setSampleError(null);
     workerRef.current?.terminate();
     workerRef.current = null;
     if (inputRef.current) inputRef.current.value = "";
   }, []);
+
+  const runAudit = useCallback(async (bytes: ArrayBuffer, candidateName: string, provenance?: WorkbookProvenance, isSample = false): Promise<void> => {
+    setError(null);
+    setSampleError(null);
+    setDigest(null);
+    setFileName(candidateName);
+    setFileSize(bytes.byteLength);
+    const hash = await crypto.subtle.digest("SHA-256", bytes);
+    const hex = [...new Uint8Array(hash)].map((part) => part.toString(16).padStart(2, "0")).join("");
+    setDigest(hex);
+    setPhase("parsing");
+    if (isSample) setSamplePhase("reading");
+    await new Promise<void>((resolve, reject) => {
+      const worker = new Worker(new URL("../workers/model-audit.worker.ts", import.meta.url), { type: "module" });
+      workerRef.current = worker;
+      worker.onmessage = (event: MessageEvent<WorkerMessage>) => {
+        if (event.data.type === "phase") {
+          if (isSample) setSamplePhase(event.data.phase);
+          return;
+        }
+        if (event.data.type === "error") {
+          setError(event.data.message);
+          if (isSample) {
+            setSamplePhase("error");
+            setSampleError(t("modelguard.sampleLoadError"));
+          }
+          setPhase("idle");
+          worker.terminate();
+          workerRef.current = null;
+          reject(new Error(event.data.message));
+          return;
+        }
+        setWorkbook(event.data.workbook);
+        setReport(event.data.report);
+        setPhase("ready");
+        if (isSample) setSamplePhase("complete");
+        worker.terminate();
+        workerRef.current = null;
+        resolve();
+      };
+      worker.postMessage({ type: "parse", input: bytes, fileName: candidateName, provenance }, [bytes]);
+    });
+  }, [t]);
 
   const acceptFile = useCallback(async (candidate: File | undefined) => {
     setError(null);
@@ -61,34 +130,50 @@ export function ModelGuardWorkspace() {
       setError(t("modelguard.fileTooLarge"));
       return;
     }
-    setFileName(candidate.name);
-    setFileSize(candidate.size);
     try {
-      const bytes = await candidate.arrayBuffer();
-      const hash = await crypto.subtle.digest("SHA-256", bytes);
-      const hex = [...new Uint8Array(hash)].map((part) => part.toString(16).padStart(2, "0")).join("");
-      setDigest(hex);
-      setPhase("parsing");
-      const worker = new Worker(new URL("../workers/model-audit.worker.ts", import.meta.url), { type: "module" });
-      workerRef.current = worker;
-      worker.onmessage = (event: MessageEvent<{ type: "complete"; workbook: ParsedWorkbook; report: AuditReport } | { type: "error"; message: string }>) => {
-        if (event.data.type === "error") {
-          setError(event.data.message);
-          setPhase("idle");
-        } else {
-          setWorkbook(event.data.workbook);
-          setReport(event.data.report);
-          setPhase("ready");
-        }
-        worker.terminate();
-        workerRef.current = null;
-      };
-      worker.postMessage({ type: "parse", input: bytes, fileName: candidate.name }, [bytes]);
+      await runAudit(await candidate.arrayBuffer(), candidate.name);
     } catch {
       setError(t("modelguard.fileRejected"));
       clearSession();
     }
-  }, [clearSession, t]);
+  }, [clearSession, runAudit, t]);
+
+  const loadSample = useCallback(async () => {
+    setSampleMode(true);
+    setSamplePhase("preparing");
+    setSampleError(null);
+    setError(null);
+    try {
+      const { MODEL_GUARD_CLEAN_SAMPLE_BASE64 } = await import("@/data/modelguard-sample-clean");
+      await runAudit(decodeBase64(MODEL_GUARD_CLEAN_SAMPLE_BASE64), "Sample model.xlsx", SAMPLE_PROVENANCE, true);
+    } catch {
+      setSamplePhase("error");
+      setSampleError(t("modelguard.sampleLoadError"));
+    }
+  }, [runAudit, t]);
+
+  const exitSampleMode = useCallback(() => {
+    clearSession();
+    window.history.replaceState(null, "", "/workspace");
+    window.setTimeout(() => inputRef.current?.focus(), 0);
+  }, [clearSession]);
+
+  useEffect(() => {
+    const sampleId = new URLSearchParams(window.location.search).get("sample");
+    if (!sampleId || sampleStartedRef.current) return;
+    const timer = window.setTimeout(() => {
+      if (sampleStartedRef.current) return;
+      sampleStartedRef.current = true;
+      if (sampleId === "clean") {
+        void loadSample();
+        return;
+      }
+      setSampleMode(true);
+      setSamplePhase("error");
+      setSampleError(t("modelguard.sampleUnknown"));
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [loadSample, t]);
 
   const download = useCallback((name: string, body: string | Uint8Array, type: string) => {
     if (!report) return;
@@ -104,7 +189,8 @@ export function ModelGuardWorkspace() {
     const bytes = await candidate.arrayBuffer();
     await new Promise<void>((resolve) => {
       const worker = new Worker(new URL("../workers/model-audit.worker.ts", import.meta.url), { type: "module" });
-      worker.onmessage = (event: MessageEvent<{ type: "complete"; workbook: ParsedWorkbook; report: AuditReport } | { type: "error" }>) => {
+      worker.onmessage = (event: MessageEvent<WorkerMessage>) => {
+        if (event.data.type === "phase") return;
         if (event.data.type === "complete") {
           if (side === "before") { setBeforeVersion(event.data.workbook); setBeforeVersionReport(event.data.report); }
           else { setAfterVersion(event.data.workbook); setAfterVersionReport(event.data.report); }
@@ -137,20 +223,34 @@ export function ModelGuardWorkspace() {
 
           <div className={styles.uploadCard}>
             <h2>{t("modelguard.uploadLabel")}</h2>
-            <label htmlFor="workbook-file">{t("modelguard.acceptedFormat")}</label>
-            <input ref={inputRef} id="workbook-file" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onChange={(event) => void acceptFile(event.target.files?.[0])} />
+            {sampleMode ? <div className={styles.sampleStatus} aria-live="polite">
+              <p className={styles.sampleIdentity}><strong>{t("modelguard.sampleModel")}</strong> · {t("modelguard.sampleCompany")}</p>
+              {samplePhase === "preparing" ? <p className={styles.notice}>{t("modelguard.samplePreparing")}</p> : null}
+              {samplePhase === "reading" ? <p className={styles.notice}>{t("modelguard.sampleReading")}</p> : null}
+              {samplePhase === "validating" ? <p className={styles.notice}>{t("modelguard.sampleValidating")}</p> : null}
+              {samplePhase === "auditing" ? <p className={styles.notice}>{t("modelguard.sampleAuditing")}</p> : null}
+              {samplePhase === "complete" ? <p className={styles.notice}>{t("modelguard.sampleReady")}</p> : null}
+              {samplePhase === "error" ? <p className={styles.error} role="alert">{sampleError ?? t("modelguard.sampleLoadError")}</p> : null}
+              <div className={styles.sampleActions}>
+                {samplePhase === "error" ? <button className={styles.smallButton} type="button" onClick={() => { sampleStartedRef.current = false; void loadSample(); }}>{t("modelguard.retrySample")}</button> : null}
+                <button className={styles.smallButton} type="button" onClick={exitSampleMode}>{t("modelguard.uploadOwnModel")}</button>
+              </div>
+            </div> : <>
+              <label htmlFor="workbook-file">{t("modelguard.acceptedFormat")}</label>
+              <input ref={inputRef} id="workbook-file" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onChange={(event) => void acceptFile(event.target.files?.[0])} />
+            </>}
             <div className={styles.uploadMeta}>
               <span>{t("modelguard.maxSize")}</span>
               <span>{t("modelguard.localOnly")}</span>
             </div>
             <p className={styles.calculationNotice}><strong>{t("modelguard.formulaValuesTitle")}</strong> {t("modelguard.formulaValuesText")}</p>
-            {fileName ? <p className={styles.notice} role="status">{fileName} · {fileSize ? `${(fileSize / 1024).toFixed(1)} KB` : ""}{digest ? ` · SHA-256 ${digest.slice(0, 16)}…` : ""}{phase === "parsing" ? ` · ${t("modelguard.parsing")}` : phase === "ready" && workbook ? ` · ${workbook.stats.worksheets} ${t("modelguard.sheets")}, ${workbook.stats.formulas} ${t("modelguard.formulas")} · ${t("modelguard.ready")}` : ""}</p> : <p className={styles.notice}>{t("modelguard.noFile")}</p>}
+            {fileName ? <p className={styles.notice} role="status">{fileName} · {fileSize ? `${(fileSize / 1024).toFixed(1)} KB` : ""}{digest ? ` · SHA-256 ${digest.slice(0, 16)}…` : ""}{phase === "parsing" ? ` · ${t("modelguard.parsing")}` : phase === "ready" && workbook ? ` · ${workbook.stats.worksheets} ${t("modelguard.sheets")}, ${workbook.stats.formulas} ${t("modelguard.formulas")} · ${t("modelguard.ready")}` : ""}</p> : sampleMode ? null : <p className={styles.notice}>{t("modelguard.noFile")}</p>}
             {error ? <p className={styles.error} role="alert">{error}</p> : null}
-            <div className={styles.sampleActions}>
+            {!sampleMode ? <div className={styles.sampleActions}>
               <a className={styles.smallButton} href="/samples/modelguard-clean-model.xlsx" download>{t("modelguard.tryClean")}</a>
               <a className={styles.smallButton} href="/samples/modelguard-error-model.xlsx" download>{t("modelguard.tryError")}</a>
               {fileName ? <button className={styles.smallButton} type="button" onClick={clearSession}>{t("modelguard.clearSession")}</button> : null}
-            </div>
+            </div> : null}
           </div>
 
           <section className={styles.versionCard} aria-labelledby="version-compare-title">
