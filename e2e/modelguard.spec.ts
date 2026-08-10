@@ -8,6 +8,7 @@ test("home communicates the local-only ModelGuard workflow", async ({ page }) =>
   await expect(page).toHaveTitle(/ModelGuard/);
   await expect(page.getByRole("heading", { name: "Check a financial model before someone else does." })).toBeVisible();
   await expect(page.getByText("Processed locally. Not uploaded. No AI. No financial-data API.")).toBeVisible();
+  await expect(page.getByText("0 uploads")).toBeVisible();
   await expect(page.getByRole("link", { name: "Upload a model" })).toHaveAttribute("href", "/workspace");
   expect(requests.filter((url) => /\/api\/|sec\.gov|query1\.finance|analytics/i.test(url))).toEqual([]);
 });
@@ -54,7 +55,10 @@ test("version compare classifies findings and exports cell changes", async ({ pa
   await page.locator("#after-version").setInputFiles("public/samples/modelguard-version-2.xlsx");
   await expect(page.getByRole("button", { name: "Version compare" })).toBeEnabled({ timeout: 20_000 });
   await page.getByRole("button", { name: "Version compare" }).click();
-  await expect(page.getByText("New findings")).toBeVisible();
+  await expect(page.getByText(/New findings:\s*1/)).toBeVisible();
+  await expect(page.getByText(/Resolved findings:\s*3/)).toBeVisible();
+  await expect(page.getByText(/Persisting findings:\s*0/)).toBeVisible();
+  await expect(page.getByText("MG-SCN-004")).toBeVisible();
   await expect(page.getByText("Changes:")).toBeVisible();
   const download = page.waitForEvent("download");
   await page.getByRole("button", { name: "Export CSV" }).last().click();

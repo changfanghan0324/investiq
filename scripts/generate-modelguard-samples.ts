@@ -95,6 +95,24 @@ function setErrorSeeds(workbook: ExcelJS.Workbook): void {
   hidden.getCell("A1").value = "Review manually";
 }
 
+function setVersionOneSeeds(workbook: ExcelJS.Workbook): void {
+  const inputs = workbook.getWorksheet("Inputs")!;
+  const income = workbook.getWorksheet("Income Statement")!;
+  value(inputs, "B10", 0.07);
+  value(inputs, "B11", 0.08);
+  value(inputs, "D10", null);
+  value(income, "C5", 1190);
+}
+
+function setVersionTwoSeeds(workbook: ExcelJS.Workbook): void {
+  const scenarios = workbook.getWorksheet("Scenarios")!;
+  value(scenarios, "B5", 0.03);
+  value(scenarios, "D5", 0.12);
+  value(scenarios, "B6", 0.15);
+  value(scenarios, "D6", 0.27);
+  formulaResults(scenarios, { B9: 22.87, C9: 22.87, D9: 22.87 });
+}
+
 async function save(workbook: ExcelJS.Workbook, name: string): Promise<void> {
   workbook.calcProperties.fullCalcOnLoad = false;
   await workbook.xlsx.writeFile(path.join(samples, name));
@@ -106,9 +124,10 @@ async function main(): Promise<void> {
   await save(clean, "modelguard-clean-model.xlsx");
 
   const versionOne = await openSample("modelguard-clean-model.xlsx");
+  setVersionOneSeeds(versionOne);
   await save(versionOne, "modelguard-version-1.xlsx");
   const versionTwo = await openSample("modelguard-clean-model.xlsx");
-  value(versionTwo.getWorksheet("Inputs")!, "B5", 0.1);
+  setVersionTwoSeeds(versionTwo);
   await save(versionTwo, "modelguard-version-2.xlsx");
 
   const error = await openSample("modelguard-clean-model.xlsx");

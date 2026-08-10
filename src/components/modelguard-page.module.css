@@ -55,6 +55,8 @@
 .versionFindings { display: grid; gap: 8px; margin: 18px 0 0; padding-left: 18px; color: var(--text-secondary); font-size: calc(13px * var(--ui-font-scale)); line-height: 1.5; }
 .versionFindings code { margin-left: 6px; color: var(--text-primary); font-family: var(--font-mono); font-size: calc(11px * var(--ui-font-scale)); }
 .uploadMeta { display: flex; flex-wrap: wrap; gap: 18px; margin-top: 18px; color: var(--text-tertiary); font-family: var(--font-mono); font-size: calc(12px * var(--ui-font-scale)); }
+.calculationNotice { margin-top: 18px; padding: 14px 16px; border-left: 3px solid var(--accent); color: var(--text-secondary); background: var(--surface-subtle); font-size: calc(13px * var(--ui-font-scale)); line-height: 1.55; }
+.calculationNotice strong { color: var(--text-primary); }
 .sampleActions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 24px; }
 .smallButton { min-height: 38px; padding: 0 14px; border: 1px solid var(--border-strong); border-radius: 4px; color: var(--accent); background: var(--surface); font-size: calc(13px * var(--ui-font-scale)); font-weight: 600; }
 .smallButton:hover { background: var(--accent-subtle); }

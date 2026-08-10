@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
-import { auditWorkbook, compareWorkbooks } from "@/domain/modelguard-audit";
+import { auditWorkbook, compareAuditFindings, compareWorkbooks } from "@/domain/modelguard-audit";
 import { workbookParser } from "@/services/modelguard-parser";
 import { auditReportToCsv, auditReportToJson, auditReportToPdf } from "@/services/modelguard-exports";
 
@@ -33,6 +33,15 @@ describe("ModelGuard deterministic audit", () => {
     const after = await parse("modelguard-version-2.xlsx");
     const changes = compareWorkbooks(before, after);
     expect(changes.some((change) => change.kind === "changed" && change.sheet === "Inputs")).toBe(true);
+  });
+
+  it("makes the version demo show three resolved findings and one new finding", async () => {
+    const before = auditWorkbook(await parse("modelguard-version-1.xlsx"));
+    const after = auditWorkbook(await parse("modelguard-version-2.xlsx"));
+    const findings = compareAuditFindings(before, after);
+    expect(findings.filter((finding) => finding.status === "resolved").map((finding) => finding.ruleId).sort()).toEqual(["MG-ASM-001", "MG-ASM-006", "MG-DCF-001"]);
+    expect(findings.filter((finding) => finding.status === "persisting")).toHaveLength(0);
+    expect(findings.filter((finding) => finding.status === "new").map((finding) => finding.ruleId)).toEqual(["MG-SCN-004"]);
   });
 
   it("exports JSON, CSV, and a local PDF payload", async () => {

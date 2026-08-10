@@ -143,6 +143,7 @@ export function ModelGuardWorkspace() {
               <span>{t("modelguard.maxSize")}</span>
               <span>{t("modelguard.localOnly")}</span>
             </div>
+            <p className={styles.calculationNotice}><strong>{t("modelguard.formulaValuesTitle")}</strong> {t("modelguard.formulaValuesText")}</p>
             {fileName ? <p className={styles.notice} role="status">{fileName} · {fileSize ? `${(fileSize / 1024).toFixed(1)} KB` : ""}{digest ? ` · SHA-256 ${digest.slice(0, 16)}…` : ""}{phase === "parsing" ? ` · ${t("modelguard.parsing")}` : phase === "ready" && workbook ? ` · ${workbook.stats.worksheets} ${t("modelguard.sheets")}, ${workbook.stats.formulas} ${t("modelguard.formulas")} · ${t("modelguard.ready")}` : ""}</p> : <p className={styles.notice}>{t("modelguard.noFile")}</p>}
             {error ? <p className={styles.error} role="alert">{error}</p> : null}
             <div className={styles.sampleActions}>

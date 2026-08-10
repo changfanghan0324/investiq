@@ -51,6 +51,20 @@ substitute for a cell-level receipt and must be validated against the workbook a
 ModelGuard is intentionally complementary rather than a claim that one workflow replaces the
 other.
 
+## Why not just use AI?
+
+ModelGuard is designed for the repeatable, evidence-first part of a model pre-review. A
+conversational assistant can still complement it when a reviewer wants exploration or drafting.
+
+| Chat assistant | ModelGuard |
+| --- | --- |
+| Flexible review | Fixed rule set |
+| Prompt-dependent | Repeatable |
+| May miss checks | Complete configured checklist |
+| General explanation | Sheet/cell-specific evidence |
+| Difficult version tracking | Resolved/new/persisting findings |
+| Often requires uploading a file | Browser-local processing |
+
 ## Historical InvestIQ note
 
 The earlier public demo used synthetic market examples. Its documentation intentionally said:
