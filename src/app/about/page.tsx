@@ -1,12 +1,12 @@
-import { AboutPage } from "@/components/about-page";
+import { ModelGuardStaticPage } from "@/components/modelguard-static-page";
 import { publicPageMetadata } from "@/config/site-metadata";
 
 export const metadata = publicPageMetadata({
   title: "About",
-  description: "The evidence, governance, and product decisions behind InvestIQ.",
+  description: "The product principles behind ModelGuard.",
   path: "/about",
 });
 
 export default function AboutRoute() {
-  return <AboutPage />;
+  return <ModelGuardStaticPage kind="about" />;
 }

@@ -1,6 +1,6 @@
 import type { TranslationKey } from "@/i18n/language";
 
-export type NavRouteId = "research" | "compare" | "portfolio" | "tools";
+export type NavRouteId = "audit" | "templates" | "methodology" | "about";
 
 export interface NavRoute {
   /** Stable identifier used to pick the route icon in the shell. */
@@ -12,12 +12,12 @@ export interface NavRoute {
   shortLabelKey: TranslationKey;
 }
 
-/** Primary decision workspaces. Market context and methodology are reached in context. */
+/** ModelGuard's four primary workspaces. All processing remains local to the browser. */
 export const primaryRoutes: readonly NavRoute[] = [
-  { id: "research", href: "/", labelKey: "nav.research", shortLabelKey: "nav.researchShort" },
-  { id: "compare", href: "/compare", labelKey: "nav.compare", shortLabelKey: "nav.compareShort" },
-  { id: "portfolio", href: "/portfolio", labelKey: "nav.portfolio", shortLabelKey: "nav.portfolioShort" },
-  { id: "tools", href: "/tools", labelKey: "nav.tools", shortLabelKey: "nav.toolsShort" },
+  { id: "audit", href: "/workspace", labelKey: "nav.audit", shortLabelKey: "nav.auditShort" },
+  { id: "templates", href: "/templates", labelKey: "nav.templates", shortLabelKey: "nav.templatesShort" },
+  { id: "methodology", href: "/methodology", labelKey: "nav.methodology", shortLabelKey: "nav.methodologyShort" },
+  { id: "about", href: "/about", labelKey: "nav.about", shortLabelKey: "nav.aboutShort" },
 ];
 
 /** Exact match for "/", prefix match for nested segments of every other route. */

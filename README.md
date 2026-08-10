@@ -1,225 +1,75 @@
-# InvestIQ
+# ModelGuard
 
-## Evidence-first Investment Research & Portfolio Analytics
+## Private financial model audit, in your browser
 
-InvestIQ connects official SEC filing evidence, explicit valuation assumptions, and portfolio-risk
-analytics in one reproducible research workflow.
+ModelGuard helps analysts check accounting linkages, formulas, DCF logic, assumptions, and
+scenario consistency before a model reaches a reviewer or investment committee.
 
-> **Public demo mode:** Company financials use real SEC filings. Price, comparison, portfolio, and
-> DCA examples use synthetic data—not actual AAPL, MSFT, SPY, or other market history.
+The existing InvestIQ repository and Vercel project are retained in place. The public product
+surface is now ModelGuard; the former market, portfolio, DCA, company research, SEC, and AI
+surfaces are retired from the active runtime. The rollback point is the annotated tag
+`investiq-v1-before-modelguard`.
 
-[Live Demo](https://investiq-eight-xi.vercel.app/) ·
-[Completed AAPL Research Case](https://investiq-eight-xi.vercel.app/case-study/aapl) ·
+[Live demo](https://investiq-eight-xi.vercel.app/) ·
+[Repository](https://github.com/changfanghan0324/investiq) ·
 [中文说明](README.zh-CN.md)
 
-**v1.0.0 release preparation:** the public demo is intentionally read-only, synthetic for market
-examples, and fail-closed when SEC or licensed-provider prerequisites are unavailable. CI runs
-quality and browser/accessibility checks as separate, deduplicated jobs on every pull request.
+## Privacy contract
 
-![InvestIQ home with public-demo disclosure](docs/assets/home-desktop.png)
+- Workbooks are read locally in the browser and parsed in a Web Worker.
+- Workbook bytes are never uploaded, stored in a database, placed in browser storage, or sent
+  to an AI assistant.
+- The production runtime has no market-data provider, SEC API, authentication, analytics,
+  upload endpoint, or database dependency.
+- Closing or clearing the tab releases the in-memory session. Exports are generated locally.
 
-_English desktop capture · 2026-08-04 · source snapshot `99c1222`._
+## Audit workflow
 
-## Data truth
+1. Choose an `.xlsx` workbook (20 MB, 50 worksheets, 200,000 non-empty cells, 100,000 formulas,
+   and 5,000 named ranges are the current limits).
+2. ModelGuard normalizes visible and hidden sheets, formulas, cached values, merged ranges, named
+   ranges, and external-link metadata without following external relationships.
+3. Deterministic checks produce cell-specific issues with a rule ID, severity, observed value,
+   expected condition, and a practical review message.
+4. Compare two local workbook versions by cell and export the audit receipt as JSON, CSV, or PDF.
 
-| Surface | Public deployment source |
-| --- | --- |
-| Company financials | Real SEC EDGAR filing evidence |
-| Filing receipts | Real accession, filing date, and economic period |
-| DCF | User-owned assumptions applied to SEC-derived anchors |
-| Company price context | Synthetic public-demo series unless licensed live mode is enabled |
-| Stock comparison | Synthetic public-demo series on this deployment |
-| Portfolio Lab | Synthetic public-demo series on this deployment |
-| Historical DCA | Synthetic public-demo series on this deployment |
-| AI explanations | Optional; never changes calculations |
+## Rule families
 
-Synthetic series demonstrate the workflow only. They do not describe historical performance of the
-ticker labels shown.
+The current rule catalogue covers formula error tokens, missing sheets/cells, uncached formulas,
+hardcoded forecast cells, hidden worksheets, blocked external links, and DCF terminal-growth
+coherence. See [the full rule catalogue](docs/MODELGUARD_RULE_CATALOG.md).
 
-### Synthetic market-data contract
+## Historical InvestIQ note
 
-Every public route that consumes the demo market adapter (`/market`, `/compare`, `/portfolio`,
-`/tools/dca`, and the company price-risk context) renders a persistent **Public Demo Market Data**
-disclosure. The disclosure is paired with a provenance receipt containing:
+The earlier public demo used synthetic market examples. Its documentation intentionally said:
+“Price, comparison, portfolio, and DCA examples use synthetic data.” Those routes are now retired
+and redirect to ModelGuard; no synthetic or live market price is rendered by the active product.
 
-```ts
-{
-  sourceType: "synthetic" | "licensed-live",
-  provider: string,
-  generatedAt: string,
-  disclaimer: string,
-}
-```
+## Development
 
-Synthetic surfaces use the labels **Synthetic Price Series**, **Illustrative Market Data**,
-**Demo Market History**, and **Synthetic Return Example**. They do not use current-price or
-historical-performance wording, and no market-data provider is connected in the public demo.
-
-## The problem
-
-Investment research often separates filing evidence, model assumptions, risk analytics, and the
-final memo. That makes lineage hard to audit and allows reported facts to blur into analyst judgment.
-
-## The solution
-
-InvestIQ preserves those boundaries. A researcher can trace a filing fact to its accession and
-period, inspect whether a DCF input is reported, constructed, or assumed, test scenarios through
-deterministic code, connect securities to portfolio risk, and export a reproducible research output.
-
-## Core workflow
-
-1. Find a US public company and inspect latest-reported SEC evidence.
-2. Review five-year financial trends and the filing receipts behind them.
-3. Enter and stress explicit DCF assumptions; market price never enters DCF mathematics.
-4. Compare 2–5 securities or model 1–10 long-only holdings on a shared evidence mode.
-5. Write a memo or print-ready report with facts, assumptions, risks, and limitations separated.
-6. Use Historical DCA (1–10 unique holdings) and Market Context as supporting tools.
-
-## Featured AAPL case
-
-The completed case uses Apple FY2025/FY2021–FY2025 SEC evidence, a typed source register, computed
-analyst observations, explicit assumption ownership, bear/base/bull DCF reruns, sensitivity
-interpretation, official-source catalysts and risks, and an uncertainty-first conclusion. It contains
-no public market-price comparison and no recommendation.
-
-![AAPL evidence and valuation case](docs/assets/aapl-case-study.png)
-
-_English desktop capture · 2026-08-04 · source snapshot `99c1222`._
-
-## Finance capabilities
-
-- Annual SEC fact selection with economic-period alignment and accession receipts.
-- Five-year revenue, operating-margin, earnings, EPS, cash-flow, and constructed-FCF evidence.
-- Unlevered FCFF DCF with an explicit EV-to-equity bridge and 5×5 sensitivities.
-- Reported, constructed, and analyst-owned assumptions shown as different evidence classes.
-- Observation-level provenance, direct-fact precedence, strict revenue/D&A constructions, and
-  partial-coverage valuation readiness for issuers whose standardized SEC histories are incomplete.
-- Price/total-return basis selection that never mixes bases within a cross-security analysis.
-- CAGR, volatility, Sharpe, Sortino, beta, alpha, historical VaR, drawdown, attribution,
-  concentration, correlation, and historical rebalancing scenarios when samples support them.
-- Historical DCA accounting with contributions, fees, dividends, taxes, liquidation, TWR, MWRR,
-  drawdown, and an auditable ledger. Future DCA is intentionally unavailable.
-
-## Analytics-engineering evidence
-
-- TypeScript/Next.js UI with pure calculation domains and typed source receipts.
-- Fail-closed SEC selection, missing-value handling, licensing gates, and security headers.
-- Run-level evidence mode prevents licensed-live and synthetic series from being combined.
-- Deterministic generated AAPL Markdown with drift tests against the typed case snapshot.
-- Vitest contracts, isolated Playwright flows, axe checks, mobile/text-scale checks, and production
-  build validation. Exact final counts are recorded in the release PR after CI.
-
-## Review and governance
-
-- [Final production audit](docs/audit/FINAL_PRODUCTION_AUDIT.md) records runtime, security, and
-  operational findings.
-- [SEC data validation](docs/audit/SEC_DATA_VALIDATION.md) records AAPL, FSLY, financial-issuer,
-  loss-making, and unavailable-field coverage.
-- [CI hardening](docs/audit/CI_HARDENING.md) explains the split quality/browser workflow and cache
-  strategy.
-- [Structured usability evaluation](docs/audit/USABILITY_RESULTS.md) reports five representative
-  task walkthroughs and labels proxy findings separately from human research.
-- Methodology, SEC selection rules, financial-model contracts, and data governance are treated as
-  reviewable product contracts; missing data remains unavailable rather than being backfilled.
-
-## Public demo limitations
-
-- Public market examples are synthetic and are not actual security history.
-- SEC availability and filing taxonomy quality can affect company research. Coverage is best effort;
-  values disclose whether they are direct SEC facts, constructed from reported components, manually
-  supplied, or unavailable. General filing-specific custom-extension parsing remains unsupported.
-- Public live-market use remains disabled until display rights and durable provider quota controls
-  are approved.
-- Sector analytics remain unavailable where no authoritative sector source exists.
-- The product provides research and education, not investment advice or suitability assessment.
-- No future DCA projection, authentication, or cloud save is provided.
-- The downloadable DCA PDF is English-only in this release; the web UI supports English and
-  Simplified Chinese.
-
-See [Known Limitations](docs/KNOWN_LIMITATIONS.md) for the complete release-candidate list.
-
-## Architecture
-
-```text
-Next.js routes and bilingual UI
-  ├─ SEC evidence and source receipts
-  ├─ licensed-live or run-pinned synthetic market adapter
-  ├─ pure fundamentals, valuation, analytics, and DCA domains
-  ├─ memo/report/CSV/PDF output services
-  └─ optional AI explanation constrained to calculated summaries
-```
-
-Requests are bounded by each workspace: Compare supports 2–5 securities, Portfolio Lab 1–10
-holdings, and DCA 1–10 unique holdings. Sequential loading bounds provider request bursts while
-supporting each workspace’s stated holding limit.
-
-## Accessibility and language
-
-The UI includes semantic landmarks, keyboard-accessible controls, a skip link, reduced-motion
-support, icon-plus-text evidence notices, English/Simplified Chinese catalogs, 320 px layouts, and
-text-size settings of 100%, 115%, 130%, and 145%.
-
-## Quick start
-
-Requirements: Node.js 24.x and npm (matching `package.json` and `.nvmrc`).
+Requirements: Node.js 24.x. Install dependencies with `npm ci` and run:
 
 ```bash
-npm ci
-cp .env.example .env.local
 npm run dev
-```
-
-SEC research works with a truthful `SEC_USER_AGENT`. Public live-market routes also require provider
-credentials, confirmed display rights, and production controls; do not bypass the licensing gate.
-
-```bash
 npm run typecheck
 npm run lint
 npm run test
 npm run build
-npm run test:e2e
 ```
+
+The static export is configured with `output: "export"`. Vercel redirects preserve old InvestIQ
+URLs while keeping the same project and domain.
 
 ## Documentation
 
-- [AAPL written research sample](docs/EQUITY_RESEARCH_SAMPLE_AAPL.md)
-- [Methodology](docs/METHODOLOGY.md)
-- [Data governance](docs/DATA_GOVERNANCE.md)
-- [Financial model contracts](docs/FINANCIAL_MODEL_CONTRACTS.md)
-- [SEC selection rules](docs/SEC_SELECTION_RULES.md)
-- [Product specification](docs/INVESTIQ_PRODUCT_SPEC.md)
-- [AI-assisted development](docs/AI_ASSISTED_DEVELOPMENT.md)
-- [Usability protocol](docs/usability/README.md)
-- [Release checklist](docs/RELEASE_CHECKLIST.md) and [draft release notes](docs/RELEASE_NOTES_V1.md)
-- [License decision](docs/LICENSE_DECISION.md) and [MIT license](LICENSE)
+- [ModelGuard product specification](docs/MODELGUARD_PRODUCT_SPEC.md)
+- [Rule catalogue](docs/MODELGUARD_RULE_CATALOG.md)
+- [Workbook schema](docs/MODELGUARD_SCHEMA.md)
+- [Privacy contract](docs/MODELGUARD_PRIVACY.md)
+- [Security model](docs/MODELGUARD_SECURITY.md)
+- [Limitations](docs/MODELGUARD_LIMITATIONS.md)
+- [Parser ADR](docs/architecture/ADR-001-WORKBOOK-PARSER.md)
+- [Static/local-only ADR](docs/architecture/ADR-002-STATIC-LOCAL-PROCESSING.md)
+- [Migration baseline](docs/audit/MODELGUARD_MIGRATION_BASELINE.md)
 
-## Screenshot gallery
-
-[Home mobile](docs/assets/home-mobile.png) · [AAPL financials](docs/assets/aapl-financials.png) ·
-[AAPL valuation](docs/assets/aapl-valuation.png) · [Portfolio demo](docs/assets/portfolio-demo.png) ·
-[DCA demo](docs/assets/dca-demo.png)
-
-All analytics captures visibly identify synthetic public-demo data. Captures are dated 2026-08-04
-from source snapshot `99c1222`; the release PR records later verification commits separately.
-
-## Author
-
-Built by **Fang Han Chang (Peter Chang)** — finance background and, as of August 2026, incoming
-Boston University M.S. in Business Analytics student.
-
-[GitHub](https://github.com/changfanghan0324) ·
-[Repository](https://github.com/changfanghan0324/investiq) ·
-[Methodology](https://investiq-eight-xi.vercel.app/methodology)
-
-LinkedIn, public email, and résumé links are intentionally omitted until the owner verifies and
-approves them.
-
-## License and release status
-
-The application source is released under the [MIT License](LICENSE). This license applies to the
-repository code and documentation only; SEC presentation, vendor market data, trademarks, and other
-third-party material remain subject to their own rights and display terms. See the [license decision](docs/LICENSE_DECISION.md).
-
-The repository is prepared for the **v1.0.0** release. The reviewed pull request, production
-promotion, and final GitHub release publication remain explicit delivery gates so the released SHA
-can be verified against the deployed application.
+ModelGuard is educational review software, not investment, accounting, tax, or legal advice.

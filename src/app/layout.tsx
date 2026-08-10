@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { ReadinessProvider } from "@/components/readiness-provider";
 import { LanguageProvider } from "@/i18n/language";
 import { rootMetadata } from "@/config/site-metadata";
 import "./globals.css";
@@ -15,7 +14,7 @@ export default function RootLayout({
     <html lang="en" data-scroll-behavior="smooth">
       <body>
         <LanguageProvider>
-          <ReadinessProvider>{children}</ReadinessProvider>
+          {children}
         </LanguageProvider>
       </body>
     </html>

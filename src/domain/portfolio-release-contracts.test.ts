@@ -23,21 +23,19 @@ describe('final portfolio release contracts', () => {
     expect(text).not.toMatch(/Server verified/i);
   });
 
-  it('puts exact public-demo truth in both language catalogs and recruiter docs', () => {
+  it('puts the local-only ModelGuard contract in both language catalogs and docs', () => {
     const catalog = read('src/i18n/language.tsx');
-    expect(catalog).toContain('Public demo mode');
-    expect(catalog).toContain('not actual AAPL, MSFT, SPY, or other market history');
-    expect(catalog).toContain('公开演示模式');
-    expect(catalog).toContain('并非 AAPL、MSFT、SPY 或其他证券的真实历史行情');
-    expect(read('README.md')).toContain('https://investiq-eight-xi.vercel.app/case-study/aapl');
+    expect(catalog).toContain('Processed locally. Not uploaded. No AI. No financial-data API.');
+    expect(catalog).toContain('在本地处理。不上传。不使用 AI。不调用金融数据 API。');
+    expect(read('README.md')).toContain('https://investiq-eight-xi.vercel.app/');
+    expect(read('README.md')).toContain('no market-data provider');
   });
 
-  it('keeps assistant and export evidence modes fail-safe', () => {
-    expect(read('src/server/assistant.ts')).toContain('absent, missing, or unrecognized');
-    expect(read('src/services/assistant-api.ts')).toContain("dataMode: report.source === 'demo' ? 'synthetic-market' : 'licensed-market'");
-    const pdf = read('src/services/pdf-export.ts');
-    expect(pdf).toContain('Synthetic public-demo series. Not actual market history.');
-    expect(pdf).toContain('Simulated estimates are not forecasts or guaranteed returns.');
+  it('keeps audit exports local and provenance-linked', () => {
+    expect(read('src/services/modelguard-exports.ts')).toContain('auditReportToJson');
+    expect(read('src/services/modelguard-exports.ts')).toContain('auditReportToCsv');
+    expect(read('src/services/modelguard-exports.ts')).toContain('auditReportToPdf');
+    expect(read('src/domain/modelguard-schema.ts')).toContain('WorkbookProvenance');
   });
 
   it('ships every recruiter-facing document and an empty usability results template', () => {
@@ -56,9 +54,9 @@ describe('final portfolio release contracts', () => {
   it('keeps the recruiter README concise and release-scoped', () => {
     const english = read('README.md');
     expect(english.trim().split('\n').length).toBeLessThanOrEqual(250);
-    expect(english).toContain('v1.0.0');
-    expect(english).toContain('MIT License');
+    expect(english).toContain('ModelGuard');
+    expect(english).toContain('MIT');
     expect(existsSync(resolve(root, 'LICENSE'))).toBe(true);
-    expect(read('README.zh-CN.md')).toContain('v1.0.0');
+    expect(read('README.zh-CN.md')).toContain('ModelGuard');
   });
 });

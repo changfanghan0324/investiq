@@ -24,6 +24,7 @@
     "@neondatabase/serverless": "^1.1.0",
     "@vercel/firewall": "^1.0.0",
     "drizzle-orm": "^0.45.2",
+    "exceljs": "4.4.0",
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.8",
     "lucide-react": "^1.25.0",
@@ -35,11 +36,11 @@
     "server-only": "^0.0.1"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.10.2",
+    "@playwright/test": "^1.54.2",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "@axe-core/playwright": "^4.10.2",
-    "@playwright/test": "^1.54.2",
     "drizzle-kit": "^0.31.10",
     "eslint": "^9",
     "eslint-config-next": "16.2.10",
