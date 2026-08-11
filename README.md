@@ -14,6 +14,20 @@ surfaces are retired from the active runtime. The rollback point is the annotate
 [Repository](https://github.com/changfanghan0324/investiq) ·
 [中文说明](README.zh-CN.md)
 
+## Product tour
+
+The public demo is packaged around a local-only audit workflow:
+
+![ModelGuard home](docs/screenshots/modelguard/home.png)
+
+![Error audit](docs/screenshots/modelguard/error-audit.png)
+
+![Finding detail](docs/screenshots/modelguard/finding-detail.png)
+
+![Version comparison](docs/screenshots/modelguard/version-comparison.png)
+
+![Mobile layout](docs/screenshots/modelguard/mobile.png)
+
 ## Privacy contract
 
 - Workbooks are read locally in the browser and parsed in a Web Worker.

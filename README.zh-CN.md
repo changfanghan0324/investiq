@@ -8,6 +8,20 @@ ModelGuard 帮助分析师在模型交给复核者或投资委员会之前，检
 
 [在线演示](https://investiq-eight-xi.vercel.app/) · [仓库](https://github.com/changfanghan0324/investiq)
 
+## 产品预览
+
+公开演示围绕本地审计流程构建：
+
+![ModelGuard 首页](docs/screenshots/modelguard/home.png)
+
+![错误模型审计](docs/screenshots/modelguard/error-audit.png)
+
+![问题详情](docs/screenshots/modelguard/finding-detail.png)
+
+![版本比较](docs/screenshots/modelguard/version-comparison.png)
+
+![移动端布局](docs/screenshots/modelguard/mobile.png)
+
 ## 隐私契约
 
 - 工作簿在浏览器中读取，并在 Web Worker 中解析。
