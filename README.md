@@ -108,6 +108,7 @@ URLs while keeping the same project and domain.
 - [Privacy contract](docs/MODELGUARD_PRIVACY.md)
 - [Security model](docs/MODELGUARD_SECURITY.md)
 - [Limitations](docs/MODELGUARD_LIMITATIONS.md)
+- [Usability walkthroughs](docs/portfolio/MODELGUARD_USABILITY_TESTS.md)
 - [Parser ADR](docs/architecture/ADR-001-WORKBOOK-PARSER.md)
 - [Static/local-only ADR](docs/architecture/ADR-002-STATIC-LOCAL-PROCESSING.md)
 - [Migration baseline](docs/audit/MODELGUARD_MIGRATION_BASELINE.md)
