@@ -12,7 +12,7 @@ describe("public portfolio metadata and profile", () => {
     assert.equal(homeMetadata.description, SITE_DESCRIPTION);
     assert.equal(rootMetadata.alternates?.canonical, "/");
     assert.equal((rootMetadata.openGraph as { type?: string })?.type, "website");
-    assert.equal(rootMetadata.openGraph?.siteName, "InvestIQ");
+    assert.equal(rootMetadata.openGraph?.siteName, "ModelGuard");
     assert.equal((rootMetadata.twitter as { card?: string })?.card, "summary_large_image");
     assert.ok(rootMetadata.openGraph?.images);
     assert.doesNotMatch(`${HOME_TITLE}\n${SITE_DESCRIPTION}`, /buy|sell|price target|return|outperform|undervalued|overvalued/i);
@@ -41,7 +41,7 @@ describe("public portfolio metadata and profile", () => {
   it("keeps ticker research pages canonical but out of search indexes", () => {
     const metadata = companyPageMetadata({ ticker: " fsly ", section: "Valuation", path: "/company/FSLY/valuation" });
 
-    expect(metadata.title).toEqual({ absolute: "Valuation: FSLY — InvestIQ" });
+    expect(metadata.title).toEqual({ absolute: "Valuation: FSLY — ModelGuard" });
     expect(metadata.alternates?.canonical).toBe("/company/FSLY/valuation");
     expect(metadata.robots).toEqual({ index: false, follow: false });
   });

@@ -35,6 +35,10 @@ function marketData(ticker: string, buyHigh: number, finalClose: number, project
     source: 'demo',
     fetchedAt: '2024-01-03T00:00:00.000Z',
     provenance: {
+      sourceType: 'synthetic',
+      provider: 'InvestIQ deterministic demo generator',
+      generatedAt: '2024-01-03T00:00:00.000Z',
+      disclaimer: 'This page uses synthetic market series for demonstration. It does not represent actual historical prices or investment performance.',
       priceProvider: 'demo',
       priceBasis: 'split-adjusted',
       fetchedAt: '2024-01-03T00:00:00.000Z',

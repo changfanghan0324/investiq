@@ -95,6 +95,10 @@ function aggregateProvenance(holdings: PortfolioHoldingReport[]): DataProvenance
     .at(-1);
   const fetchedAt = items.map((item) => item.fetchedAt).sort().at(-1) ?? new Date().toISOString();
   return {
+    sourceType: 'licensed-live',
+    provider: [...new Set(items.map((item) => item.provider))].join(' + ') || 'Configured market-data provider',
+    generatedAt: fetchedAt,
+    disclaimer: 'Licensed market history fetched from the configured provider; coverage and corporate-action treatment remain provider-scoped.',
     priceProvider: 'yahoo',
     priceBasis: 'split-adjusted',
     lastCompletedSession,

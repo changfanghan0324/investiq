@@ -1,13 +1,15 @@
 import type { MetadataRoute } from "next";
 import { SITE_URL } from "@/config/site-metadata";
 
-/** Keep operational/query-driven workspaces out of search indexes. */
+export const dynamic = "force-static";
+
+/** Keep the local audit workspace out of search indexes. */
 export default function robots(): MetadataRoute.Robots {
   return {
     rules: {
       userAgent: "*",
-      allow: ["/", "/about", "/methodology", "/case-study/"],
-      disallow: ["/company/", "/compare", "/portfolio", "/tools", "/market", "/api/"],
+      allow: ["/", "/about", "/methodology", "/templates", "/privacy"],
+      disallow: ["/workspace", "/api/", "/market", "/compare", "/portfolio", "/tools", "/company/"],
     },
     sitemap: `${SITE_URL}/sitemap.xml`,
   };

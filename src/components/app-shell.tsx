@@ -18,7 +18,7 @@ export function AppShell({
   children: ReactNode;
   /** Page-specific header buttons, rendered after the display controls. */
   actions?: ReactNode;
-  /** Compact service/data status indicator for pages that read live data. */
+      /** Optional page-level status or action controls. */
   status?: ReactNode;
 }) {
   const pathname = usePathname();
@@ -31,7 +31,7 @@ export function AppShell({
       <header className={styles.header}>
         <Link className={styles.brand} href="/">
           <BrandMark />
-          <strong>InvestIQ</strong>
+          <strong>ModelGuard</strong>
         </Link>
 
         <nav className={styles.desktopNav} aria-label={t("nav.primary")}>
@@ -152,13 +152,13 @@ function BrandMark() {
 /** Inline outline icons keep the bottom navigation legible at 18px without extra dependencies. */
 function NavIcon({ id }: { id: NavRouteId }) {
   const paths: Record<NavRouteId, ReactNode> = {
-    research: (
+    audit: (
       <>
         <circle cx="10.5" cy="10.5" r="6.5" />
         <path d="M15.5 15.5 L21 21" />
       </>
     ),
-    compare: (
+    templates: (
       <>
         <path d="M12 4 L12 20" />
         <path d="M4 8 L20 8" />
@@ -166,13 +166,13 @@ function NavIcon({ id }: { id: NavRouteId }) {
         <path d="M20 8 L17.5 14 L22.5 14 Z" />
       </>
     ),
-    portfolio: (
+    methodology: (
       <>
         <rect x="3" y="7" width="18" height="13" rx="1.5" />
         <path d="M9 7 L9 4.5 L15 4.5 L15 7" />
       </>
     ),
-    tools: (
+    about: (
       <>
         <path d="M4 7 L20 7" />
         <path d="M4 17 L20 17" />

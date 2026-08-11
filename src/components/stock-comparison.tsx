@@ -563,6 +563,7 @@ export function StockComparison() {
   const view = assembled?.view;
   const isDemoRun = run?.securities.some((load) => load.data?.source === "demo") ?? false;
   const showSyntheticNotice = analysisReadiness === "unavailable" || isDemoRun;
+  const demoProvenance = run?.securities.find((load) => load.data?.source === "demo")?.data?.provenance;
 
   const failedSecurities = useMemo(
     () => run?.securities.filter((load) => load.status === "error") ?? [],
@@ -634,12 +635,12 @@ export function StockComparison() {
     <AppShell>
       <div className={styles.page}>
         <div className={styles.pageHead}>
-          <h1>{t("compare.title")}</h1>
+          <h1>{t(showSyntheticNotice ? "compare.titleSynthetic" : "compare.title")}</h1>
           <p className={styles.subtitle}>{t(showSyntheticNotice ? "compare.subtitleSynthetic" : "compare.subtitle")}</p>
           {run || running ? <p className={styles.quietStatus} role="status" aria-live="polite">{statusText}</p> : null}
         </div>
 
-        {showSyntheticNotice ? <EvidenceModeNotice id="comparison-demo-title" /> : null}
+        {showSyntheticNotice ? <EvidenceModeNotice id="comparison-demo-title" provenance={demoProvenance} /> : null}
 
         <form className={styles.controls} onSubmit={handleSubmit} aria-label={t("compare.controlsTitle")}>
           <fieldset className={styles.symbolFields}>
@@ -906,7 +907,7 @@ export function StockComparison() {
                 <section className={styles.panel} aria-labelledby="compare-chart-title">
                   <header className={styles.panelHead}>
                     <div>
-                      <h2 id="compare-chart-title">{t("compare.chartTitle")}</h2>
+                      <h2 id="compare-chart-title">{t(isDemoRun ? "compare.chartTitleSynthetic" : "compare.chartTitle")}</h2>
                       <p className={styles.panelSub}>
                         {t("compare.chartWindow", {
                           from: formatDate(view.commonWindow.startDate, locale),
@@ -936,7 +937,7 @@ export function StockComparison() {
                           onClick={() => setChartTab(tab.id)}
                           onKeyDown={(event) => handleTabKeys(event, index)}
                         >
-                          {t(tab.labelKey)}
+                          {t(isDemoRun && tab.id === "cumulative" ? "compare.tabCumulativeSynthetic" : isDemoRun && tab.id === "daily" ? "compare.tabDailySynthetic" : tab.labelKey)}
                         </button>
                       );
                     })}
@@ -965,7 +966,9 @@ export function StockComparison() {
                       colors={colorBySymbol}
                       locale={locale}
                       ariaLabel={t(
-                        chartTab === "cumulative" ? "compare.chartCumulativeAria" : "compare.chartDailyAria",
+                        isDemoRun
+                          ? chartTab === "cumulative" ? "compare.chartCumulativeAriaSynthetic" : "compare.chartDailyAriaSynthetic"
+                          : chartTab === "cumulative" ? "compare.chartCumulativeAria" : "compare.chartDailyAria",
                         { symbols: joinSymbols(view.narrative.symbols, locale) },
                       )}
                       emptyLabel={t(
@@ -975,9 +978,9 @@ export function StockComparison() {
                     />
                     <p className={styles.caption}>
                       {t(
-                        chartTab === "cumulative"
-                          ? "compare.chartCumulativeCaption"
-                          : "compare.chartDailyCaption",
+                        isDemoRun
+                          ? chartTab === "cumulative" ? "compare.chartCumulativeCaptionSynthetic" : "compare.chartDailyCaptionSynthetic"
+                          : chartTab === "cumulative" ? "compare.chartCumulativeCaption" : "compare.chartDailyCaption",
                         { date: formatDate(view.commonWindow.startDate, locale) },
                       )}
                     </p>
@@ -988,7 +991,7 @@ export function StockComparison() {
                 <section className={styles.panel} aria-labelledby="compare-metrics-title">
                   <header className={styles.panelHead}>
                     <div>
-                      <h2 id="compare-metrics-title">{t("compare.metrics")}</h2>
+                      <h2 id="compare-metrics-title">{t(isDemoRun ? "compare.metricsSynthetic" : "compare.metrics")}</h2>
                       <p className={styles.panelSub}>
                         {t("compare.metricsSub", { count: formatCount(view.commonWindow.sessions, locale) })}
                       </p>
@@ -999,7 +1002,7 @@ export function StockComparison() {
                     </button>
                   </header>
 
-                  <MetricsTable view={view} colors={colorBySymbol} locale={locale} t={t} />
+                  <MetricsTable view={view} colors={colorBySymbol} locale={locale} t={t} synthetic={isDemoRun} />
 
                   <p className={styles.footnote}>{t("compare.dashMeaning")}</p>
                   <p className={styles.footnote}>{t("compare.csvNote")}</p>
@@ -1290,11 +1293,13 @@ function MetricsTable({
   colors,
   locale,
   t,
+  synthetic,
 }: {
   view: StockComparisonViewModel;
   colors: Map<string, string>;
   locale: string;
   t: Translate;
+  synthetic: boolean;
 }) {
   return (
     <>
@@ -1320,8 +1325,8 @@ function MetricsTable({
           <thead>
             <tr>
               <th scope="col">{t("result.ticker")}</th>
-              <th scope="col">{t("compare.colCagr")}</th>
-              <th scope="col">{t("compare.colTotalReturn")}</th>
+              <th scope="col">{t(synthetic ? "compare.colSyntheticCagr" : "compare.colCagr")}</th>
+              <th scope="col">{t(synthetic ? "compare.colSyntheticReturn" : "compare.colTotalReturn")}</th>
               <th scope="col">{t("compare.colVendorTotalReturn")}</th>
               <th scope="col">{t("metric.volatility")}</th>
               <th scope="col">{t("metric.sharpe")}</th>

@@ -201,6 +201,14 @@ export type MarketDataMode = 'analysis' | 'dca';
  * is absent from *both* providers cannot be detected here.
  */
 export interface DataProvenance {
+  /** Stable classification used by every UI/export consumer before it renders market data. */
+  sourceType: 'synthetic' | 'licensed-live';
+  /** Human-readable provider or generator name; never implied from a ticker symbol. */
+  provider: string;
+  /** ISO timestamp for when this dataset was generated or fetched. */
+  generatedAt: string;
+  /** Plain-language limitation that must travel with the dataset. */
+  disclaimer: string;
   /** Price series provider and adjustment basis. Dividends are NOT embedded in the OHLC. */
   priceProvider: 'yahoo' | 'demo';
   priceBasis: 'split-adjusted';

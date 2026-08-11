@@ -28,7 +28,7 @@ interface ChartDatum {
   drawdown: number;
 }
 
-export function PortfolioPerformanceChart({ result }: { result: PortfolioAggregateResult }) {
+export function PortfolioPerformanceChart({ result, synthetic = false }: { result: PortfolioAggregateResult; synthetic?: boolean }) {
   const { locale, t } = useLanguage();
   const [mode, setMode] = useState<ChartMode>("value");
   const [range, setRange] = useState<ChartRange>("all");
@@ -48,7 +48,7 @@ export function PortfolioPerformanceChart({ result }: { result: PortfolioAggrega
               className={mode === item ? styles.chartTabActive : styles.chartTab}
               onClick={() => setMode(item)}
             >
-              {t(item === "value" ? "chart.value" : item === "return" ? "chart.return" : "chart.drawdown")}
+              {t(chartLabelKey(item, synthetic))}
             </button>
           ))}
         </div>
@@ -67,11 +67,11 @@ export function PortfolioPerformanceChart({ result }: { result: PortfolioAggrega
       </div>
 
       <div className={styles.chartLegend}>
-        <span><i className={styles.legendCyan} />{legendForMode(mode, t)}</span>
+        <span><i className={styles.legendCyan} />{legendForMode(mode, t, synthetic)}</span>
         {mode === "value" ? <span><i className={styles.legendSlate} />{t("chart.contributedCapital")}</span> : null}
       </div>
 
-      <div className={styles.chartCanvas} role="img" aria-label={t("chart.aria", { mode: t(mode === "value" ? "chart.value" : mode === "return" ? "chart.return" : "chart.drawdown") })}>
+      <div className={styles.chartCanvas} role="img" aria-label={t(synthetic ? "chart.syntheticAria" : "chart.aria", { mode: t(chartLabelKey(mode, synthetic)) })}>
         {range === "all" ? (
           <div className={styles.chartEventBands} aria-hidden="true">
             <span>{t("chart.covid")}</span>
@@ -106,7 +106,7 @@ export function PortfolioPerformanceChart({ result }: { result: PortfolioAggrega
               tick={{ fill: "#787b86", fontSize: 10 }}
               tickFormatter={(value: number) => mode === "value" ? compactCurrency(value) : `${value.toFixed(0)}%`}
             />
-            <Tooltip content={<ChartTooltip mode={mode} />} cursor={{ stroke: "rgba(91, 140, 255, 0.52)", strokeDasharray: "3 4" }} />
+            <Tooltip content={<ChartTooltip mode={mode} synthetic={synthetic} />} cursor={{ stroke: "rgba(91, 140, 255, 0.52)", strokeDasharray: "3 4" }} />
             {mode === "value" ? (
               <>
                 <Area
@@ -181,7 +181,7 @@ function buildChartData(result: PortfolioAggregateResult, range: ChartRange): Ch
   return visible.filter((_, index) => index % step === 0 || index === visible.length - 1);
 }
 
-function ChartTooltip({ active, payload, mode }: { active?: boolean; payload?: Array<{ payload: ChartDatum }>; mode: ChartMode }) {
+function ChartTooltip({ active, payload, mode, synthetic }: { active?: boolean; payload?: Array<{ payload: ChartDatum }>; mode: ChartMode; synthetic: boolean }) {
   const { t } = useLanguage();
   const point = payload?.[0]?.payload;
   if (!active || !point) return null;
@@ -194,7 +194,7 @@ function ChartTooltip({ active, payload, mode }: { active?: boolean; payload?: A
           <span><i className={styles.legendSlate} />{t("chart.contributed")} {usd(point.contributed)}</span>
         </>
       ) : (
-        <span>{mode === "return" ? t("chart.cashFlowReturn") : t("chart.drawdown")} {mode === "return" ? point.returnPercent.toFixed(2) : point.drawdown.toFixed(2)}%</span>
+        <span>{mode === "return" ? t(synthetic ? "chart.syntheticReturn" : "chart.cashFlowReturn") : t(synthetic ? "chart.syntheticDrawdown" : "chart.drawdown")} {mode === "return" ? point.returnPercent.toFixed(2) : point.drawdown.toFixed(2)}%</span>
       )}
     </div>
   );
@@ -210,9 +210,19 @@ function usd(value: number) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(value);
 }
 
-function legendForMode(mode: ChartMode, t: Translate) {
-  if (mode === "return") return t("chart.cashFlowReturn");
-  if (mode === "drawdown") return t("chart.peakDrawdown");
+function chartLabelKey(mode: ChartMode, synthetic: boolean) {
+  if (synthetic && mode === "return") return "chart.syntheticReturn" as const;
+  if (synthetic && mode === "drawdown") return "chart.syntheticDrawdown" as const;
+  if (synthetic) return "chart.syntheticValue" as const;
+  if (mode === "value") return "chart.value" as const;
+  if (mode === "return") return "chart.return" as const;
+  return "chart.drawdown" as const;
+}
+
+function legendForMode(mode: ChartMode, t: Translate, synthetic: boolean) {
+  if (mode === "return") return t(synthetic ? "chart.syntheticReturn" : "chart.cashFlowReturn");
+  if (mode === "drawdown") return t(synthetic ? "chart.syntheticDrawdown" : "chart.peakDrawdown");
+  if (synthetic) return t("chart.syntheticValue");
   return t("chart.portfolioValue");
 }
 

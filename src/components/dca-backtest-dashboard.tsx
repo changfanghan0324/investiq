@@ -231,8 +231,8 @@ export function DcaBacktestDashboard() {
     <AppShell>
       <div className={styles.appShell}>
       <header className={styles.quietPageHead}>
-        <h1>{t("dca.title")}</h1>
-        <p>{t("dca.subtitle")}</p>
+        <h1>{t(health !== "ready" || report?.source === "demo" ? "dca.titleSynthetic" : "dca.title")}</h1>
+        <p>{t(health !== "ready" || report?.source === "demo" ? "dca.subtitleSynthetic" : "dca.subtitle")}</p>
         <span>{health === "ready" ? t("header.liveCapability") : t("header.publicDemoAvailable")}</span>
       </header>
 
@@ -469,7 +469,12 @@ export function DcaBacktestDashboard() {
         </aside>
 
         <section className={styles.workspace} ref={workspaceRef} id="portfolio-lab">
-          {report?.source === "demo" ? <EvidenceModeNotice id="dca-demo-title" /> : null}
+          {health !== "ready" || report?.source === "demo" ? (
+            <EvidenceModeNotice
+              id="dca-demo-title"
+              provenance={report?.source === "demo" ? report.provenance : undefined}
+            />
+          ) : null}
           {selected && report ? (
             <ResultsWorkspace
               report={report}
@@ -745,7 +750,7 @@ function ResultsWorkspace({
       <div className={styles.resultHeader}>
         <div>
           <div className={styles.resultTitleRow}>
-            <h1>{t("result.performance")}</h1>
+            <h1>{t(report.source === "demo" ? "result.performanceSynthetic" : "result.performance")}</h1>
             <span className={report.source === "demo" ? styles.demoPill : styles.livePill}>
               <i /> {report.source === "demo" ? t("result.synthetic") : t("result.verified")}
             </span>
@@ -779,7 +784,7 @@ function ResultsWorkspace({
       {resultMode !== "historical" ? (
         <div className={styles.simulationBanner}>
           <Zap size={15} />
-          <span><strong>{t("result.simulationTitle")}</strong> {t("result.simulationText")}</span>
+          <span><strong>{t("result.simulationTitle")}</strong> {t(report.source === "demo" ? "result.simulationTextSynthetic" : "result.simulationText")}</span>
           <div className={styles.projectionScenarioTabs} role="group" aria-label={t("result.projectionAssumption")}>
             {projectionOptions.map((scenario) => (
               <button type="button" key={scenario.id} className={resultMode === scenario.id ? styles.projectionScenarioActive : undefined} onClick={() => onResultMode(scenario.id)}>{labelScenario(scenario.id, t)}</button>
@@ -795,7 +800,7 @@ function ResultsWorkspace({
         <Metric label={t("result.maxDrawdown")} value={result.maxDrawdown.percent} formatter={formatPercent} tone="negative" />
       </div>
 
-      <PortfolioPerformanceChart result={result} />
+      <PortfolioPerformanceChart result={result} synthetic={report.source === "demo"} />
 
       <div className={styles.lowerGrid}>
         {/* Reveals on mount, not on scroll: a scroll-triggered fade left these panels blank
@@ -827,7 +832,7 @@ function ResultsWorkspace({
             tabIndex={0}
           >
             <div className={styles.transactionHeader}>
-              <span>{t("result.date")}</span><span>{t("result.ticker")}</span><span>{t("result.action")}</span><span>{t("holding.shares")}</span><span>{t("result.price")}</span>
+              <span>{t("result.date")}</span><span>{t("result.ticker")}</span><span>{t("result.action")}</span><span>{t("holding.shares")}</span><span>{t(report.source === "demo" ? "result.syntheticPrice" : "result.price")}</span>
             </div>
             {transactions.map((transaction, index) => {
               const isAdjustment = transaction.type === "portfolio-tax-adjustment";
@@ -862,13 +867,14 @@ function InsightsRail({
 }) {
   const { t } = useLanguage();
   void holdingResults;
+  const synthetic = report.source === "demo";
   const contributionBase = Math.max(result.totalContributions, 0.000001);
   return (
     <div className={styles.insightScroll}>
       <RailSection title={t("audit.execution")}>
-        <AuditRow label={t("audit.purchasePrice")} value={t("audit.dailyHigh")} />
+        <AuditRow label={t(synthetic ? "audit.syntheticPurchasePrice" : "audit.purchasePrice")} value={t(synthetic ? "audit.syntheticDailyHigh" : "audit.dailyHigh")} />
         <AuditRow label={t("audit.nonTrading")} value={t("audit.nextSession")} />
-        <AuditRow label={t("audit.priceBasis")} value={t("audit.priceExcludesDividends")} />
+        <AuditRow label={t(synthetic ? "audit.syntheticPriceBasis" : "audit.priceBasis")} value={t("audit.priceExcludesDividends")} />
         <AuditRow label={t("audit.dividends")} value={t("audit.payDate")} />
         <AuditRow label={t("audit.dividendCoverage")} value={coverageLabel(report.provenance.dividendCoverage, t)} verified={report.provenance.dividendCoverage === "cross-checked"} />
         <AuditRow label={t("audit.splitCoverage")} value={coverageLabel(report.provenance.splitCoverage, t)} verified={report.provenance.splitCoverage === "cross-checked"} />
@@ -879,7 +885,7 @@ function InsightsRail({
         {report.source !== "demo" ? <p className={styles.railFootnote}>{t("audit.coverageLimitation")}</p> : null}
       </RailSection>
 
-      <RailSection title={t("audit.performanceMeasures")}>
+      <RailSection title={t(synthetic ? "audit.syntheticPerformanceMeasures" : "audit.performanceMeasures")}>
         <AuditRow label={t("result.netGainRatio")} value={formatPercent(result.netGainRatioPercent)} tone={result.totalProfit >= 0 ? "positive" : "negative"} />
         <AuditRow label={t("result.twrPeriod")} value={formatPercent(result.twr.cumulative * 100)} tone={result.twr.cumulative >= 0 ? "positive" : "negative"} />
         <AuditRow label={t("result.twrAnnualized")} value={twrAnnualizedLabel(result.twr, t)} />
@@ -887,8 +893,8 @@ function InsightsRail({
         <p className={styles.railFootnote}>{t("audit.measuresNote")}</p>
       </RailSection>
 
-      <RailSection title={t("audit.returnBreakdown")}>
-        <AuditRow label={t("audit.stockReturn")} value={formatPercent(result.priceReturn / contributionBase * 100)} tone={result.priceReturn >= 0 ? "positive" : "negative"} />
+      <RailSection title={t(synthetic ? "audit.syntheticReturnBreakdown" : "audit.returnBreakdown")}>
+        <AuditRow label={t(synthetic ? "audit.syntheticStockReturn" : "audit.stockReturn")} value={formatPercent(result.priceReturn / contributionBase * 100)} tone={result.priceReturn >= 0 ? "positive" : "negative"} />
         <AuditRow label={t("audit.dividendReturn")} value={formatPercent(result.grossDividends / contributionBase * 100)} tone="positive" />
         <AuditRow label={t("audit.fees")} value={formatPercent(-result.totalFees / contributionBase * 100)} tone="negative" />
         <AuditRow label={t("audit.taxes")} value={formatPercent(-(result.dividendTax + result.capitalGainsTax) / contributionBase * 100)} tone="negative" />

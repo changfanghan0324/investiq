@@ -1,12 +1,12 @@
 import type { Metadata } from "next";
 
 export const SITE_URL = "https://investiq-eight-xi.vercel.app";
-export const SITE_NAME = "InvestIQ";
-export const DEFAULT_TITLE = "InvestIQ — Investment Research & Portfolio Analytics";
-export const HOME_TITLE = "InvestIQ — Auditable Investment Research & Portfolio Analytics";
-export const SITE_DESCRIPTION = "Trace official SEC filing evidence, test explicit valuation assumptions, and connect holdings to portfolio-level risk in one reproducible workflow.";
+export const SITE_NAME = "ModelGuard";
+export const DEFAULT_TITLE = "ModelGuard — Private Financial Model Audit";
+export const HOME_TITLE = "ModelGuard — Check a financial model before someone else does";
+export const SITE_DESCRIPTION = "Audit accounting linkages, formulas, DCF logic, assumptions, and scenario consistency locally in your browser.";
 
-export const SOCIAL_IMAGE = { url: "/opengraph-image", width: 1200, height: 630, alt: "InvestIQ — Investment Research & Portfolio Analytics" };
+export const SOCIAL_IMAGE = { url: "/opengraph.svg", width: 1200, height: 630, alt: "ModelGuard — Private Financial Model Audit" };
 
 export const rootMetadata: Metadata = {
   metadataBase: new URL(SITE_URL),
@@ -28,7 +28,7 @@ export const rootMetadata: Metadata = {
     description: SITE_DESCRIPTION,
     images: [SOCIAL_IMAGE.url],
   },
-  keywords: ["investment research", "SEC filing evidence", "DCF valuation", "portfolio analytics", "risk analytics"],
+  keywords: ["financial model audit", "DCF model review", "investment committee readiness", "spreadsheet audit"],
   icons: { icon: "/icon.svg" },
 };
 

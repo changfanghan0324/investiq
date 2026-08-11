@@ -71,10 +71,15 @@ export function createDemoMarketData(ticker = 'DEMO', seed = 1): MarketData {
 
 /** Distinctly labelled provenance so demo runs never read as checked live data. */
 export function demoProvenance(): DataProvenance {
+  const generatedAt = new Date().toISOString();
   return {
+    sourceType: 'synthetic',
+    provider: 'InvestIQ deterministic demo generator',
+    generatedAt,
+    disclaimer: 'This page uses synthetic market series for demonstration. It does not represent actual historical prices or investment performance.',
     priceProvider: 'demo',
     priceBasis: 'split-adjusted',
-    fetchedAt: new Date().toISOString(),
+    fetchedAt: generatedAt,
     dividendCoverage: 'demo',
     totalReturnCoverage: 'demo',
     splitCoverage: 'demo',

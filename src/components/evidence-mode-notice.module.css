@@ -19,6 +19,25 @@
 .notice small,
 .homeNotice small { display: block; margin-top: 7px; color: var(--text-secondary); font-size: calc(12px * var(--ui-font-scale, 1)); line-height: 1.55; }
 
+.provenance {
+  display: grid;
+  gap: 6px;
+  margin: 12px 0 0;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-subtle);
+  font-size: calc(12px * var(--ui-font-scale, 1));
+  line-height: 1.45;
+}
+
+.provenance > div {
+  display: grid;
+  grid-template-columns: minmax(110px, 0.32fr) minmax(0, 1fr);
+  gap: 10px;
+}
+
+.provenance dt { color: var(--text-secondary); }
+.provenance dd { margin: 0; color: var(--text-primary); overflow-wrap: anywhere; }
+
 .homeNotice { max-width: 1380px; margin: 0 auto 28px; padding: 24px 28px; }
 .homeNotice strong { font-size: calc(18px * var(--ui-font-scale, 1)); }
 .homeNotice p { max-width: 980px; }

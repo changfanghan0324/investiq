@@ -82,6 +82,9 @@ function isMarketData(value: unknown): value is MarketData {
     Array.isArray(candidate.dividends) &&
     Array.isArray(candidate.splits) &&
     Array.isArray(candidate.tickerChanges) &&
+    (candidate.source === "demo" || candidate.source === "yahoo" || candidate.source === "hybrid") &&
+    ((candidate.source === "demo" && candidate.provenance?.sourceType === "synthetic") ||
+      (candidate.source !== "demo" && candidate.provenance?.sourceType === "licensed-live")) &&
     isProvenance(candidate.provenance)
   );
 }
@@ -90,6 +93,11 @@ function isProvenance(value: unknown): value is MarketData['provenance'] {
   if (!value || typeof value !== 'object') return false;
   const candidate = value as Partial<MarketData['provenance']>;
   return (
+    (candidate.sourceType === 'synthetic' || candidate.sourceType === 'licensed-live') &&
+    typeof candidate.provider === 'string' &&
+    typeof candidate.generatedAt === 'string' &&
+    Number.isFinite(Date.parse(candidate.generatedAt)) &&
+    typeof candidate.disclaimer === 'string' &&
     typeof candidate.priceProvider === 'string' &&
     typeof candidate.priceBasis === 'string' &&
     typeof candidate.fetchedAt === 'string' &&

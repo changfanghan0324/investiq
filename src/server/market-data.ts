@@ -451,6 +451,10 @@ export async function loadMarketData(
     ? 'yahoo-adjusted-close'
     : 'unavailable';
   const provenance: DataProvenance = {
+    sourceType: 'licensed-live',
+    provider: massiveUsed ? 'Yahoo Finance + Massive' : 'Yahoo Finance',
+    generatedAt: fetchedAt,
+    disclaimer: 'Licensed market history fetched from the configured provider; coverage and corporate-action treatment remain provider-scoped.',
     priceProvider: 'yahoo',
     priceBasis: 'split-adjusted',
     lastCompletedSession: prices[prices.length - 1].date,

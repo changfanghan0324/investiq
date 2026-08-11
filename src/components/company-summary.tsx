@@ -19,8 +19,10 @@ import { buildStockAnalysis, type StockAnalysisViewModel } from "@/domain/stock-
 import { useLanguage, type Translate, type TranslationKey } from "@/i18n/language";
 import { loadAnalysisMarketData } from "@/services/analysis-market-data";
 import { loadCompanyFundamentals } from "@/services/fundamentals-api";
+import type { MarketData } from "@/types/backtest";
 import { addYearsClamped, todayDateString } from "@/utils/date";
 import { FinancialOriginLabel } from "./financial-origin-label";
+import { EvidenceModeNotice } from "./evidence-mode-notice";
 
 import styles from "./company-summary.module.css";
 
@@ -32,6 +34,7 @@ export function CompanySummary({ rawTicker }: { rawTicker: string }) {
   const [fundamentals, setFundamentals] = useState<FundamentalsResult>();
   const [priceContext, setPriceContext] = useState<StockAnalysisViewModel>();
   const [priceIsDemo, setPriceIsDemo] = useState(false);
+  const [priceProvenance, setPriceProvenance] = useState<MarketData["provenance"]>();
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -53,6 +56,7 @@ export function CompanySummary({ rawTicker }: { rawTicker: string }) {
       .then((marketData) => {
         if (!active) return;
         setPriceIsDemo(marketData.source === "demo");
+        setPriceProvenance(marketData.provenance);
         setPriceContext(buildStockAnalysis({ marketData, annualRiskFreeRate: 0 }));
       })
       .catch(() => undefined);
@@ -113,19 +117,16 @@ export function CompanySummary({ rawTicker }: { rawTicker: string }) {
           </div>
 
           <section className={styles.pricePanel}>
-            <header><h2>4. {t("company.priceRiskTitle")}</h2><span>{t("company.priceRiskBasis")}</span></header>
+            <header><h2>4. {t(priceIsDemo ? "company.priceRiskTitleSynthetic" : "company.priceRiskTitle")}</h2><span>{t("company.priceRiskBasis")}</span></header>
             {priceContext ? (
               <>
                 {priceIsDemo ? (
-                  <div className={styles.priceDemoNotice}>
-                    <TriangleAlert size={15} />
-                    <div><strong>{t("company.priceDemoTitle")}</strong><p>{t("company.priceDemoBody", { ticker })}</p></div>
-                  </div>
+                  <EvidenceModeNotice id="company-price-demo-title" provenance={priceProvenance} />
                 ) : null}
                 <div className={styles.priceMetrics}>
-                  <Metric label={priceContext.returnBasis === "total" ? t("company.trailingTotalReturn") : t("company.trailingPriceReturn")} value={pct(priceContext.totalReturn ?? priceContext.priceReturn)} />
+                  <Metric label={priceIsDemo ? t("company.syntheticReturnExample") : priceContext.returnBasis === "total" ? t("company.trailingTotalReturn") : t("company.trailingPriceReturn")} value={pct(priceContext.totalReturn ?? priceContext.priceReturn)} />
                   <Metric label={t("company.annualizedVolatility")} value={priceContext.volatility === undefined ? "—" : pct(priceContext.volatility, false)} />
-                  <Metric label={t("company.priceAsOf")} value={priceContext.latestDate} />
+                  <Metric label={priceIsDemo ? t("company.syntheticPriceGeneratedAt") : t("company.priceAsOf")} value={priceContext.latestDate} />
                 </div>
               </>
             ) : (
