@@ -49,9 +49,11 @@ The public demo is packaged around a local-only audit workflow:
 
 ## Rule families
 
-The current catalogue has 33 published rules: 6 spreadsheet/linkage checks, 5 accounting
-reconciliations, 11 DCF controls, 5 scenario controls, and 6 assumption-governance checks. The
-clean golden workbook passes all 33; the error golden workbook deliberately remains `Not ready`.
+The current catalogue has 38 published rules: 11 spreadsheet/linkage and structure checks, 5
+accounting reconciliations, 11 DCF controls, 5 scenario controls, and 6 assumption-governance
+checks. The clean golden workbook passes all mapped checks; the error golden workbook
+deliberately remains `Not ready`. The catalogue also records scope, tolerance, non-applicability,
+false-positive/false-negative risks, remediation, and rule version for every entry.
 Every mapped rule reports passed, failed, not-applicable, or cannot-verify rather than filling a
 missing value with an inference. See [the full rule catalogue](docs/MODELGUARD_RULE_CATALOG.md).
 
@@ -109,6 +111,7 @@ URLs while keeping the same project and domain.
 - [Security model](docs/MODELGUARD_SECURITY.md)
 - [Limitations](docs/MODELGUARD_LIMITATIONS.md)
 - [Usability walkthroughs](docs/portfolio/MODELGUARD_USABILITY_TESTS.md)
+- [Professional-review update](docs/audit/MODELGUARD_REVIEW_UPDATE.md)
 - [Parser ADR](docs/architecture/ADR-001-WORKBOOK-PARSER.md)
 - [Static/local-only ADR](docs/architecture/ADR-002-STATIC-LOCAL-PROCESSING.md)
 - [Migration baseline](docs/audit/MODELGUARD_MIGRATION_BASELINE.md)

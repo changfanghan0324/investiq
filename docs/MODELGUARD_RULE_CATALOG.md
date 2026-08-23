@@ -4,7 +4,7 @@ Rules are versioned by stable IDs. An issue is a review signal, not an accountin
 valuation claim, investment recommendation, or professional certification. Every rule emits a
 passed, failed, not-applicable, or cannot-verify check when its mapped scope is encountered.
 
-## Spreadsheet and linkage integrity — 6 rules
+## Spreadsheet, structure, and linkage integrity — 11 rules
 
 | Rule ID | Severity | Trigger |
 | --- | --- | --- |
@@ -14,6 +14,11 @@ passed, failed, not-applicable, or cannot-verify check when its mapped scope is 
 | `MG-STR-004` | critical | A1 reference points to a cell with no parsed value or formula |
 | `MG-STR-005` | medium | External workbook/link metadata is present and deliberately not followed |
 | `MG-STR-006` | info | Worksheet is hidden or very hidden and needs explicit review |
+| `MG-STR-007` | info | Hidden rows or columns can conceal inputs, formulas, or supporting evidence |
+| `MG-STR-008` | info | Merged ranges can obscure the cell that owns an input or formula |
+| `MG-STR-009` | info | Defined names are preserved for reviewer traceability and version receipts |
+| `MG-STR-010` | warning | A formula directly references its own cell; Excel iteration is not executed |
+| `MG-STR-011` | medium | Formula coverage has a gap between populated formula periods |
 
 ## Accounting integrity — 5 rules
 
@@ -62,7 +67,7 @@ passed, failed, not-applicable, or cannot-verify check when its mapped scope is 
 | `MG-ASM-005` | medium | The first forecast operating margin changes by more than the configured 10 percentage-point threshold |
 | `MG-ASM-006` | medium | A forecast-period Income Statement value is hardcoded instead of formula-linked |
 
-The clean golden workbook passes all 33 published rules. The error golden workbook intentionally
+The clean golden workbook passes all 38 published rules. The error golden workbook intentionally
 contains structural, accounting, DCF, scenario, and assumption defects; it is expected to be
 `Not ready`. Missing cached results, unavailable mappings, external links, and absent sheets are
 never replaced with zeros or inferred values. New rules require a stable ID, a fixture, boundary

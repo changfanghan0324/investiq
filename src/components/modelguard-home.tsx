@@ -18,6 +18,7 @@ export function ModelGuardHome() {
             <div className={styles.actions}>
               <Link className={styles.primaryButton} href="/workspace">{t("modelguard.uploadAction")}</Link>
               <a className={styles.secondaryButton} href="/workspace?sample=clean">{t("modelguard.sampleAction")}</a>
+              <a className={styles.secondaryButton} href="/workspace?sample=error">{t("modelguard.errorSampleAction")}</a>
             </div>
             <p className={styles.privacyLine}>{t("modelguard.privacyLine")}</p>
           </div>

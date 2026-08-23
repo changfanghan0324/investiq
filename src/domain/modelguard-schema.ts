@@ -24,6 +24,8 @@ export interface ParsedSheet {
   state: "visible" | "hidden" | "veryHidden";
   cells: CellRecord[];
   mergedRanges: string[];
+  hiddenRows?: number[];
+  hiddenColumns?: string[];
 }
 
 export interface DefinedNameRecord {

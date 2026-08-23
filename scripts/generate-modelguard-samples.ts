@@ -118,12 +118,24 @@ async function save(workbook: ExcelJS.Workbook, name: string): Promise<void> {
   await workbook.xlsx.writeFile(path.join(samples, name));
 }
 
-async function bundleCleanSample(): Promise<void> {
-  const bytes = await readFile(path.join(samples, "modelguard-clean-model.xlsx"));
+async function bundleSample(fileName: string, moduleName: string, exportName: string): Promise<void> {
+  const bytes = await readFile(path.join(samples, fileName));
   const encoded = bytes.toString("base64");
   const chunks = encoded.match(/.{1,100}/g) ?? [];
-  const source = `/** Generated from public/samples/modelguard-clean-model.xlsx. Do not hand-edit. */\nexport const MODEL_GUARD_CLEAN_SAMPLE_BASE64 =\n  ${chunks.map((chunk) => `"${chunk}"`).join(" +\n  ")};\n`;
-  await writeFile(path.join(root, "src", "data", "modelguard-sample-clean.ts"), source);
+  const source = `/** Generated from public/samples/${fileName}. Do not hand-edit. */\nexport const ${exportName} =\n  ${chunks.map((chunk) => `"${chunk}"`).join(" +\n  ")};\n`;
+  await writeFile(path.join(root, "src", "data", moduleName), source);
+}
+
+async function generateAuditReceipt(): Promise<void> {
+  const [{ workbookParser }, { auditWorkbook }] = await Promise.all([
+    import("../src/services/modelguard-parser"),
+    import("../src/domain/modelguard-audit"),
+  ]);
+  const bytes = await readFile(path.join(samples, "modelguard-dcf-error.xlsx"));
+  const input = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
+  const workbook = await workbookParser.parse(input, { fileName: "modelguard-dcf-error.xlsx" });
+  const report = auditWorkbook(workbook);
+  await writeFile(path.join(samples, "modelguard-sample-audit-report.json"), JSON.stringify(report, null, 2));
 }
 
 async function main(): Promise<void> {
@@ -141,7 +153,29 @@ async function main(): Promise<void> {
   const error = await openSample("modelguard-clean-model.xlsx");
   setErrorSeeds(error);
   await save(error, "modelguard-error-model.xlsx");
-  await bundleCleanSample();
+
+  const balanceError = await openSample("modelguard-clean-model.xlsx");
+  formulaResults(balanceError.getWorksheet("Balance Sheet")!, { C7: 999 });
+  await save(balanceError, "modelguard-balance-sheet-error.xlsx");
+
+  const dcfError = await openSample("modelguard-clean-model.xlsx");
+  value(dcfError.getWorksheet("Inputs")!, "B10", 0.07);
+  value(dcfError.getWorksheet("Inputs")!, "B11", 0.08);
+  await save(dcfError, "modelguard-dcf-error.xlsx");
+
+  const hardcodeError = await openSample("modelguard-clean-model.xlsx");
+  value(hardcodeError.getWorksheet("Income Statement")!, "C5", 1500);
+  await save(hardcodeError, "modelguard-hardcode-error.xlsx");
+
+  const scenarioError = await openSample("modelguard-clean-model.xlsx");
+  setVersionTwoSeeds(scenarioError);
+  await save(scenarioError, "modelguard-scenario-error.xlsx");
+  await bundleSample("modelguard-clean-model.xlsx", "modelguard-sample-clean.ts", "MODEL_GUARD_CLEAN_SAMPLE_BASE64");
+  await bundleSample("modelguard-error-model.xlsx", "modelguard-sample-error.ts", "MODEL_GUARD_ERROR_SAMPLE_BASE64");
+  await generateAuditReceipt();
+  const blank = new ExcelJS.Workbook();
+  await blank.xlsx.writeFile(path.join(samples, "modelguard-blank-workbook.xlsx"));
+  await writeFile(path.join(samples, "modelguard-not-a-workbook.txt"), "This is intentionally not an Excel workbook.\n");
 }
 
 void main();

@@ -1,6 +1,8 @@
 "use client";
 
 import { AppShell } from "@/components/app-shell";
+import { MODEL_GUARD_RULE_CATALOG } from "@/domain/modelguard-rule-catalog";
+import { MODEL_GUARD_SAMPLE_DEFINITIONS } from "@/data/modelguard-samples";
 import { useLanguage } from "@/i18n/language";
 import styles from "./modelguard-page.module.css";
 
@@ -29,19 +31,21 @@ export function ModelGuardStaticPage({ kind }: { kind: StaticPageKind }) {
 
 function TemplateContent() {
   const { t } = useLanguage();
-  return <div className={styles.contentGrid}>
-    <article className={styles.contentCard}><h2>{t("modelguard.cleanTitle")}</h2><p>{t("modelguard.cleanText")}</p></article>
-    <article className={styles.contentCard}><h2>{t("modelguard.handoffTitle")}</h2><p>{t("modelguard.handoffText")}</p></article>
-    <article className={styles.contentCard}><h2>{t("modelguard.includedTitle")}</h2><p>{t("modelguard.includedText")}</p></article>
-  </div>;
+  return <div className={styles.templateList}>{MODEL_GUARD_SAMPLE_DEFINITIONS.map((sample) => <article className={styles.contentCard} key={sample.id}>
+    <div className={styles.templateHeader}><h2>{sample.title}</h2><a className={styles.smallButton} href={sample.downloadPath} download>{t("modelguard.downloadTemplate")}</a></div>
+    <p>{sample.description}</p>
+    <dl className={styles.templateMeta}><div><dt>{t("modelguard.expectedFindings")}</dt><dd>{sample.expectedRuleIds.length ? sample.expectedRuleIds.join(", ") : t("modelguard.expectedNone")}</dd></div><div><dt>{t("modelguard.templateFormula")}</dt><dd>{sample.containsFormulas ? t("modelguard.yes") : t("modelguard.no")}</dd></div><div><dt>{t("modelguard.templateIntentionalError")}</dt><dd>{sample.intentionallyBroken ? t("modelguard.yes") : t("modelguard.no")}</dd></div></dl>
+    <p className={styles.templatePurpose}>{sample.purpose}</p>
+  </article>)}</div>;
 }
 
 function MethodologyContent() {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   return <div className={styles.contentGrid}>
     <article className={styles.contentCard}><h2>{t("modelguard.checksTitle")}</h2><p>{t("modelguard.checksText")}</p></article>
     <article className={styles.contentCard}><h2>{t("modelguard.evidenceTitle")}</h2><p>{t("modelguard.evidenceText")}</p></article>
     <article className={styles.contentCard}><h2>{t("modelguard.boundariesTitle")}</h2><p>{t("modelguard.boundariesText")}</p></article>
+    <section className={styles.ruleCatalog} aria-labelledby="rule-catalog-title"><div className={styles.ruleCatalogHeader}><h2 id="rule-catalog-title">{t("modelguard.ruleCatalogTitle")}</h2><p>{t("modelguard.ruleCatalogSubtitle")}</p></div><div className={styles.ruleTable}>{MODEL_GUARD_RULE_CATALOG.map((rule) => <details key={rule.ruleId} className={styles.ruleRow}><summary><code>{rule.ruleId}</code><strong>{language === "zh-CN" ? rule.nameZh ?? rule.name : rule.name}</strong><span>{rule.severity.toUpperCase()} · {rule.category}</span></summary><div className={styles.ruleDetailGrid}><p><b>{t("modelguard.checkObject")}</b>{rule.checkObject}</p><p><b>{t("modelguard.checkLogic")}</b>{rule.logic}</p><p><b>{t("modelguard.observed")}</b>{rule.observed}</p><p><b>{t("modelguard.expected")}</b>{rule.expected}</p><p><b>{t("modelguard.tolerance")}</b>{rule.tolerance}</p><p><b>{t("modelguard.scope")}</b>{rule.scope}</p><p><b>{t("modelguard.notApplicable")}</b>{rule.notApplicable}</p><p><b>{t("modelguard.falsePositive")}</b>{rule.falsePositive}</p><p><b>{t("modelguard.falseNegative")}</b>{rule.falseNegative}</p><p><b>{t("modelguard.remediation")}</b>{rule.remediation}</p><p><b>{t("modelguard.ruleVersion")}</b>{rule.ruleVersion}</p></div></details>)}</div></section>
   </div>;
 }
 

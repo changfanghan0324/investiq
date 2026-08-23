@@ -1,0 +1,442 @@
+{
+  "schemaVersion": "1.0",
+  "generatedAt": "2026-08-23T21:49:04.574Z",
+  "fileName": "modelguard-dcf-error.xlsx",
+  "workbookSha256": "ffb587ca5f9ade8cf483f5a5cdb1d2554134fcf8e8e4cb9ed446c732e45987e0",
+  "provenance": {
+    "sourceType": "user-local",
+    "provider": "browser",
+    "generatedAt": "2026-08-23T21:49:04.570Z",
+    "disclaimer": "Workbook content is processed locally and is not uploaded. ModelGuard does not provide investment advice."
+  },
+  "issues": [
+    {
+      "status": "failed",
+      "confidence": "high",
+      "whyItMatters": "A reviewer should trace this finding before relying on the model output.",
+      "howToVerify": "Open the cited cell and compare the observed value with the expected condition.",
+      "impact": "May affect downstream model outputs or review confidence.",
+      "remediation": "Review the cited cell, source, and neighboring period before changing the model.",
+      "recheck": "Rerun the same workbook after the change and confirm this rule is passed or explicitly unavailable.",
+      "potentialFalsePositive": "A documented exception or non-standard model convention may make this signal intentional.",
+      "potentialFalseNegative": "ModelGuard does not recalculate Excel or infer undocumented business meaning.",
+      "ruleVersion": "1.0",
+      "ruleId": "MG-DCF-001",
+      "category": "dcf",
+      "severity": "critical",
+      "title": "Terminal growth is not below WACC",
+      "message": "The Gordon-growth denominator is zero or negative when terminal growth is at least the discount rate.",
+      "sheet": "Inputs",
+      "address": "A11",
+      "observed": "0.08",
+      "expected": "Less than WACC (0.07)",
+      "difference": "0.0100",
+      "tolerance": "0",
+      "id": "MG-DCF-001:Inputs:A11:0"
+    }
+  ],
+  "checks": [
+    {
+      "ruleId": "MG-ACC-001",
+      "category": "accounting",
+      "status": "passed",
+      "sheet": "Balance Sheet",
+      "address": "A5",
+      "period": "2024A"
+    },
+    {
+      "ruleId": "MG-ACC-001",
+      "category": "accounting",
+      "status": "passed",
+      "sheet": "Balance Sheet",
+      "address": "A5",
+      "period": "2025E"
+    },
+    {
+      "ruleId": "MG-ACC-001",
+      "category": "accounting",
+      "status": "passed",
+      "sheet": "Balance Sheet",
+      "address": "A5",
+      "period": "2026E"
+    },
+    {
+      "ruleId": "MG-ACC-001",
+      "category": "accounting",
+      "status": "passed",
+      "sheet": "Balance Sheet",
+      "address": "A5",
+      "period": "2027E"
+    },
+    {
+      "ruleId": "MG-ACC-001",
+      "category": "accounting",
+      "status": "passed",
+      "sheet": "Balance Sheet",
+      "address": "A5",
+      "period": "2028E"
+    },
+    {
+      "ruleId": "MG-ACC-002",
+      "category": "accounting",
+      "status": "passed",
+      "sheet": "Cash Flow",
+      "address": "A5",
+      "period": "2024A"
+    },
+    {
+      "ruleId": "MG-ACC-002",
+      "category": "accounting",
+      "status": "passed",
+      "sheet": "Cash Flow",
+      "address": "A5",
+      "period": "2025E"
+    },
+    {
+      "ruleId": "MG-ACC-002",
+      "category": "accounting",
+      "status": "passed",
+      "sheet": "Cash Flow",
+      "address": "A5",
+      "period": "2026E"
+    },
+    {
+      "ruleId": "MG-ACC-002",
+      "category": "accounting",
+      "status": "passed",
+      "sheet": "Cash Flow",
+      "address": "A5",
+      "period": "2027E"
+    },
+    {
+      "ruleId": "MG-ACC-002",
+      "category": "accounting",
+      "status": "passed",
+      "sheet": "Cash Flow",
+      "address": "A5",
+      "period": "2028E"
+    },
+    {
+      "ruleId": "MG-ACC-003",
+      "category": "accounting",
+      "status": "passed",
+      "sheet": "Balance Sheet",
+      "address": "A8",
+      "period": "2024A"
+    },
+    {
+      "ruleId": "MG-ACC-003",
+      "category": "accounting",
+      "status": "passed",
+      "sheet": "Balance Sheet",
+      "address": "A8",
+      "period": "2025E"
+    },
+    {
+      "ruleId": "MG-ACC-003",
+      "category": "accounting",
+      "status": "passed",
+      "sheet": "Balance Sheet",
+      "address": "A8",
+      "period": "2026E"
+    },
+    {
+      "ruleId": "MG-ACC-003",
+      "category": "accounting",
+      "status": "passed",
+      "sheet": "Balance Sheet",
+      "address": "A8",
+      "period": "2027E"
+    },
+    {
+      "ruleId": "MG-ACC-003",
+      "category": "accounting",
+      "status": "passed",
+      "sheet": "Balance Sheet",
+      "address": "A8",
+      "period": "2028E"
+    },
+    {
+      "ruleId": "MG-ACC-004",
+      "category": "accounting",
+      "status": "passed",
+      "sheet": "Debt Schedule",
+      "address": "A7",
+      "period": "2024A"
+    },
+    {
+      "ruleId": "MG-ACC-004",
+      "category": "accounting",
+      "status": "passed",
+      "sheet": "Debt Schedule",
+      "address": "A7",
+      "period": "2025E"
+    },
+    {
+      "ruleId": "MG-ACC-004",
+      "category": "accounting",
+      "status": "passed",
+      "sheet": "Debt Schedule",
+      "address": "A7",
+      "period": "2026E"
+    },
+    {
+      "ruleId": "MG-ACC-004",
+      "category": "accounting",
+      "status": "passed",
+      "sheet": "Debt Schedule",
+      "address": "A7",
+      "period": "2027E"
+    },
+    {
+      "ruleId": "MG-ACC-004",
+      "category": "accounting",
+      "status": "passed",
+      "sheet": "Debt Schedule",
+      "address": "A7",
+      "period": "2028E"
+    },
+    {
+      "ruleId": "MG-ACC-005",
+      "category": "accounting",
+      "status": "passed",
+      "sheet": "DCF",
+      "address": "A13"
+    },
+    {
+      "ruleId": "MG-DCF-001",
+      "category": "dcf",
+      "status": "failed",
+      "severity": "critical",
+      "sheet": "Inputs",
+      "address": "A11"
+    },
+    {
+      "ruleId": "MG-DCF-002",
+      "category": "dcf",
+      "status": "passed",
+      "sheet": "DCF",
+      "address": "A5",
+      "period": "2024A"
+    },
+    {
+      "ruleId": "MG-DCF-002",
+      "category": "dcf",
+      "status": "passed",
+      "sheet": "DCF",
+      "address": "A5",
+      "period": "2025E"
+    },
+    {
+      "ruleId": "MG-DCF-002",
+      "category": "dcf",
+      "status": "passed",
+      "sheet": "DCF",
+      "address": "A5",
+      "period": "2026E"
+    },
+    {
+      "ruleId": "MG-DCF-002",
+      "category": "dcf",
+      "status": "passed",
+      "sheet": "DCF",
+      "address": "A5",
+      "period": "2027E"
+    },
+    {
+      "ruleId": "MG-DCF-002",
+      "category": "dcf",
+      "status": "passed",
+      "sheet": "DCF",
+      "address": "A5",
+      "period": "2028E"
+    },
+    {
+      "ruleId": "MG-DCF-004",
+      "category": "dcf",
+      "status": "passed",
+      "sheet": "DCF",
+      "address": "A7",
+      "period": "2024A"
+    },
+    {
+      "ruleId": "MG-DCF-004",
+      "category": "dcf",
+      "status": "passed",
+      "sheet": "DCF",
+      "address": "A7",
+      "period": "2025E"
+    },
+    {
+      "ruleId": "MG-DCF-004",
+      "category": "dcf",
+      "status": "passed",
+      "sheet": "DCF",
+      "address": "A7",
+      "period": "2026E"
+    },
+    {
+      "ruleId": "MG-DCF-004",
+      "category": "dcf",
+      "status": "passed",
+      "sheet": "DCF",
+      "address": "A7",
+      "period": "2027E"
+    },
+    {
+      "ruleId": "MG-DCF-004",
+      "category": "dcf",
+      "status": "passed",
+      "sheet": "DCF",
+      "address": "A7",
+      "period": "2028E"
+    },
+    {
+      "ruleId": "MG-DCF-003",
+      "category": "dcf",
+      "status": "passed",
+      "sheet": "DCF",
+      "address": "A6"
+    },
+    {
+      "ruleId": "MG-DCF-005",
+      "category": "dcf",
+      "status": "cannot-verify",
+      "severity": "medium",
+      "sheet": "DCF",
+      "address": "A8"
+    },
+    {
+      "ruleId": "MG-DCF-006",
+      "category": "dcf",
+      "status": "passed",
+      "sheet": "DCF",
+      "address": "A10"
+    },
+    {
+      "ruleId": "MG-DCF-007",
+      "category": "dcf",
+      "status": "passed",
+      "sheet": "DCF",
+      "address": "A11"
+    },
+    {
+      "ruleId": "MG-DCF-008",
+      "category": "dcf",
+      "status": "passed",
+      "sheet": "DCF",
+      "address": "A12"
+    },
+    {
+      "ruleId": "MG-DCF-009",
+      "category": "dcf",
+      "status": "passed",
+      "sheet": "DCF",
+      "address": "A14"
+    },
+    {
+      "ruleId": "MG-DCF-010",
+      "category": "dcf",
+      "status": "passed",
+      "sheet": "DCF",
+      "address": "A10"
+    },
+    {
+      "ruleId": "MG-DCF-011",
+      "category": "dcf",
+      "status": "passed",
+      "sheet": "DCF",
+      "address": "A5"
+    },
+    {
+      "ruleId": "MG-SCN-001",
+      "category": "scenario",
+      "status": "passed",
+      "sheet": "Scenarios",
+      "address": "A5"
+    },
+    {
+      "ruleId": "MG-SCN-002",
+      "category": "scenario",
+      "status": "passed",
+      "sheet": "Scenarios",
+      "address": "A5"
+    },
+    {
+      "ruleId": "MG-SCN-003",
+      "category": "scenario",
+      "status": "passed",
+      "sheet": "Scenarios",
+      "address": "A9"
+    },
+    {
+      "ruleId": "MG-SCN-004",
+      "category": "scenario",
+      "status": "passed",
+      "sheet": "Scenarios",
+      "address": "A9"
+    },
+    {
+      "ruleId": "MG-SCN-005",
+      "category": "scenario",
+      "status": "passed",
+      "sheet": "Scenarios",
+      "address": "A5"
+    },
+    {
+      "ruleId": "MG-ASM-001",
+      "category": "assumption",
+      "status": "passed"
+    },
+    {
+      "ruleId": "MG-ASM-002",
+      "category": "assumption",
+      "status": "passed"
+    },
+    {
+      "ruleId": "MG-ASM-003",
+      "category": "assumption",
+      "status": "passed",
+      "sheet": "Inputs",
+      "address": "A10"
+    },
+    {
+      "ruleId": "MG-ASM-004",
+      "category": "assumption",
+      "status": "passed",
+      "sheet": "Income Statement",
+      "address": "A5"
+    },
+    {
+      "ruleId": "MG-ASM-005",
+      "category": "assumption",
+      "status": "passed",
+      "sheet": "Income Statement",
+      "address": "A6"
+    },
+    {
+      "ruleId": "MG-ASM-006",
+      "category": "assumption",
+      "status": "passed",
+      "sheet": "Income Statement",
+      "address": "A5"
+    }
+  ],
+  "summary": {
+    "critical": 1,
+    "high": 0,
+    "medium": 0,
+    "warning": 0,
+    "info": 0,
+    "low": 0,
+    "passed": 49,
+    "cannotVerify": 1,
+    "notApplicable": 0
+  },
+  "limitations": [
+    "ModelGuard reads formula text and cached workbook values but does not recalculate Excel formulas.",
+    "External links, macros, circular references, and unsupported workbook features are not executed.",
+    "A clean result means no configured deterministic issue was found; it is not an accounting certification or investment recommendation."
+  ],
+  "modelStatus": "Not ready"
+}

@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { compareAuditFindings, compareWorkbooks, type AuditReport, type VersionChange, type VersionFindingChange } from "@/domain/modelguard-audit";
+import { sampleDefinition } from "@/data/modelguard-samples";
+import { ruleCatalogEntry } from "@/domain/modelguard-rule-catalog";
 import type { ParsedWorkbook, WorkbookProvenance } from "@/domain/modelguard-schema";
 import { auditReportToCsv, auditReportToJson, auditReportToPdf, versionChangesToCsv, versionFindingsToCsv } from "@/services/modelguard-exports";
 import { useLanguage } from "@/i18n/language";
@@ -30,7 +32,7 @@ function decodeBase64(source: string): ArrayBuffer {
 }
 
 export function ModelGuardWorkspace() {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const inputRef = useRef<HTMLInputElement>(null);
   const [fileName, setFileName] = useState<string | null>(null);
   const [fileSize, setFileSize] = useState<number | null>(null);
@@ -45,8 +47,14 @@ export function ModelGuardWorkspace() {
   const [afterVersionReport, setAfterVersionReport] = useState<AuditReport | null>(null);
   const [versionChanges, setVersionChanges] = useState<VersionChange[]>([]);
   const [versionFindings, setVersionFindings] = useState<VersionFindingChange[]>([]);
-  const [issueFilter, setIssueFilter] = useState<"all" | "critical" | "dcf">("all");
+  const [issueFilter, setIssueFilter] = useState<"all" | "critical" | "high" | "medium" | "low" | "cannot-verify" | "not-applicable" | "dcf" | "accounting" | "assumption" | "scenario">("all");
+  const [issueSheet, setIssueSheet] = useState("all");
+  const [issueRule, setIssueRule] = useState("all");
+  const [issueSearch, setIssueSearch] = useState("");
+  const [versionFilter, setVersionFilter] = useState<"all" | "formula" | "value" | "format" | "sheet" | "severity" | "status">("all");
+  const [exportFeedback, setExportFeedback] = useState<{ name: string; generatedAt: string } | null>(null);
   const [sampleMode, setSampleMode] = useState(false);
+  const [activeSampleId, setActiveSampleId] = useState<"clean" | "error">("clean");
   const [samplePhase, setSamplePhase] = useState<SamplePhase>("idle");
   const [sampleError, setSampleError] = useState<string | null>(null);
   const workerRef = useRef<Worker | null>(null);
@@ -67,7 +75,13 @@ export function ModelGuardWorkspace() {
     setVersionChanges([]);
     setVersionFindings([]);
     setIssueFilter("all");
+    setIssueSheet("all");
+    setIssueRule("all");
+    setIssueSearch("");
+    setVersionFilter("all");
+    setExportFeedback(null);
     setSampleMode(false);
+    setActiveSampleId("clean");
     setSamplePhase("idle");
     setSampleError(null);
     workerRef.current?.terminate();
@@ -132,25 +146,32 @@ export function ModelGuardWorkspace() {
     }
     try {
       await runAudit(await candidate.arrayBuffer(), candidate.name);
-    } catch {
-      setError(t("modelguard.fileRejected"));
+    } catch (cause) {
+      const code = cause instanceof Error ? cause.message : "";
       clearSession();
+      setError(code === "BLANK_WORKBOOK" ? t("modelguard.blankWorkbook") : code.includes("too many") ? t("modelguard.fileLimitExceeded") : t("modelguard.fileRejected"));
     }
   }, [clearSession, runAudit, t]);
 
-  const loadSample = useCallback(async () => {
+  const loadSample = useCallback(async (requestedSampleId?: "clean" | "error") => {
+    const sampleId = requestedSampleId ?? activeSampleId;
     setSampleMode(true);
     setSamplePhase("preparing");
     setSampleError(null);
     setError(null);
     try {
-      const { MODEL_GUARD_CLEAN_SAMPLE_BASE64 } = await import("@/data/modelguard-sample-clean");
-      await runAudit(decodeBase64(MODEL_GUARD_CLEAN_SAMPLE_BASE64), "Sample model.xlsx", SAMPLE_PROVENANCE, true);
+      if (sampleId === "error") {
+        const { MODEL_GUARD_ERROR_SAMPLE_BASE64 } = await import("@/data/modelguard-sample-error");
+        await runAudit(decodeBase64(MODEL_GUARD_ERROR_SAMPLE_BASE64), "Error sample model.xlsx", { ...SAMPLE_PROVENANCE, disclaimer: "Synthetic fictional company workbook with intentional audit findings for demonstration. It is not live financial data or investment advice." }, true);
+      } else {
+        const { MODEL_GUARD_CLEAN_SAMPLE_BASE64 } = await import("@/data/modelguard-sample-clean");
+        await runAudit(decodeBase64(MODEL_GUARD_CLEAN_SAMPLE_BASE64), "Sample model.xlsx", SAMPLE_PROVENANCE, true);
+      }
     } catch {
       setSamplePhase("error");
       setSampleError(t("modelguard.sampleLoadError"));
     }
-  }, [runAudit, t]);
+  }, [activeSampleId, runAudit, t]);
 
   const exitSampleMode = useCallback(() => {
     clearSession();
@@ -164,8 +185,9 @@ export function ModelGuardWorkspace() {
     const timer = window.setTimeout(() => {
       if (sampleStartedRef.current) return;
       sampleStartedRef.current = true;
-      if (sampleId === "clean") {
-        void loadSample();
+      if (sampleId === "clean" || sampleId === "error") {
+        setActiveSampleId(sampleId);
+        void loadSample(sampleId);
         return;
       }
       setSampleMode(true);
@@ -208,6 +230,23 @@ export function ModelGuardWorkspace() {
     }
   }, [afterVersion, afterVersionReport, beforeVersion, beforeVersionReport]);
 
+  const exportReport = useCallback((name: string, body: string | Uint8Array, type: string) => {
+    download(name, body, type);
+    setExportFeedback({ name, generatedAt: new Date().toISOString() });
+  }, [download]);
+
+  const knownSample = sampleMode ? sampleDefinition(activeSampleId === "error" ? "modelguard-error-model.xlsx" : "modelguard-clean-model.xlsx") : sampleDefinition(fileName);
+  const issueSheets = report ? [...new Set(report.issues.map((issue) => issue.sheet).filter((sheet): sheet is string => Boolean(sheet)))].sort() : [];
+  const visibleIssues = report?.issues.filter((issue) => {
+    const status = issue.status ?? "failed";
+    const severityMatch = issueFilter === "all" || issueFilter === "dcf" ? (issueFilter !== "dcf" || issue.category === "dcf") : issueFilter === "accounting" || issueFilter === "assumption" || issueFilter === "scenario" ? issue.category === issueFilter : issueFilter === "cannot-verify" || issueFilter === "not-applicable" ? status === issueFilter : issue.severity === issueFilter;
+    const sheetMatch = issueSheet === "all" || issue.sheet === issueSheet;
+    const ruleMatch = issueRule === "all" || issue.ruleId === issueRule;
+    const query = issueSearch.trim().toLowerCase();
+    const textMatch = !query || [issue.ruleId, issue.title, issue.message, issue.sheet, issue.address, issue.observed, issue.expected].filter(Boolean).join(" ").toLowerCase().includes(query);
+    return severityMatch && sheetMatch && ruleMatch && textMatch;
+  }) ?? [];
+
   return (
     <AppShell>
       <div className={styles.page}>
@@ -220,6 +259,10 @@ export function ModelGuardWorkspace() {
             </div>
             <p className={styles.privacyLine}>{t("modelguard.privacyLine")}</p>
           </div>
+
+          <ol className={styles.workflowSteps} aria-label={t("modelguard.workflowLabel")}>
+            {["workflowChoose", "workflowInspect", "workflowReview", "workflowExport"].map((key, index) => <li key={key}><span>0{index + 1}</span><strong>{t(`modelguard.${key}` as "modelguard.workflowChoose" | "modelguard.workflowInspect" | "modelguard.workflowReview" | "modelguard.workflowExport")}</strong></li>)}
+          </ol>
 
           <div className={styles.uploadCard}>
             <h2>{t("modelguard.uploadLabel")}</h2>
@@ -245,6 +288,7 @@ export function ModelGuardWorkspace() {
             </div>
             <p className={styles.calculationNotice}><strong>{t("modelguard.formulaValuesTitle")}</strong> {t("modelguard.formulaValuesText")}</p>
             {fileName ? <p className={styles.notice} role="status">{fileName} · {fileSize ? `${(fileSize / 1024).toFixed(1)} KB` : ""}{digest ? ` · SHA-256 ${digest.slice(0, 16)}…` : ""}{phase === "parsing" ? ` · ${t("modelguard.parsing")}` : phase === "ready" && workbook ? ` · ${workbook.stats.worksheets} ${t("modelguard.sheets")}, ${workbook.stats.formulas} ${t("modelguard.formulas")} · ${t("modelguard.ready")}` : ""}</p> : sampleMode ? null : <p className={styles.notice}>{t("modelguard.noFile")}</p>}
+            {knownSample ? <div className={styles.expectedBox}><strong>{t("modelguard.expectedFindings")}</strong><span>{knownSample.expectedRuleIds.length ? knownSample.expectedRuleIds.join(", ") : t("modelguard.expectedNone")}</span><small>{knownSample.purpose}</small></div> : null}
             {error ? <p className={styles.error} role="alert">{error}</p> : null}
             {!sampleMode ? <div className={styles.sampleActions}>
               <a className={styles.smallButton} href="/samples/modelguard-clean-model.xlsx" download>{t("modelguard.tryClean")}</a>
@@ -263,8 +307,10 @@ export function ModelGuardWorkspace() {
             <button className={styles.smallButton} type="button" disabled={!beforeVersion || !afterVersion || !beforeVersionReport || !afterVersionReport} onClick={runVersionCompare}>{t("modelguard.versionCompare")}</button>
             {versionChanges.length || versionFindings.length ? <>
               <div className={styles.versionSummary} aria-live="polite"><span>{t("modelguard.versionNew")}: <strong>{versionFindings.filter((change) => change.status === "new").length}</strong></span><span>{t("modelguard.versionResolved")}: <strong>{versionFindings.filter((change) => change.status === "resolved").length}</strong></span><span>{t("modelguard.versionPersisting")}: <strong>{versionFindings.filter((change) => change.status === "persisting").length}</strong></span><span>{t("modelguard.changes")}: <strong>{versionChanges.length}</strong></span></div>
+              <div className={styles.filterBar} role="group" aria-label={t("modelguard.versionFilterLabel")}><button className={versionFilter === "all" ? styles.filterActive : styles.filterButton} type="button" onClick={() => setVersionFilter("all")}>{t("modelguard.filterAll")}</button>{["formula", "value", "format", "sheet", "severity", "status"].map((filter) => <button key={filter} className={versionFilter === filter ? styles.filterActive : styles.filterButton} type="button" onClick={() => setVersionFilter(filter as typeof versionFilter)}>{t(`modelguard.versionFilter${filter[0].toUpperCase()}${filter.slice(1)}` as "modelguard.versionFilterFormula" | "modelguard.versionFilterValue" | "modelguard.versionFilterFormat" | "modelguard.versionFilterSheet" | "modelguard.versionFilterSeverity" | "modelguard.versionFilterStatus")}</button>)}</div>
               <div className={styles.sampleActions}><button className={styles.smallButton} type="button" onClick={() => { const url = URL.createObjectURL(new Blob([versionChangesToCsv(versionChanges)], { type: "text/csv;charset=utf-8" })); const link = document.createElement("a"); link.href = url; link.download = "modelguard-version-changes.csv"; link.click(); URL.revokeObjectURL(url); }}>{t("modelguard.exportCsv")}</button><button className={styles.smallButton} type="button" onClick={() => { const url = URL.createObjectURL(new Blob([versionFindingsToCsv(versionFindings)], { type: "text/csv;charset=utf-8" })); const link = document.createElement("a"); link.href = url; link.download = "modelguard-version-findings.csv"; link.click(); URL.revokeObjectURL(url); }}>{t("modelguard.exportCsv")}</button></div>
-              <ul className={styles.versionFindings}>{versionFindings.map((change) => <li key={`${change.status}-${change.ruleId}-${change.sheet ?? "workbook"}-${change.address ?? ""}-${change.period ?? ""}`}><span className={`${styles.severity} ${styles[`severity${change.severity}`]}`}>{t(`modelguard.version${change.status[0].toUpperCase()}${change.status.slice(1)}` as "modelguard.versionNew" | "modelguard.versionResolved" | "modelguard.versionPersisting")}</span> <code>{change.ruleId}</code> {change.sheet ? `${change.sheet}!${change.address ?? ""}` : t("modelguard.workbook")}{change.period ? ` · ${change.period}` : ""}</li>)}</ul>
+              <ul className={styles.versionFindings}>{versionFindings.filter((change) => versionFilter === "all" || versionFilter === "status" || (versionFilter === "severity" && ["critical", "high"].includes(change.severity))).map((change) => <li key={`${change.status}-${change.ruleId}-${change.sheet ?? "workbook"}-${change.address ?? ""}-${change.period ?? ""}`}><span className={`${styles.severity} ${styles[`severity${change.severity}`]}`}>{t(`modelguard.version${change.status[0].toUpperCase()}${change.status.slice(1)}` as "modelguard.versionNew" | "modelguard.versionResolved" | "modelguard.versionPersisting" | "modelguard.versionChanged")}</span> <code>{change.ruleId}</code> {change.sheet ? `${change.sheet}!${change.address ?? ""}` : t("modelguard.workbook")}{change.period ? ` · ${change.period}` : ""}</li>)}</ul>
+              <ul className={styles.versionChanges}>{versionChanges.filter((change) => versionFilter === "all" || versionFilter === "formula" && change.changeType === "formula" || versionFilter === "value" && change.changeType === "value" || versionFilter === "format" && change.changeType === "format" || versionFilter === "sheet" && change.changeType?.startsWith("sheet-")).map((change, index) => <li key={`${change.kind}-${change.sheet}-${change.address}-${index}`}><span className={styles.changeType}>{change.changeType ?? change.kind}</span> <code>{change.sheet}{change.address ? `!${change.address}` : ""}</code><span>{change.before?.formula ?? String(change.before?.value ?? "—")} → {change.after?.formula ?? String(change.after?.value ?? "—")}</span></li>)}</ul>
             </> : null}
           </section>
 
@@ -272,11 +318,14 @@ export function ModelGuardWorkspace() {
             <div className={styles.reportHeader}>
               <div><p className={styles.eyebrow}>{t("modelguard.reportLabel")}</p><h2 id="issue-explorer-title">{t("modelguard.issueExplorer")}</h2><p className={styles.modelStatus}>{t("modelguard.modelStatus")}: <strong>{report.modelStatus}</strong></p></div>
               <div className={styles.sampleActions}>
-                <button className={styles.smallButton} type="button" onClick={() => download("modelguard-audit.json", auditReportToJson(report), "application/json")}>{t("modelguard.exportJson")}</button>
-                <button className={styles.smallButton} type="button" onClick={() => download("modelguard-audit.csv", auditReportToCsv(report), "text/csv;charset=utf-8")}>{t("modelguard.exportCsv")}</button>
-                <button className={styles.smallButton} type="button" onClick={() => download("modelguard-audit.pdf", auditReportToPdf(report), "application/pdf")}>{t("modelguard.exportPdf")}</button>
+                <button className={styles.smallButton} type="button" onClick={() => exportReport("modelguard-audit.json", auditReportToJson(report), "application/json")}>{t("modelguard.exportJson")}</button>
+                <button className={styles.smallButton} type="button" onClick={() => exportReport("modelguard-audit.csv", auditReportToCsv(report), "text/csv;charset=utf-8")}>{t("modelguard.exportCsv")}</button>
+                <button className={styles.smallButton} type="button" onClick={() => exportReport("modelguard-audit.pdf", auditReportToPdf(report, { versionComparison: { newFindings: versionFindings.filter((change) => change.status === "new").length, resolvedFindings: versionFindings.filter((change) => change.status === "resolved").length, persistingFindings: versionFindings.filter((change) => change.status === "persisting").length, changedFindings: versionFindings.filter((change) => change.status === "changed").length } }), "application/pdf")}>{t("modelguard.exportPdf")}</button>
               </div>
             </div>
+            {exportFeedback ? <p className={styles.exportFeedback} role="status">{t("modelguard.exportSuccess")} · {exportFeedback.name} · {new Date(exportFeedback.generatedAt).toLocaleString()}</p> : null}
+            <div className={styles.reportMeta}><span>{t("modelguard.modelFile")}: {report.fileName}</span><span>SHA-256: {report.workbookSha256.slice(0, 16)}…</span><span>{t("modelguard.ruleVersion")}: 1.0</span><span>{t("modelguard.sheets")}: {workbook?.stats.worksheets ?? "—"}</span><span>{t("modelguard.formulas")}: {workbook?.stats.formulas ?? "—"}</span></div>
+            {knownSample ? <div className={styles.expectedBox}><strong>{t("modelguard.expectedActual")}</strong>{knownSample.expectedRuleIds.length ? knownSample.expectedRuleIds.map((ruleId) => <span key={ruleId}><code>{ruleId}</code> · {report.issues.some((issue) => issue.ruleId === ruleId) ? t("modelguard.expectedFound") : t("modelguard.expectedMissing")}</span>) : <span>{t("modelguard.expectedNone")}</span>}</div> : null}
             <div className={styles.summaryGrid}>
               <div><span>{t("modelguard.critical")}</span><strong>{report.summary.critical}</strong></div>
               <div><span>{t("modelguard.high")}</span><strong>{report.summary.high}</strong></div>
@@ -286,16 +335,17 @@ export function ModelGuardWorkspace() {
               <div><span>{t("modelguard.notApplicable")}</span><strong>{report.summary.notApplicable}</strong></div>
             </div>
             <div className={styles.filterBar} role="group" aria-label={t("modelguard.issueExplorer")}>
-              <button className={issueFilter === "all" ? styles.filterActive : styles.filterButton} type="button" onClick={() => setIssueFilter("all")}>{t("modelguard.filterAll")}</button>
-              <button className={issueFilter === "critical" ? styles.filterActive : styles.filterButton} type="button" onClick={() => setIssueFilter("critical")}>{t("modelguard.filterCritical")}</button>
-              <button className={issueFilter === "dcf" ? styles.filterActive : styles.filterButton} type="button" onClick={() => setIssueFilter("dcf")}>{t("modelguard.filterDcf")}</button>
+              {(["all", "critical", "high", "medium", "low", "cannot-verify", "not-applicable", "dcf", "accounting", "assumption", "scenario"] as const).map((filter) => <button key={filter} className={issueFilter === filter ? styles.filterActive : styles.filterButton} type="button" onClick={() => setIssueFilter(filter)}>{t(`modelguard.filter${filter === "all" ? "All" : filter === "cannot-verify" ? "CannotVerify" : filter === "not-applicable" ? "NotApplicable" : filter[0].toUpperCase() + filter.slice(1)}` as "modelguard.filterAll" | "modelguard.filterCritical" | "modelguard.filterHigh" | "modelguard.filterMedium" | "modelguard.filterLow" | "modelguard.filterCannotVerify" | "modelguard.filterNotApplicable" | "modelguard.filterDcf" | "modelguard.filterAccounting" | "modelguard.filterAssumption" | "modelguard.filterScenario")}</button>)}
             </div>
-            {report.issues.filter((issue) => issueFilter === "all" || (issueFilter === "critical" ? issue.severity === "critical" : issue.category === "dcf")).length ? <div className={styles.issueList}>{report.issues.filter((issue) => issueFilter === "all" || (issueFilter === "critical" ? issue.severity === "critical" : issue.category === "dcf")).map((issue) => <article className={styles.issue} key={issue.id}>
+            <div className={styles.filterFields}><input aria-label={t("modelguard.searchIssues")} placeholder={t("modelguard.searchIssues")} value={issueSearch} onChange={(event) => setIssueSearch(event.target.value)} /><select aria-label={t("modelguard.filterSheet")} value={issueSheet} onChange={(event) => setIssueSheet(event.target.value)}><option value="all">{t("modelguard.filterSheet")}: {t("modelguard.filterAll")}</option>{issueSheets.map((sheet) => <option key={sheet} value={sheet}>{sheet}</option>)}</select><input aria-label={t("modelguard.filterRule")} placeholder={t("modelguard.filterRule")} value={issueRule === "all" ? "" : issueRule} onChange={(event) => setIssueRule(event.target.value || "all")} /></div>
+            {visibleIssues.length ? <div className={styles.issueList}>{visibleIssues.map((issue) => <article className={styles.issue} key={issue.id}>
               <div className={styles.issueTop}><span className={`${styles.severity} ${styles[`severity${issue.severity}`]}`}>{t(`modelguard.${issue.severity}` as "modelguard.critical" | "modelguard.high" | "modelguard.medium" | "modelguard.warning" | "modelguard.info")}</span><code>{issue.ruleId}</code></div>
-              <h3>{issue.title}</h3><p>{issue.message}</p>
+              <h3>{language === "zh-CN" ? ruleCatalogEntry(issue.ruleId)?.nameZh ?? issue.title : issue.title}</h3><p>{language === "zh-CN" ? `检测到规则 ${issue.ruleId} 的确定性信号。请根据观察值与预期条件复核该单元格。` : issue.message}</p>
               <dl><div><dt>{t("modelguard.location")}</dt><dd>{issue.sheet ? `${issue.sheet}!${issue.address ?? ""}` : t("modelguard.workbook")}</dd></div>{issue.period ? <div><dt>{t("modelguard.period")}</dt><dd>{issue.period}</dd></div> : null}{issue.observed ? <div><dt>{t("modelguard.observed")}</dt><dd>{issue.observed}</dd></div> : null}{issue.expected ? <div><dt>{t("modelguard.expected")}</dt><dd>{issue.expected}</dd></div> : null}{issue.difference ? <div><dt>{t("modelguard.difference")}</dt><dd>{issue.difference}</dd></div> : null}{issue.tolerance ? <div><dt>{t("modelguard.tolerance")}</dt><dd>{issue.tolerance}</dd></div> : null}</dl>
-              {issue.whyItMatters ? <details className={styles.issueDetails}><summary>{t("modelguard.whyItMatters")}</summary><p>{issue.whyItMatters}</p><p>{t("modelguard.howToVerify")}: {issue.howToVerify}</p></details> : null}
+              {issue.whyItMatters ? <details className={styles.issueDetails}><summary>{t("modelguard.whyItMatters")}</summary><p>{issue.whyItMatters}</p><p><strong>{t("modelguard.impact")}</strong>: {issue.impact}</p><p><strong>{t("modelguard.remediation")}</strong>: {issue.remediation}</p><p><strong>{t("modelguard.howToVerify")}</strong>: {issue.howToVerify}</p><p><strong>{t("modelguard.recheck")}</strong>: {issue.recheck}</p><p><strong>{t("modelguard.falsePositive")}</strong>: {issue.potentialFalsePositive}</p><p><strong>{t("modelguard.falseNegative")}</strong>: {issue.potentialFalseNegative}</p></details> : null}
             </article>)}</div> : <p className={styles.notice}>{t("modelguard.noIssues")}</p>}
+            {!visibleIssues.length && report.issues.length === 0 ? <p className={styles.disclaimer}>{t("modelguard.cleanDisclaimer")}</p> : null}
+            {report.limitations?.length ? <details className={styles.limitations}><summary>{t("modelguard.limitations")}</summary><ul>{report.limitations.map((limitation) => <li key={limitation}>{limitation}</li>)}</ul></details> : null}
           </section> : null}
         </section>
       </div>

@@ -42,6 +42,18 @@ test("unknown sample IDs fail safely without loading an arbitrary path", async (
   await expect(page.locator("#workbook-file")).toHaveCount(0);
 });
 
+test("homepage error sample runs locally and displays its expected rule family", async ({ page }) => {
+  const requests: string[] = [];
+  page.on("request", (request) => requests.push(request.url()));
+  await page.goto("/");
+  await page.getByRole("link", { name: "Run the error sample" }).click();
+  await expect(page).toHaveURL(/\/workspace\?sample=error$/);
+  await expect(page.getByText("MG-STR-004").first()).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByText("Expected findings", { exact: true })).toBeVisible();
+  await expect(page.getByText("Not ready").first()).toBeVisible();
+  expect(requests.filter((url) => /\/api\/|sec\.gov|query1\.finance|analytics/i.test(url))).toEqual([]);
+});
+
 test("clean sample is ready for review without network calls", async ({ page }) => {
   const requests: string[] = [];
   page.on("request", (request) => requests.push(request.url()));
@@ -67,7 +79,7 @@ test("error sample exposes finance rule IDs and local exports", async ({ page })
   await expect(page.getByText("MG-SCN-001").first()).toBeVisible();
   await page.getByRole("button", { name: "DCF" }).click();
   await expect(page.getByText("MG-DCF-007").first()).toBeVisible();
-  await expect(page.getByText("MG-ACC-001").first()).toBeHidden();
+  await expect(page.locator("article").filter({ hasText: "MG-ACC-001" })).toHaveCount(0);
   await page.getByRole("button", { name: "All" }).click();
   for (const label of ["Export JSON", "Export CSV", "Export PDF"]) {
     const download = page.waitForEvent("download");
@@ -115,4 +127,28 @@ test("retired InvestIQ URLs redirect to the local ModelGuard surfaces", async ({
   await expect(page).toHaveURL(/\/workspace/);
   await page.goto("/tools/dca");
   await expect(page).toHaveURL(/\/templates/);
+});
+
+test("templates expose actual downloadable samples and methodology exposes the rule catalog", async ({ page }) => {
+  await page.goto("/templates");
+  await expect(page.getByRole("heading", { name: "Clean Model" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Download workbook" }).first()).toHaveAttribute("download", "");
+  await expect(page.getByText("Balance Sheet Error")).toBeVisible();
+  await page.goto("/methodology");
+  await expect(page.getByRole("heading", { name: "Rule catalog" })).toBeVisible();
+  await expect(page.getByText("MG-ACC-001")).toBeVisible();
+  await page.locator("details").first().locator("summary").click();
+  await expect(page.getByText("Potential false positive").first()).toBeVisible();
+});
+
+test("unsupported and blank workbooks fail with actionable local messages", async ({ page }) => {
+  await page.goto("/workspace");
+  await page.locator("#workbook-file").setInputFiles("public/samples/modelguard-not-a-workbook.txt");
+  await expect(page.getByText("Only .xlsx workbooks are supported.")).toBeVisible();
+  await page.locator("#workbook-file").setInputFiles({ name: "unreadable.xlsx", mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", buffer: Buffer.from("not an xlsx zip") });
+  await expect(page.getByText("This workbook could not be accepted.")).toBeVisible();
+  await page.locator("#workbook-file").setInputFiles({ name: "too-large.xlsx", mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", buffer: Buffer.alloc(20 * 1024 * 1024 + 1) });
+  await expect(page.getByText("larger than the 20 MB local limit")).toBeVisible();
+  await page.locator("#workbook-file").setInputFiles("public/samples/modelguard-blank-workbook.xlsx");
+  await expect(page.getByText(/workbook is blank/i)).toBeVisible({ timeout: 20_000 });
 });

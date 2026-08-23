@@ -67,7 +67,10 @@ export class ExcelJsWorkbookParser implements WorkbookParser {
       });
       const state = worksheet.state === "veryHidden" ? "veryHidden" : worksheet.state === "hidden" ? "hidden" : "visible";
       const model = worksheet.model as unknown as { merges?: string[] };
-      sheets.push({ name: worksheet.name, state, cells, mergedRanges: model.merges ?? [] });
+      const hiddenRows: number[] = [];
+      worksheet.eachRow({ includeEmpty: true }, (row) => { if (row.hidden) hiddenRows.push(row.number); });
+      const hiddenColumns = worksheet.columns.filter((column) => column.hidden).map((column) => column.letter).filter((letter): letter is string => Boolean(letter));
+      sheets.push({ name: worksheet.name, state, cells, mergedRanges: model.merges ?? [], hiddenRows, hiddenColumns });
       if (performance.now() - started > WORKBOOK_LIMITS.maxParseMilliseconds) throw new Error("Workbook parsing exceeded the time limit");
     }
     const definedNames = (workbook.definedNames.model ?? []).map((entry) => ({ name: entry.name, ranges: [...entry.ranges] }));
@@ -75,6 +78,7 @@ export class ExcelJsWorkbookParser implements WorkbookParser {
     const model = workbook.model as unknown as { externalLinks?: Array<{ target?: string }> };
     const externalLinks = (model.externalLinks ?? []).map((link) => link.target ?? "external-link");
     if (externalLinks.length) warnings.push("External links were detected and were not followed.");
+    if (nonEmptyCells === 0) throw new Error("BLANK_WORKBOOK");
     const parsedAt = new Date().toISOString();
     return {
       schemaVersion: "1.0",
