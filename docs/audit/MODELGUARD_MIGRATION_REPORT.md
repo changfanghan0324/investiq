@@ -40,7 +40,7 @@ routes were removed. The active navigation is Audit, Templates, Methodology, Abo
 - Vitest: 40 files, 677 tests passed, including published sample expectations, finance-rule
   pass/fail/unavailable, version-finding, tolerance-boundary, and real-workbook-shaped smoke coverage.
 - Next static build: passed; all generated application routes are static.
-- Playwright ModelGuard suite: 21 passed, 1 mobile accessibility duplicate skipped; the suite
+- Playwright ModelGuard suite: 23 passed, 1 mobile accessibility duplicate skipped; the suite
   covers the bundled sample CTA and reload/exit flow, unknown sample IDs, clean/error golden
   workbooks, rule IDs, filters, local exports, clear-session behavior, version comparison,
   redirects, bilingual scaling, axe, and zero API/SEC/finance/analytics requests.
@@ -50,7 +50,7 @@ routes were removed. The active navigation is Audit, Templates, Methodology, Abo
 - `modelguard-clean-model.xlsx`: 0 critical, 0 high, 0 medium, 51 period/check passes, 0
   cannot-verify; model status `Ready for review`.
 - `modelguard-error-model.xlsx`: 8 critical, 21 high, 11 medium, 1 info, 18 passes, 8
-  cannot-verify; model status `Not ready`. Seeded Rule IDs are recorded in
+  cannot-verify; model status `Needs review`. Seeded Rule IDs are recorded in
   [the error manifest](../samples/ERROR_MODEL_MANIFEST.md). The terminal-value formula is
   explicitly `cannot-verify` when WACC is not above terminal growth; ModelGuard does not force a
   calculation through an invalid denominator.

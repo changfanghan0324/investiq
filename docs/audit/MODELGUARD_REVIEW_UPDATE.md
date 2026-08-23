@@ -14,7 +14,7 @@ SEC API, database, or analytics endpoint is used.
 | DCF Error | `MG-DCF-001` | Found |
 | Hardcode Error | `MG-ASM-004`, `MG-ASM-006` | Found |
 | Scenario Error | `MG-SCN-004` | Found |
-| Error Sample Model | Published rule-ID list in the Templates and Audit surfaces | Found; `Not ready` |
+| Error Sample Model | Published rule-ID list in the Templates and Audit surfaces | Found; `Needs review` |
 | Version Before → After | Resolved 3, Persisting 0, New 1 | Resolved 3, Persisting 0, New 1 |
 
 The sample test compares the actual rule-ID set with the published expected set. A clean result
@@ -27,7 +27,7 @@ investment advice, or proof that a workbook is error-free.
 - TypeScript typecheck: passed.
 - ESLint: passed.
 - Next static production build: passed; 20 static routes generated.
-- Playwright: 21 passed, 1 accessibility duplicate skipped. The suite covers clean/error samples,
+- Playwright: 23 passed, 1 accessibility duplicate skipped. The suite covers clean/error samples,
   expected findings, filters, local downloads, version comparison, redirects, bilingual UI,
   145% text size, mobile layout, wrong format, unreadable workbook, oversized workbook, and blank
   workbook handling. Requests to API/SEC/finance/analytics paths are asserted absent.

@@ -25,7 +25,7 @@ test("Try sample model runs the bundled clean audit without a file picker", asyn
   const summary = page.locator('[class*="summaryGrid"]');
   await expect(summary.locator("strong").nth(0)).toHaveText("0");
   await expect(summary.locator("strong").nth(1)).toHaveText("0");
-  await expect(summary.locator("strong").nth(3)).toHaveText("51");
+  await expect(summary.locator("div").filter({ hasText: "Checks passed" }).locator("strong")).toHaveText("51");
   await expect(page.locator("#workbook-file")).toHaveCount(0);
   await page.reload();
   await expect(page.getByText("Ready for review").first()).toBeVisible({ timeout: 20_000 });
@@ -50,7 +50,7 @@ test("homepage error sample runs locally and displays its expected rule family",
   await expect(page).toHaveURL(/\/workspace\?sample=error$/);
   await expect(page.getByText("MG-STR-004").first()).toBeVisible({ timeout: 20_000 });
   await expect(page.getByText("Expected findings", { exact: true })).toBeVisible();
-  await expect(page.getByText("Not ready").first()).toBeVisible();
+  await expect(page.getByText("Needs review").first()).toBeVisible();
   expect(requests.filter((url) => /\/api\/|sec\.gov|query1\.finance|analytics/i.test(url))).toEqual([]);
 });
 
@@ -84,10 +84,24 @@ test("error sample exposes finance rule IDs and local exports", async ({ page })
   for (const label of ["Export JSON", "Export CSV", "Export PDF"]) {
     const download = page.waitForEvent("download");
     await page.getByRole("button", { name: label }).click();
-    await expect((await download).suggestedFilename()).toMatch(/modelguard-audit\.(json|csv|pdf)$/);
+    await expect((await download).suggestedFilename()).toMatch(/modelguard-error-model_\d{4}-\d{2}-\d{2}\.(json|csv|pdf)$/i);
+    await expect(page.getByRole("link", { name: "Download again" })).toBeVisible();
   }
+  await expect(page.getByText("Why it matters").first()).toBeVisible();
+  await expect(page.getByText("Remediation").first()).toBeVisible();
+  await expect(page.getByText("Recheck").first()).toBeVisible();
+  await expect(page.getByText("Limitations and review boundaries")).toBeVisible();
   await page.getByRole("button", { name: "Clear this session" }).click();
   await expect(page.getByRole("heading", { name: "Issue explorer" })).toBeHidden();
+});
+
+test("one-click version sample shows the documented comparison result", async ({ page }) => {
+  await page.goto("/workspace");
+  await page.getByRole("button", { name: "Try version comparison sample" }).click();
+  await expect(page.getByText(/New findings:\s*1/)).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByText(/Resolved findings:\s*3/)).toBeVisible();
+  await expect(page.getByText(/Persisting findings:\s*0/)).toBeVisible();
+  await expect(page.getByText(/Changed findings:\s*0/)).toBeVisible();
 });
 
 test("version compare classifies findings and exports cell changes", async ({ page }) => {
@@ -137,8 +151,8 @@ test("templates expose actual downloadable samples and methodology exposes the r
   await page.goto("/methodology");
   await expect(page.getByRole("heading", { name: "Rule catalog" })).toBeVisible();
   await expect(page.getByText("MG-ACC-001")).toBeVisible();
-  await page.locator("details").first().locator("summary").click();
   await expect(page.getByText("Potential false positive").first()).toBeVisible();
+  await expect(page.getByText("Evidence contract / pseudocode").first()).toBeVisible();
 });
 
 test("unsupported and blank workbooks fail with actionable local messages", async ({ page }) => {

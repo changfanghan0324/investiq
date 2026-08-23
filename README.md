@@ -52,7 +52,7 @@ The public demo is packaged around a local-only audit workflow:
 The current catalogue has 38 published rules: 11 spreadsheet/linkage and structure checks, 5
 accounting reconciliations, 11 DCF controls, 5 scenario controls, and 6 assumption-governance
 checks. The clean golden workbook passes all mapped checks; the error golden workbook
-deliberately remains `Not ready`. The catalogue also records scope, tolerance, non-applicability,
+deliberately remains `Needs review`. The catalogue also records scope, tolerance, non-applicability,
 false-positive/false-negative risks, remediation, and rule version for every entry.
 Every mapped rule reports passed, failed, not-applicable, or cannot-verify rather than filling a
 missing value with an inference. See [the full rule catalogue](docs/MODELGUARD_RULE_CATALOG.md).

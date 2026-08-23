@@ -106,12 +106,17 @@
 .reportMeta { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-top: 16px; color: var(--text-tertiary); font-family: var(--font-mono); font-size: calc(11px * var(--ui-font-scale)); }
 .modelStatus { margin-top: 8px; color: var(--text-secondary); font-size: calc(14px * var(--ui-font-scale)); }
 .modelStatus strong { color: var(--text-primary); }
-.summaryGrid { display: grid; grid-template-columns: repeat(6, 1fr); margin-top: 24px; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+.summaryGrid { display: grid; grid-template-columns: repeat(8, 1fr); margin-top: 24px; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
 .summaryGrid div { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 16px; }
 .summaryGrid div + div { border-left: 1px solid var(--border); }
 .summaryGrid span { color: var(--text-secondary); font-size: calc(13px * var(--ui-font-scale)); }
 .summaryGrid strong { font-size: calc(28px * var(--ui-font-scale)); font-weight: 500; }
 .issueList { display: grid; gap: 12px; margin-top: 20px; }
+.rootCauseSection { margin-top: 20px; padding: 16px; border: 1px solid var(--warning); background: var(--surface-subtle); }
+.rootCauseSection h3 { margin: 0; font-size: calc(15px * var(--ui-font-scale)); }
+.rootCauseCard { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+.rootCauseCard p { margin-top: 5px; color: var(--text-secondary); font-size: calc(13px * var(--ui-font-scale)); line-height: 1.5; }
+.rootCauseCard span { display: block; margin-top: 6px; color: var(--text-tertiary); font-family: var(--font-mono); font-size: calc(11px * var(--ui-font-scale)); }
 .issue { padding: 18px; border: 1px solid var(--border); background: var(--surface); }
 .issueTop { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .issueTop code { color: var(--text-tertiary); font-family: var(--font-mono); font-size: calc(11px * var(--ui-font-scale)); }

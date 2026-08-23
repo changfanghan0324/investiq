@@ -69,6 +69,6 @@ passed, failed, not-applicable, or cannot-verify check when its mapped scope is 
 
 The clean golden workbook passes all 38 published rules. The error golden workbook intentionally
 contains structural, accounting, DCF, scenario, and assumption defects; it is expected to be
-`Not ready`. Missing cached results, unavailable mappings, external links, and absent sheets are
+`Needs review`. Missing cached results, unavailable mappings, external links, and absent sheets are
 never replaced with zeros or inferred values. New rules require a stable ID, a fixture, boundary
 coverage, and a regression test.

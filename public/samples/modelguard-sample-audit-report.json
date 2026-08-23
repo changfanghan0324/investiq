@@ -1,25 +1,31 @@
 {
   "schemaVersion": "1.0",
-  "generatedAt": "2026-08-23T21:49:04.574Z",
+  "generatedAt": "2026-08-23T22:54:09.356Z",
   "fileName": "modelguard-dcf-error.xlsx",
-  "workbookSha256": "ffb587ca5f9ade8cf483f5a5cdb1d2554134fcf8e8e4cb9ed446c732e45987e0",
+  "workbookSha256": "4d5a3ad5c6e3ee5e5463a460d2fc10003eb3dedbfd6686c96d413a783d5f90d9",
   "provenance": {
     "sourceType": "user-local",
     "provider": "browser",
-    "generatedAt": "2026-08-23T21:49:04.570Z",
+    "generatedAt": "2026-08-23T22:54:09.352Z",
     "disclaimer": "Workbook content is processed locally and is not uploaded. ModelGuard does not provide investment advice."
+  },
+  "workbookStats": {
+    "nonEmptyCells": 300,
+    "formulas": 112,
+    "worksheets": 7,
+    "parseMilliseconds": 5
   },
   "issues": [
     {
       "status": "failed",
       "confidence": "high",
-      "whyItMatters": "A reviewer should trace this finding before relying on the model output.",
-      "howToVerify": "Open the cited cell and compare the observed value with the expected condition.",
-      "impact": "May affect downstream model outputs or review confidence.",
-      "remediation": "Review the cited cell, source, and neighboring period before changing the model.",
-      "recheck": "Rerun the same workbook after the change and confirm this rule is passed or explicitly unavailable.",
-      "potentialFalsePositive": "A documented exception or non-standard model convention may make this signal intentional.",
-      "potentialFalseNegative": "ModelGuard does not recalculate Excel or infer undocumented business meaning.",
+      "whyItMatters": "The Gordon-growth denominator is WACC − g. When terminal growth is equal to or above WACC, the terminal value formula is invalid or unstable.",
+      "impact": "Enterprise value and implied share value can become undefined, negative, or extremely sensitive to small assumption changes.",
+      "remediation": "Review the terminal-growth input, confirm it is below WACC, and confirm the assumption applies to every scenario using the DCF.",
+      "howToVerify": "Compare the WACC and terminal-growth cells in Inputs and calculate WACC − g directly.",
+      "recheck": "Rerun MG-DCF-001 after saving; the difference should be zero and the terminal-value checks should become verifiable.",
+      "potentialFalsePositive": "A non-Gordon terminal-value method may be intentional, but the method must be documented and reviewed separately.",
+      "potentialFalseNegative": "The check cannot validate whether WACC or growth is economically well supported; it only tests the denominator condition.",
       "ruleVersion": "1.0",
       "ruleId": "MG-DCF-001",
       "category": "dcf",
@@ -438,5 +444,5 @@
     "External links, macros, circular references, and unsupported workbook features are not executed.",
     "A clean result means no configured deterministic issue was found; it is not an accounting certification or investment recommendation."
   ],
-  "modelStatus": "Not ready"
+  "modelStatus": "Needs review"
 }

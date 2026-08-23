@@ -16,6 +16,9 @@ export interface RuleCatalogEntry {
   falsePositive: string;
   falseNegative: string;
   remediation: string;
+  pseudoCode: string;
+  exampleInput: string;
+  exampleOutput: string;
   ruleVersion: string;
   implemented: boolean;
 }
@@ -28,7 +31,7 @@ const ZH_RULE_NAMES: Record<string, string> = {
   "MG-ASM-001": "假设来源", "MG-ASM-002": "假设负责人", "MG-ASM-003": "分析师估值假设", "MG-ASM-004": "预测期阶跃变化", "MG-ASM-005": "预测期利润率跳变", "MG-ASM-006": "预测期硬编码",
 };
 
-const base = (entry: Omit<RuleCatalogEntry, "tolerance" | "scope" | "notApplicable" | "falsePositive" | "falseNegative" | "remediation" | "ruleVersion" | "implemented">): RuleCatalogEntry => ({
+const base = (entry: Omit<RuleCatalogEntry, "tolerance" | "scope" | "notApplicable" | "falsePositive" | "falseNegative" | "remediation" | "pseudoCode" | "exampleInput" | "exampleOutput" | "ruleVersion" | "implemented">): RuleCatalogEntry => ({
   ...entry,
   nameZh: ZH_RULE_NAMES[entry.ruleId],
   tolerance: "Configured finance tolerance (default 0.1) where numeric reconciliation applies.",
@@ -37,6 +40,9 @@ const base = (entry: Omit<RuleCatalogEntry, "tolerance" | "scope" | "notApplicab
   falsePositive: "A documented exception or non-standard model convention may make this signal intentional.",
   falseNegative: "ModelGuard does not recalculate Excel, execute macros, or infer undocumented business meaning.",
   remediation: "Review the cited cell and source, correct or document the assumption, then rerun the audit.",
+  pseudoCode: "Observe mapped evidence → calculate the expected condition → compare the difference with tolerance → report pass, finding, not applicable, or cannot verify.",
+  exampleInput: "Mapped worksheet cells, formulas, cached values, and period headers.",
+  exampleOutput: "A cell-level finding with observed value, expected condition, and review status.",
   ruleVersion: "1.0",
   implemented: true,
 });

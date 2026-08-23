@@ -52,7 +52,7 @@ describe("ModelGuard deterministic audit", () => {
   });
 
   it("guards CSV formula injection", () => {
-    const report = { schemaVersion: "1.0" as const, generatedAt: "2026-08-10T00:00:00.000Z", fileName: "=unsafe.xlsx", workbookSha256: "0", provenance: { sourceType: "user-local" as const, provider: "browser" as const, generatedAt: "2026-08-10T00:00:00.000Z", disclaimer: "local" }, issues: [{ id: "1", ruleId: "X", severity: "warning" as const, category: "formula" as const, title: "=formula", message: "safe", observed: "=unsafe" }], checks: [], summary: { critical: 0, high: 0, medium: 0, warning: 1, info: 0, passed: 0, cannotVerify: 0, notApplicable: 0 }, modelStatus: "Ready with limitations" as const };
+    const report = { schemaVersion: "1.0" as const, generatedAt: "2026-08-10T00:00:00.000Z", fileName: "=unsafe.xlsx", workbookSha256: "0", provenance: { sourceType: "user-local" as const, provider: "browser" as const, generatedAt: "2026-08-10T00:00:00.000Z", disclaimer: "local" }, issues: [{ id: "1", ruleId: "X", severity: "warning" as const, category: "formula" as const, title: "=formula", message: "safe", observed: "=unsafe" }], checks: [], summary: { critical: 0, high: 0, medium: 0, warning: 1, info: 0, passed: 0, cannotVerify: 0, notApplicable: 0 }, modelStatus: "Audit complete with limitations" as const };
     expect(auditReportToCsv(report)).toContain("'=formula");
     expect(auditReportToCsv(report)).toContain("'=unsafe");
   });

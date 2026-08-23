@@ -172,6 +172,8 @@ async function main(): Promise<void> {
   await save(scenarioError, "modelguard-scenario-error.xlsx");
   await bundleSample("modelguard-clean-model.xlsx", "modelguard-sample-clean.ts", "MODEL_GUARD_CLEAN_SAMPLE_BASE64");
   await bundleSample("modelguard-error-model.xlsx", "modelguard-sample-error.ts", "MODEL_GUARD_ERROR_SAMPLE_BASE64");
+  await bundleSample("modelguard-version-1.xlsx", "modelguard-sample-version-before.ts", "MODEL_GUARD_VERSION_BEFORE_BASE64");
+  await bundleSample("modelguard-version-2.xlsx", "modelguard-sample-version-after.ts", "MODEL_GUARD_VERSION_AFTER_BASE64");
   await generateAuditReceipt();
   const blank = new ExcelJS.Workbook();
   await blank.xlsx.writeFile(path.join(samples, "modelguard-blank-workbook.xlsx"));
