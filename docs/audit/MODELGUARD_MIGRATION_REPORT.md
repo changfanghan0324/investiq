@@ -69,7 +69,7 @@ routes were removed. The active navigation is Audit, Templates, Methodology, Abo
 - Pull request: [#11 — pivot public demo to local ModelGuard audit](https://github.com/changfanghan0324/investiq/pull/11) (intentionally not merged)
 - Vercel preview: [investiq-git-codex-modelguard-cf8712](https://investiq-git-codex-modelguard-cf8712-cpeter0814-3476s-projects.vercel.app)
 - GitHub Browser, Quality, Vercel, and Vercel Preview Comments checks: passed.
-- Production alias remains on the pre-migration deployment; no production promotion was performed.
+- Production alias: [investiq-eight-xi.vercel.app](https://investiq-eight-xi.vercel.app), deployment `dpl_CfU4tAZ1f4Fbnp2C29zhpT4B9zK2`, commit `6eb20c7` (READY).
 
 ## Claude review record
 
